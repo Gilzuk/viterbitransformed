@@ -1,0 +1,2129 @@
+cpu
+iteration: 0,snr=12, block-length=120, num-symbols=2, model=Transformer
+iteration: 0,snr=12, block-length=120, num-symbols=2, model=ViterbiNet
+iteration: 0,snr=13, block-length=120, num-symbols=2, model=Transformer
+iteration: 0,snr=13, block-length=120, num-symbols=2, model=ViterbiNet
+iteration: 0,snr=14, block-length=120, num-symbols=2, model=Transformer
+iteration: 0,snr=14, block-length=120, num-symbols=2, model=ViterbiNet
+cpu
+cpu
+cpu
+cpu
+cpu
+cpu
+Transformer: num parameters: 6960
+ECC_Transformer_ModelBased
+model:Transformer, snr:12 *** New: number of pilots for training :  25
+Transformer_ModelBased_cost2100_12_120_2
+C:\viterbitransformed\Code\../Results\plots\Transformer_ModelBased_cost2100_12_120_2_ISI_AWGN.pkl
+calculating fresh
+loading model from SNR 12 and gamma 0.2
+Transformer: num parameters: 6960
+ECC_Transformer_ModelBased
+model:Transformer, snr:13 *** New: number of pilots for training :  75
+Transformer_ModelBased_cost2100_13_120_2
+C:\viterbitransformed\Code\../Results\plots\Transformer_ModelBased_cost2100_13_120_2_ISI_AWGN.pkl
+calculating fresh
+loading model from SNR 13 and gamma 0.2
+ViterbiNet: num parameters: 7002
+ViterbiNet_ModelBased
+model:ViterbiNet, snr:12 *** New: number of pilots for training :  25
+ViterbiNet_ModelBased_cost2100_12_120_2
+C:\viterbitransformed\Code\../Results\plots\ViterbiNet_ModelBased_cost2100_12_120_2_ISI_AWGN.pkl
+calculating fresh
+loading model from SNR 12 and gamma 0.2
+ViterbiNet: num parameters: 7002
+ViterbiNet_ModelBased
+model:ViterbiNet, snr:13 *** New: number of pilots for training :  75
+ViterbiNet_ModelBased_cost2100_13_120_2
+C:\viterbitransformed\Code\../Results\plots\ViterbiNet_ModelBased_cost2100_13_120_2_ISI_AWGN.pkl
+calculating fresh
+loading model from SNR 13 and gamma 0.2
+ViterbiNet: num parameters: 7002
+ViterbiNet_ModelBased
+model:ViterbiNet, snr:14 *** New: number of pilots for training :  125
+ViterbiNet_ModelBased_cost2100_14_120_2
+C:\viterbitransformed\Code\../Results\plots\ViterbiNet_ModelBased_cost2100_14_120_2_ISI_AWGN.pkl
+calculating fresh
+loading model from SNR 14 and gamma 0.2
+Transformer: num parameters: 6960
+ECC_Transformer_ModelBased
+model:Transformer, snr:14 *** New: number of pilots for training :  125
+Transformer_ModelBased_cost2100_14_120_2
+C:\viterbitransformed\Code\../Results\plots\Transformer_ModelBased_cost2100_14_120_2_ISI_AWGN.pkl
+calculating fresh
+loading model from SNR 14 and gamma 0.2
+model:Transformer, snr:12  Start training model - Transformer,SNR - 12, Gamma - 0.2, Channel Cost - cost2100
+model:Transformer, snr:13  Start training model - Transformer,SNR - 13, Gamma - 0.2, Channel Cost - cost2100
+model:ViterbiNet, snr:12  Start training model - ViterbiNet,SNR - 12, Gamma - 0.2, Channel Cost - cost2100
+model:ViterbiNet, snr:13  Start training model - ViterbiNet,SNR - 13, Gamma - 0.2, Channel Cost - cost2100
+model:ViterbiNet, snr:14  Start training model - ViterbiNet,SNR - 14, Gamma - 0.2, Channel Cost - cost2100
+model:Transformer, snr:14  Start training model - Transformer,SNR - 14, Gamma - 0.2, Channel Cost - cost2100
+model:ViterbiNet, snr:13Best Validation SER - 0.002449333667755127 (saved)
+**************************************************
+model:ViterbiNet, snr:13, Start online evaluation using 3 repetitions
+model:ViterbiNet, snr:12Best Validation SER - 0.004745364189147949 (saved)
+**************************************************
+model:ViterbiNet, snr:12, Start online evaluation using 1 repetitions
+model:ViterbiNet, snr:14Best Validation SER - 0.0005611777305603027 (saved)
+**************************************************
+model:ViterbiNet, snr:14, Start online evaluation using 5 repetitions
+model:ViterbiNet, snr:13 , Self-supervised: 30/900, Average SER 0.0
+model:ViterbiNet, snr:12 , Self-supervised: 30/300, Average SER 0.0
+model:ViterbiNet, snr:14 , Self-supervised: 30/1500, Average SER 0.0
+model:ViterbiNet, snr:13 , Self-supervised: 60/900, Average SER 0.0
+model:ViterbiNet, snr:12 , Self-supervised: 60/300, Average SER 0.0
+model:ViterbiNet, snr:14 , Self-supervised: 60/1500, Average SER 0.0
+model:ViterbiNet, snr:13 , Self-supervised: 90/900, Average SER 0.00037037067943149145
+model:ViterbiNet, snr:12 , Self-supervised: 90/300, Average SER 0.00037037067943149145
+model:ViterbiNet, snr:13 , Self-supervised: 120/900, Average SER 0.00027777800957361855
+model:ViterbiNet, snr:12 , Self-supervised: 120/300, Average SER 0.00027777800957361855
+model:ViterbiNet, snr:14 , Self-supervised: 90/1500, Average SER 0.00037037067943149145
+model:ViterbiNet, snr:13 , Self-supervised: 150/900, Average SER 0.00022222240765889487
+model:ViterbiNet, snr:12 , Self-supervised: 150/300, Average SER 0.00033333341280619304
+model:ViterbiNet, snr:14 , Self-supervised: 120/1500, Average SER 0.00027777800957361855
+model:ViterbiNet, snr:13 , Self-supervised: 180/900, Average SER 0.00032407409614986844
+model:ViterbiNet, snr:12 , Self-supervised: 180/300, Average SER 0.00027777784400516084
+model:ViterbiNet, snr:14 , Self-supervised: 150/1500, Average SER 0.00022222240765889487
+model:ViterbiNet, snr:13 , Self-supervised: 210/900, Average SER 0.0002777777966998872
+model:ViterbiNet, snr:12 , Self-supervised: 210/300, Average SER 0.00023809529486156644
+model:ViterbiNet, snr:14 , Self-supervised: 180/1500, Average SER 0.00018518533971574572
+model:ViterbiNet, snr:13 , Self-supervised: 240/900, Average SER 0.00024305557211240131
+model:ViterbiNet, snr:12 , Self-supervised: 240/300, Average SER 0.00020833338300387064
+model:ViterbiNet, snr:13 , Self-supervised: 270/900, Average SER 0.00027777773362618903
+model:ViterbiNet, snr:14 , Self-supervised: 210/1500, Average SER 0.0001587302911849249
+model:ViterbiNet, snr:12 , Self-supervised: 270/300, Average SER 0.00027777773362618903
+model:ViterbiNet, snr:13 , Self-supervised: 300/900, Average SER 0.00024999996026357015
+model:ViterbiNet, snr:12 , Self-supervised: 300/300, Average SER 0.0004166664679845174
+model: ViterbiNet, SNR: 12, Final SER: 0.0004166664679845174
+0.0004166664679845174
+model:Transformer, snr:14Best Validation SER - 0.0003647804260253906 (saved)
+**************************************************
+model:Transformer, snr:13Best Validation SER - 0.0010698437690734863 (saved)
+**************************************************
+model:Transformer, snr:14, Start online evaluation using 5 repetitions
+model:Transformer, snr:13, Start online evaluation using 3 repetitions
+model:ViterbiNet, snr:14 , Self-supervised: 240/1500, Average SER 0.00013888900478680927
+model:Transformer, snr:12Best Validation SER - 0.0031828880310058594 (saved)
+**************************************************
+model:Transformer, snr:12, Start online evaluation using 1 repetitions
+model:ViterbiNet, snr:13 , Self-supervised: 330/900, Average SER 0.00022727269114870014
+model:ViterbiNet, snr:14 , Self-supervised: 270/1500, Average SER 0.00012345689314383046
+model:ViterbiNet, snr:13 , Self-supervised: 360/900, Average SER 0.0002083333002196418
+model:ViterbiNet, snr:14 , Self-supervised: 300/1500, Average SER 0.00016666670640309652
+model:ViterbiNet, snr:13 , Self-supervised: 390/900, Average SER 0.0001923076617412078
+model:ViterbiNet, snr:14 , Self-supervised: 330/1500, Average SER 0.00015151518763917865
+model:ViterbiNet, snr:13 , Self-supervised: 420/900, Average SER 0.0001785714001882644
+model:ViterbiNet, snr:14 , Self-supervised: 360/1500, Average SER 0.00013888892200258042
+model:ViterbiNet, snr:13 , Self-supervised: 450/900, Average SER 0.00016666664017571343
+model:ViterbiNet, snr:13 , Self-supervised: 480/900, Average SER 0.00015624997516473134
+model:ViterbiNet, snr:14 , Self-supervised: 390/1500, Average SER 0.00012820515877161272
+model:ViterbiNet, snr:13 , Self-supervised: 510/900, Average SER 0.00014705880015504125
+model:ViterbiNet, snr:14 , Self-supervised: 420/1500, Average SER 0.00011904764743078322
+model:Transformer, snr:13 , Self-supervised: 30/900, Average SER 0.0011111120382944742
+model:ViterbiNet, snr:13 , Self-supervised: 540/900, Average SER 0.00013888886681309452
+model:Transformer, snr:12 , Self-supervised: 30/300, Average SER 0.0011111120382944742
+model:Transformer, snr:14 , Self-supervised: 30/1500, Average SER 0.0
+model:ViterbiNet, snr:14 , Self-supervised: 450/1500, Average SER 0.00011111113760206435
+model:ViterbiNet, snr:13 , Self-supervised: 570/900, Average SER 0.0001315789264545106
+model:ViterbiNet, snr:14 , Self-supervised: 480/1500, Average SER 0.00010416669150193532
+model:ViterbiNet, snr:13 , Self-supervised: 600/900, Average SER 0.00012499998013178507
+model:ViterbiNet, snr:14 , Self-supervised: 510/1500, Average SER 9.8039239060645e-05
+model:ViterbiNet, snr:13 , Self-supervised: 630/900, Average SER 0.00011904760012550959
+model:ViterbiNet, snr:14 , Self-supervised: 540/1500, Average SER 9.259261466838696e-05
+model:ViterbiNet, snr:13 , Self-supervised: 660/900, Average SER 0.00013888884674419057
+model:ViterbiNet, snr:14 , Self-supervised: 570/1500, Average SER 8.771931915952448e-05
+model:ViterbiNet, snr:13 , Self-supervised: 690/900, Average SER 0.00015700476756994275
+model:ViterbiNet, snr:14 , Self-supervised: 600/1500, Average SER 0.0001111111044883728
+model:ViterbiNet, snr:13 , Self-supervised: 720/900, Average SER 0.00015046290225452847
+model:ViterbiNet, snr:14 , Self-supervised: 630/1500, Average SER 0.000105820099512736
+model:Transformer, snr:12 , Self-supervised: 60/300, Average SER 0.0012499998013178507
+model:Transformer, snr:13 , Self-supervised: 60/900, Average SER 0.0005555560191472371
+model:ViterbiNet, snr:13 , Self-supervised: 750/900, Average SER 0.00014444438616434733
+model:Transformer, snr:14 , Self-supervised: 60/1500, Average SER 0.0
+model:ViterbiNet, snr:14 , Self-supervised: 660/1500, Average SER 0.00010101009498942983
+model:ViterbiNet, snr:13 , Self-supervised: 780/900, Average SER 0.000160256333840199
+model:ViterbiNet, snr:14 , Self-supervised: 690/1500, Average SER 9.661835172901983e-05
+model:ViterbiNet, snr:13 , Self-supervised: 810/900, Average SER 0.0001851850821648115
+model:ViterbiNet, snr:13 , Self-supervised: 840/900, Average SER 0.00017857132923035395
+model:ViterbiNet, snr:14 , Self-supervised: 720/1500, Average SER 9.259258707364401e-05
+model:ViterbiNet, snr:13 , Self-supervised: 870/900, Average SER 0.00017241369718792794
+model:ViterbiNet, snr:14 , Self-supervised: 750/1500, Average SER 8.888888359069824e-05
+model:ViterbiNet, snr:13 , Self-supervised: 900/900, Average SER 0.00018518507480621337
+model: ViterbiNet, SNR: 13, Final SER: 0.00018518507480621337
+0.00018518507480621337
+model:ViterbiNet, snr:14 , Self-supervised: 780/1500, Average SER 8.547008037567139e-05
+model:ViterbiNet, snr:14 , Self-supervised: 810/1500, Average SER 8.230452184323912e-05
+model:Transformer, snr:12 , Self-supervised: 90/300, Average SER 0.0011111107137468125
+model:Transformer, snr:13 , Self-supervised: 90/900, Average SER 0.0007407413588629829
+model:Transformer, snr:14 , Self-supervised: 90/1500, Average SER 0.0
+model:ViterbiNet, snr:14 , Self-supervised: 840/1500, Average SER 7.936507463455201e-05
+model:ViterbiNet, snr:14 , Self-supervised: 870/1500, Average SER 0.0001053639527024894
+model:ViterbiNet, snr:14 , Self-supervised: 900/1500, Average SER 0.00018518514103359646
+model:ViterbiNet, snr:14 , Self-supervised: 930/1500, Average SER 0.00017921142680670625
+model:ViterbiNet, snr:14 , Self-supervised: 960/1500, Average SER 0.0001736110697189967
+model:ViterbiNet, snr:14 , Self-supervised: 990/1500, Average SER 0.00016835012821236043
+model:Transformer, snr:13 , Self-supervised: 120/900, Average SER 0.0007638891537984212
+model:Transformer, snr:12 , Self-supervised: 120/300, Average SER 0.0009722217917442321
+model:Transformer, snr:14 , Self-supervised: 120/1500, Average SER 0.0
+model:ViterbiNet, snr:14 , Self-supervised: 1020/1500, Average SER 0.00016339865385317336
+model:ViterbiNet, snr:14 , Self-supervised: 1050/1500, Average SER 0.00015873012088593981
+model:ViterbiNet, snr:14 , Self-supervised: 1080/1500, Average SER 0.00015432095086133037
+model:ViterbiNet, snr:14 , Self-supervised: 1110/1500, Average SER 0.0001501501143515647
+model:ViterbiNet, snr:14 , Self-supervised: 1140/1500, Average SER 0.00014619879555283932
+model:ViterbiNet, snr:14 , Self-supervised: 1170/1500, Average SER 0.00042022782513219067
+model:Transformer, snr:13 , Self-supervised: 150/900, Average SER 0.0006111113230387369
+model:Transformer, snr:12 , Self-supervised: 150/300, Average SER 0.0007777774333953858
+model:ViterbiNet, snr:14 , Self-supervised: 1200/1500, Average SER 0.0005069443086783091
+model:Transformer, snr:14 , Self-supervised: 150/1500, Average SER 0.0
+model:ViterbiNet, snr:14 , Self-supervised: 1230/1500, Average SER 0.0004945798133446918
+model:ViterbiNet, snr:14 , Self-supervised: 1260/1500, Average SER 0.00048280410350315156
+model:ViterbiNet, snr:14 , Self-supervised: 1290/1500, Average SER 0.0004715761010961015
+model:ViterbiNet, snr:14 , Self-supervised: 1320/1500, Average SER 0.00046085846243482646
+model:ViterbiNet, snr:14 , Self-supervised: 1350/1500, Average SER 0.0004506171632696081
+model:Transformer, snr:13 , Self-supervised: 180/900, Average SER 0.0010648147927390206
+model:Transformer, snr:12 , Self-supervised: 180/300, Average SER 0.0010185182094573975
+model:ViterbiNet, snr:14 , Self-supervised: 1380/1500, Average SER 0.0004649757475092791
+model:Transformer, snr:14 , Self-supervised: 180/1500, Average SER 0.0
+model:ViterbiNet, snr:14 , Self-supervised: 1410/1500, Average SER 0.00045508264649844337
+model:ViterbiNet, snr:14 , Self-supervised: 1440/1500, Average SER 0.0004629628525839912
+model:ViterbiNet, snr:14 , Self-supervised: 1470/1500, Average SER 0.0004705214176048227
+model:ViterbiNet, snr:14 , Self-supervised: 1500/1500, Average SER 0.0005222221215565999
+model: ViterbiNet, SNR: 14, Final SER: 0.0005222221215565999
+0.0005222221215565999
+model:Transformer, snr:13 , Self-supervised: 210/900, Average SER 0.0009126983937763032
+model:Transformer, snr:12 , Self-supervised: 210/300, Average SER 0.0009523806117829822
+model:Transformer, snr:14 , Self-supervised: 210/1500, Average SER 0.0
+model:Transformer, snr:12 , Self-supervised: 240/300, Average SER 0.0010763886074225107
+model:Transformer, snr:13 , Self-supervised: 240/900, Average SER 0.0007986110945542653
+model:Transformer, snr:14 , Self-supervised: 240/1500, Average SER 0.0
+model:Transformer, snr:12 , Self-supervised: 270/300, Average SER 0.0011728392706976997
+model:Transformer, snr:13 , Self-supervised: 270/900, Average SER 0.0009876542621188693
+model:Transformer, snr:14 , Self-supervised: 270/1500, Average SER 0.0
+model:Transformer, snr:13 , Self-supervised: 300/900, Average SER 0.0011111108462015789
+model:Transformer, snr:12 , Self-supervised: 300/300, Average SER 0.0012499996026357014
+model: Transformer, SNR: 12, Final SER: 0.0012499996026357014
+0.0012499996026357014
+model:Transformer, snr:14 , Self-supervised: 300/1500, Average SER 0.0
+model:Transformer, snr:13 , Self-supervised: 330/900, Average SER 0.0010101007692741625
+model:Transformer, snr:14 , Self-supervised: 330/1500, Average SER 0.0
+model:Transformer, snr:13 , Self-supervised: 360/900, Average SER 0.0009259257051679824
+model:Transformer, snr:14 , Self-supervised: 360/1500, Average SER 0.0
+model:Transformer, snr:13 , Self-supervised: 390/900, Average SER 0.0009188031538938865
+model:Transformer, snr:14 , Self-supervised: 390/1500, Average SER 0.0
+model:Transformer, snr:13 , Self-supervised: 420/900, Average SER 0.0008531743571871803
+model:Transformer, snr:14 , Self-supervised: 420/1500, Average SER 0.0
+model:Transformer, snr:13 , Self-supervised: 450/900, Average SER 0.000796296066708035
+model:Transformer, snr:14 , Self-supervised: 450/1500, Average SER 0.0
+model:Transformer, snr:13 , Self-supervised: 480/900, Average SER 0.0007465275625387828
+model:Transformer, snr:14 , Self-supervised: 480/1500, Average SER 0.0
+model:Transformer, snr:13 , Self-supervised: 510/900, Average SER 0.0007026141765070896
+model:Transformer, snr:14 , Self-supervised: 510/1500, Average SER 0.0
+model:Transformer, snr:13 , Self-supervised: 540/900, Average SER 0.0006635800555900291
+model:Transformer, snr:14 , Self-supervised: 540/1500, Average SER 0.0
+model:Transformer, snr:13 , Self-supervised: 570/900, Average SER 0.0006286547895063434
+model:Transformer, snr:14 , Self-supervised: 570/1500, Average SER 0.0
+model:Transformer, snr:13 , Self-supervised: 600/900, Average SER 0.0005972220500310262
+model:Transformer, snr:14 , Self-supervised: 600/1500, Average SER 0.0
+model:Transformer, snr:13 , Self-supervised: 630/900, Average SER 0.0005687829047914536
+model:Transformer, snr:14 , Self-supervised: 630/1500, Average SER 0.0
+model:Transformer, snr:13 , Self-supervised: 660/900, Average SER 0.000542929136391842
+model:Transformer, snr:14 , Self-supervised: 660/1500, Average SER 0.0
+model:Transformer, snr:13 , Self-supervised: 690/900, Average SER 0.0005434780881024789
+model:Transformer, snr:14 , Self-supervised: 690/1500, Average SER 0.0
+model:Transformer, snr:13 , Self-supervised: 720/900, Average SER 0.0005208331677648756
+model:Transformer, snr:14 , Self-supervised: 720/1500, Average SER 0.0
+model:Transformer, snr:13 , Self-supervised: 750/900, Average SER 0.0004999998410542806
+model:Transformer, snr:14 , Self-supervised: 750/1500, Average SER 0.0
+model:Transformer, snr:13 , Self-supervised: 780/900, Average SER 0.00048076907793680824
+model:Transformer, snr:14 , Self-supervised: 780/1500, Average SER 0.0
+model:Transformer, snr:13 , Self-supervised: 810/900, Average SER 0.00046296281579100054
+model:Transformer, snr:14 , Self-supervised: 810/1500, Average SER 0.0
+model:Transformer, snr:13 , Self-supervised: 840/900, Average SER 0.0004464284295127505
+model:Transformer, snr:14 , Self-supervised: 840/1500, Average SER 0.0
+model:Transformer, snr:13 , Self-supervised: 870/900, Average SER 0.0004310343457364488
+model:Transformer, snr:14 , Self-supervised: 870/1500, Average SER 0.0
+model:Transformer, snr:13 , Self-supervised: 900/900, Average SER 0.0004814813534418742
+model: Transformer, SNR: 13, Final SER: 0.0004814813534418742
+0.0004814813534418742
+model:Transformer, snr:14 , Self-supervised: 900/1500, Average SER 2.7777751286824546e-05
+model:Transformer, snr:14 , Self-supervised: 930/1500, Average SER 2.6881694793701172e-05
+model:Transformer, snr:14 , Self-supervised: 960/1500, Average SER 2.604164183139801e-05
+model:Transformer, snr:14 , Self-supervised: 990/1500, Average SER 2.5252501169840496e-05
+model:Transformer, snr:14 , Self-supervised: 1020/1500, Average SER 2.4509780547198126e-05
+model:Transformer, snr:14 , Self-supervised: 1050/1500, Average SER 2.3809501102992466e-05
+model:Transformer, snr:14 , Self-supervised: 1080/1500, Average SER 2.3148126072353785e-05
+model:Transformer, snr:14 , Self-supervised: 1110/1500, Average SER 2.252250104337125e-05
+model:Transformer, snr:14 , Self-supervised: 1140/1500, Average SER 2.1929803647493062e-05
+model:Transformer, snr:14 , Self-supervised: 1170/1500, Average SER 2.1367500989865035e-05
+model:Transformer, snr:14 , Self-supervised: 1200/1500, Average SER 2.0833313465118407e-05
+model:Transformer, snr:14 , Self-supervised: 1230/1500, Average SER 2.0325183868408203e-05
+model:Transformer, snr:14 , Self-supervised: 1260/1500, Average SER 1.984125091916039e-05
+model:Transformer, snr:14 , Self-supervised: 1290/1500, Average SER 1.9379826479179916e-05
+model:Transformer, snr:14 , Self-supervised: 1320/1500, Average SER 1.893937587738037e-05
+model:Transformer, snr:14 , Self-supervised: 1350/1500, Average SER 1.851850085788303e-05
+model:Transformer, snr:14 , Self-supervised: 1380/1500, Average SER 8.454106856083525e-05
+model:Transformer, snr:14 , Self-supervised: 1410/1500, Average SER 8.2742322421243e-05
+model:Transformer, snr:14 , Self-supervised: 1440/1500, Average SER 8.101852403746711e-05
+model:Transformer, snr:14 , Self-supervised: 1470/1500, Average SER 9.637187127353383e-05
+model:Transformer, snr:14 , Self-supervised: 1500/1500, Average SER 9.444443384806315e-05
+model: Transformer, SNR: 14, Final SER: 9.444443384806315e-05
+9.444443384806315e-05
+iteration: 1,snr=12, block-length=120, num-symbols=2, model=Transformer
+iteration: 1,snr=12, block-length=120, num-symbols=2, model=ViterbiNet
+iteration: 1,snr=13, block-length=120, num-symbols=2, model=Transformer
+iteration: 1,snr=13, block-length=120, num-symbols=2, model=ViterbiNet
+iteration: 1,snr=14, block-length=120, num-symbols=2, model=Transformer
+iteration: 1,snr=14, block-length=120, num-symbols=2, model=ViterbiNet
+cpu
+cpu
+cpu
+cpu
+cpu
+cpu
+ViterbiNet: num parameters: 7002
+ViterbiNet_ModelBased
+ViterbiNet: num parameters: 7002
+ViterbiNet: num parameters: 7002
+ViterbiNet_ModelBased
+ViterbiNet_ModelBased
+model:ViterbiNet, snr:12 *** New: number of pilots for training : model:ViterbiNet, snr:14 *** New: number of pilots for training :   25125
+
+model:ViterbiNet, snr:13 *** New: number of pilots for training :  75ViterbiNet_ModelBased_cost2100_14_120_2
+
+ViterbiNet_ModelBased_cost2100_12_120_2
+ViterbiNet_ModelBased_cost2100_13_120_2
+C:\viterbitransformed\Code\../Results\plots\ViterbiNet_ModelBased_cost2100_13_120_2_ISI_AWGN.pkl
+C:\viterbitransformed\Code\../Results\plots\ViterbiNet_ModelBased_cost2100_14_120_2_ISI_AWGN.pkl
+C:\viterbitransformed\Code\../Results\plots\ViterbiNet_ModelBased_cost2100_12_120_2_ISI_AWGN.pkl
+calculating freshcalculating fresh
+calculating fresh
+
+loading model from SNR 13 and gamma 0.2
+loading model from SNR 14 and gamma 0.2loading model from SNR 12 and gamma 0.2
+
+Transformer: num parameters: 6960
+ECC_Transformer_ModelBased
+Transformer: num parameters: 6960
+ECC_Transformer_ModelBased
+model:Transformer, snr:12 *** New: number of pilots for training :  25
+Transformer_ModelBased_cost2100_12_120_2
+C:\viterbitransformed\Code\../Results\plots\Transformer_ModelBased_cost2100_12_120_2_ISI_AWGN.pkl
+calculating fresh
+loading model from SNR 12 and gamma 0.2
+Transformer: num parameters: 6960
+ECC_Transformer_ModelBased
+model:Transformer, snr:14 *** New: number of pilots for training :  125
+Transformer_ModelBased_cost2100_14_120_2
+C:\viterbitransformed\Code\../Results\plots\Transformer_ModelBased_cost2100_14_120_2_ISI_AWGN.pkl
+calculating fresh
+loading model from SNR 14 and gamma 0.2
+model:Transformer, snr:13 *** New: number of pilots for training :  75
+Transformer_ModelBased_cost2100_13_120_2
+C:\viterbitransformed\Code\../Results\plots\Transformer_ModelBased_cost2100_13_120_2_ISI_AWGN.pkl
+calculating fresh
+loading model from SNR 13 and gamma 0.2
+model:Transformer, snr:12  Start training model - Transformer,SNR - 12, Gamma - 0.2, Channel Cost - cost2100model:ViterbiNet, snr:14  Start training model - ViterbiNet,SNR - 14, Gamma - 0.2, Channel Cost - cost2100
+
+model:ViterbiNet, snr:13  Start training model - ViterbiNet,SNR - 13, Gamma - 0.2, Channel Cost - cost2100
+model:Transformer, snr:13  Start training model - Transformer,SNR - 13, Gamma - 0.2, Channel Cost - cost2100
+model:ViterbiNet, snr:12  Start training model - ViterbiNet,SNR - 12, Gamma - 0.2, Channel Cost - cost2100
+model:Transformer, snr:14  Start training model - Transformer,SNR - 14, Gamma - 0.2, Channel Cost - cost2100
+model:ViterbiNet, snr:13Best Validation SER - 0.002336740493774414 (saved)
+**************************************************
+model:ViterbiNet, snr:12Best Validation SER - 0.002951383590698242 (saved)
+**************************************************
+model:ViterbiNet, snr:13, Start online evaluation using 3 repetitions
+model:ViterbiNet, snr:12, Start online evaluation using 1 repetitions
+model:ViterbiNet, snr:14Best Validation SER - 0.0018799304962158203 (saved)
+**************************************************
+model:ViterbiNet, snr:14, Start online evaluation using 5 repetitions
+model:ViterbiNet, snr:12 , Self-supervised: 30/300, Average SER 0.0
+model:ViterbiNet, snr:13 , Self-supervised: 30/900, Average SER 0.0
+model:ViterbiNet, snr:14 , Self-supervised: 30/1500, Average SER 0.0
+model:ViterbiNet, snr:12 , Self-supervised: 60/300, Average SER 0.0
+model:ViterbiNet, snr:13 , Self-supervised: 60/900, Average SER 0.0
+model:ViterbiNet, snr:14 , Self-supervised: 60/1500, Average SER 0.0
+model:ViterbiNet, snr:12 , Self-supervised: 90/300, Average SER 0.00037037067943149145
+model:ViterbiNet, snr:13 , Self-supervised: 90/900, Average SER 0.00037037067943149145
+model:ViterbiNet, snr:14 , Self-supervised: 90/1500, Average SER 0.0
+model:ViterbiNet, snr:12 , Self-supervised: 120/300, Average SER 0.00027777800957361855
+model:ViterbiNet, snr:13 , Self-supervised: 120/900, Average SER 0.00027777800957361855
+model:ViterbiNet, snr:14 , Self-supervised: 120/1500, Average SER 0.0
+model:ViterbiNet, snr:12 , Self-supervised: 150/300, Average SER 0.00022222240765889487
+model:ViterbiNet, snr:13 , Self-supervised: 150/900, Average SER 0.00022222240765889487
+model:ViterbiNet, snr:14 , Self-supervised: 150/1500, Average SER 0.0
+model:ViterbiNet, snr:12 , Self-supervised: 180/300, Average SER 0.00027777784400516084
+model:ViterbiNet, snr:13 , Self-supervised: 180/900, Average SER 0.00027777784400516084
+model:ViterbiNet, snr:14 , Self-supervised: 180/1500, Average SER 9.259250428941514e-05
+model:Transformer, snr:12Best Validation SER - 0.0030092597007751465 (saved)
+**************************************************
+model:Transformer, snr:12, Start online evaluation using 1 repetitions
+model:ViterbiNet, snr:12 , Self-supervised: 210/300, Average SER 0.00023809529486156644
+model:ViterbiNet, snr:13 , Self-supervised: 210/900, Average SER 0.00023809529486156644
+model:ViterbiNet, snr:14 , Self-supervised: 210/1500, Average SER 7.936500367664156e-05
+model:Transformer, snr:13Best Validation SER - 0.0020270347595214844 (saved)
+**************************************************
+model:Transformer, snr:14Best Validation SER - 0.00028055906295776367 (saved)
+**************************************************
+model:Transformer, snr:14, Start online evaluation using 5 repetitions
+model:Transformer, snr:13, Start online evaluation using 3 repetitions
+model:ViterbiNet, snr:12 , Self-supervised: 240/300, Average SER 0.00020833338300387064
+model:ViterbiNet, snr:13 , Self-supervised: 240/900, Average SER 0.00020833338300387064
+model:ViterbiNet, snr:14 , Self-supervised: 240/1500, Average SER 6.944437821706136e-05
+model:ViterbiNet, snr:12 , Self-supervised: 270/300, Average SER 0.00043209857410854766
+model:ViterbiNet, snr:13 , Self-supervised: 270/900, Average SER 0.00027777773362618903
+model:ViterbiNet, snr:14 , Self-supervised: 270/1500, Average SER 0.00012345667238588686
+model:ViterbiNet, snr:12 , Self-supervised: 300/300, Average SER 0.000583333174387614
+model: ViterbiNet, SNR: 12, Final SER: 0.000583333174387614
+0.000583333174387614
+model:ViterbiNet, snr:13 , Self-supervised: 300/900, Average SER 0.0003888887166976929
+model:ViterbiNet, snr:14 , Self-supervised: 300/1500, Average SER 0.00030555546283721923
+model:ViterbiNet, snr:13 , Self-supervised: 330/900, Average SER 0.0003535351969979026
+model:ViterbiNet, snr:14 , Self-supervised: 330/1500, Average SER 0.00027777769348838113
+model:ViterbiNet, snr:13 , Self-supervised: 360/900, Average SER 0.00032407393058141073
+model:ViterbiNet, snr:14 , Self-supervised: 360/1500, Average SER 0.0002546295523643494
+model:ViterbiNet, snr:13 , Self-supervised: 390/900, Average SER 0.00029914516669053297
+model:ViterbiNet, snr:14 , Self-supervised: 390/1500, Average SER 0.0002350426637209379
+model:Transformer, snr:12 , Self-supervised: 30/300, Average SER 0.0
+model:ViterbiNet, snr:13 , Self-supervised: 420/900, Average SER 0.0002777776547840663
+model:ViterbiNet, snr:14 , Self-supervised: 420/1500, Average SER 0.00021825390202658517
+model:Transformer, snr:13 , Self-supervised: 30/900, Average SER 0.0
+model:Transformer, snr:14 , Self-supervised: 30/1500, Average SER 0.0
+model:ViterbiNet, snr:13 , Self-supervised: 450/900, Average SER 0.00025925914446512857
+model:ViterbiNet, snr:14 , Self-supervised: 450/1500, Average SER 0.0002037036418914795
+model:ViterbiNet, snr:13 , Self-supervised: 480/900, Average SER 0.00024305544793605803
+model:ViterbiNet, snr:14 , Self-supervised: 480/1500, Average SER 0.000190972164273262
+model:ViterbiNet, snr:13 , Self-supervised: 510/900, Average SER 0.0002287580686457017
+model:ViterbiNet, snr:14 , Self-supervised: 510/1500, Average SER 0.00017973850755130543
+model:ViterbiNet, snr:13 , Self-supervised: 540/900, Average SER 0.00021604928705427383
+model:ViterbiNet, snr:14 , Self-supervised: 540/1500, Average SER 0.00016975303490956623
+model:ViterbiNet, snr:13 , Self-supervised: 570/900, Average SER 0.00024853787924114024
+model:ViterbiNet, snr:14 , Self-supervised: 570/1500, Average SER 0.00016081866465116802
+model:Transformer, snr:12 , Self-supervised: 60/300, Average SER 0.00041666626930236816
+model:ViterbiNet, snr:13 , Self-supervised: 600/900, Average SER 0.000374999741713206
+model:ViterbiNet, snr:14 , Self-supervised: 600/1500, Average SER 0.00031944443782170614
+model:ViterbiNet, snr:13 , Self-supervised: 630/900, Average SER 0.0003571426111554343
+model:ViterbiNet, snr:14 , Self-supervised: 630/1500, Average SER 0.0003042327979254344
+model:Transformer, snr:13 , Self-supervised: 60/900, Average SER 0.0
+model:Transformer, snr:14 , Self-supervised: 60/1500, Average SER 0.0
+model:ViterbiNet, snr:13 , Self-supervised: 660/900, Average SER 0.00034090885610291453
+model:ViterbiNet, snr:14 , Self-supervised: 660/1500, Average SER 0.0002904040343833692
+model:ViterbiNet, snr:13 , Self-supervised: 690/900, Average SER 0.0003260867319245269
+model:ViterbiNet, snr:14 , Self-supervised: 690/1500, Average SER 0.0002777777720188749
+model:ViterbiNet, snr:13 , Self-supervised: 720/900, Average SER 0.000312499784761005
+model:ViterbiNet, snr:14 , Self-supervised: 720/1500, Average SER 0.00026620369818475514
+model:ViterbiNet, snr:13 , Self-supervised: 750/900, Average SER 0.0002999997933705648
+model:ViterbiNet, snr:14 , Self-supervised: 750/1500, Average SER 0.00025555555025736493
+model:ViterbiNet, snr:13 , Self-supervised: 780/900, Average SER 0.0002884613397793892
+model:ViterbiNet, snr:14 , Self-supervised: 780/1500, Average SER 0.0002991452431067442
+model:Transformer, snr:12 , Self-supervised: 90/300, Average SER 0.0006481481922997369
+model:ViterbiNet, snr:13 , Self-supervised: 810/900, Average SER 0.00027777758645422665
+model:ViterbiNet, snr:14 , Self-supervised: 810/1500, Average SER 0.0002880657896583463
+model:ViterbiNet, snr:13 , Self-supervised: 840/900, Average SER 0.0002678569583665757
+model:ViterbiNet, snr:14 , Self-supervised: 840/1500, Average SER 0.00027777772574197676
+model:Transformer, snr:13 , Self-supervised: 90/900, Average SER 0.0
+model:Transformer, snr:14 , Self-supervised: 90/1500, Average SER 0.0
+model:ViterbiNet, snr:13 , Self-supervised: 870/900, Average SER 0.00037356306766641554
+model:ViterbiNet, snr:14 , Self-supervised: 870/1500, Average SER 0.0003065133916920629
+model:ViterbiNet, snr:13 , Self-supervised: 900/900, Average SER 0.0007037034961912367
+model: ViterbiNet, SNR: 13, Final SER: 0.0007037034961912367
+0.0007037034961912367
+model:ViterbiNet, snr:14 , Self-supervised: 900/1500, Average SER 0.0002962962786356608
+model:ViterbiNet, snr:14 , Self-supervised: 930/1500, Average SER 0.00028673833416354273
+model:ViterbiNet, snr:14 , Self-supervised: 960/1500, Average SER 0.000277777761220932
+model:Transformer, snr:12 , Self-supervised: 120/300, Average SER 0.0009027774135271708
+model:ViterbiNet, snr:14 , Self-supervised: 990/1500, Average SER 0.0002693602533051462
+model:ViterbiNet, snr:14 , Self-supervised: 1020/1500, Average SER 0.00026143789291381835
+model:Transformer, snr:13 , Self-supervised: 120/900, Average SER 0.0
+model:Transformer, snr:14 , Self-supervised: 120/1500, Average SER 0.0
+model:ViterbiNet, snr:14 , Self-supervised: 1050/1500, Average SER 0.0002539682388305664
+model:ViterbiNet, snr:14 , Self-supervised: 1080/1500, Average SER 0.000285493775650307
+model:ViterbiNet, snr:14 , Self-supervised: 1110/1500, Average SER 0.0002777777276597581
+model:ViterbiNet, snr:14 , Self-supervised: 1140/1500, Average SER 0.00033625725068544085
+model:Transformer, snr:12 , Self-supervised: 150/300, Average SER 0.0007222219308217366
+model:ViterbiNet, snr:14 , Self-supervised: 1170/1500, Average SER 0.00045584032678196574
+model:ViterbiNet, snr:14 , Self-supervised: 1200/1500, Average SER 0.00044444431861241656
+model:Transformer, snr:13 , Self-supervised: 150/900, Average SER 0.0
+model:Transformer, snr:14 , Self-supervised: 150/1500, Average SER 0.0
+model:ViterbiNet, snr:14 , Self-supervised: 1230/1500, Average SER 0.00043360421328040644
+model:ViterbiNet, snr:14 , Self-supervised: 1260/1500, Average SER 0.0004232803034403967
+model:ViterbiNet, snr:14 , Self-supervised: 1290/1500, Average SER 0.00041343657545341077
+model:Transformer, snr:12 , Self-supervised: 180/300, Average SER 0.0012962963845994737
+model:ViterbiNet, snr:14 , Self-supervised: 1320/1500, Average SER 0.00040404028964765145
+model:ViterbiNet, snr:14 , Self-supervised: 1350/1500, Average SER 0.0003950616165443703
+model:ViterbiNet, snr:14 , Self-supervised: 1380/1500, Average SER 0.0005917873071587604
+model:ViterbiNet, snr:14 , Self-supervised: 1410/1500, Average SER 0.0007092197313376353
+model:Transformer, snr:13 , Self-supervised: 180/900, Average SER 0.0
+model:Transformer, snr:14 , Self-supervised: 180/1500, Average SER 0.0
+model:ViterbiNet, snr:14 , Self-supervised: 1440/1500, Average SER 0.0006944443202681011
+model:ViterbiNet, snr:14 , Self-supervised: 1470/1500, Average SER 0.0007199545295871034
+model:ViterbiNet, snr:14 , Self-supervised: 1500/1500, Average SER 0.0007166665395100911
+model: ViterbiNet, SNR: 14, Final SER: 0.0007166665395100911
+0.0007166665395100911
+model:Transformer, snr:12 , Self-supervised: 210/300, Average SER 0.0013492061978294737
+model:Transformer, snr:13 , Self-supervised: 210/900, Average SER 0.00011904750551496233
+model:Transformer, snr:14 , Self-supervised: 210/1500, Average SER 0.0
+model:Transformer, snr:12 , Self-supervised: 240/300, Average SER 0.001458333432674408
+model:Transformer, snr:13 , Self-supervised: 240/900, Average SER 0.00010416656732559204
+model:Transformer, snr:14 , Self-supervised: 240/1500, Average SER 0.0
+model:Transformer, snr:12 , Self-supervised: 270/300, Average SER 0.0014814816139362477
+model:Transformer, snr:13 , Self-supervised: 270/900, Average SER 0.00015432084048235857
+model:Transformer, snr:14 , Self-supervised: 270/1500, Average SER 6.172833619294343e-05
+model:Transformer, snr:12 , Self-supervised: 300/300, Average SER 0.0015555554628372192
+model: Transformer, SNR: 12, Final SER: 0.0015555554628372192
+0.0015555554628372192
+model:Transformer, snr:13 , Self-supervised: 300/900, Average SER 0.0003611107667287191
+model:Transformer, snr:14 , Self-supervised: 300/1500, Average SER 0.0003611109654108683
+model:Transformer, snr:13 , Self-supervised: 330/900, Average SER 0.00032828251520792645
+model:Transformer, snr:14 , Self-supervised: 330/1500, Average SER 0.0003282826958280621
+model:Transformer, snr:13 , Self-supervised: 360/900, Average SER 0.0003009256389405992
+model:Transformer, snr:14 , Self-supervised: 360/1500, Average SER 0.00030092580450905693
+model:Transformer, snr:14 , Self-supervised: 390/1500, Average SER 0.0002777776657006679
+model:Transformer, snr:13 , Self-supervised: 390/900, Average SER 0.0002777775128682454
+model:Transformer, snr:14 , Self-supervised: 420/1500, Average SER 0.00025793640386490593
+model:Transformer, snr:13 , Self-supervised: 420/900, Average SER 0.00025793626194908504
+model:Transformer, snr:14 , Self-supervised: 450/1500, Average SER 0.00024074064360724554
+model:Transformer, snr:13 , Self-supervised: 450/900, Average SER 0.0002407405111524794
+model:Transformer, snr:14 , Self-supervised: 480/1500, Average SER 0.0002256943533817927
+model:Transformer, snr:13 , Self-supervised: 480/900, Average SER 0.00022569422920544943
+model:Transformer, snr:14 , Self-supervised: 510/1500, Average SER 0.00021241821494756962
+model:Transformer, snr:13 , Self-supervised: 510/900, Average SER 0.00021241809807571711
+model:Transformer, snr:14 , Self-supervised: 540/1500, Average SER 0.00020061720300603797
+model:Transformer, snr:13 , Self-supervised: 540/900, Average SER 0.00020061709262706614
+model:Transformer, snr:14 , Self-supervised: 570/1500, Average SER 0.00023391801014281156
+model:Transformer, snr:13 , Self-supervised: 570/900, Average SER 0.0001900582982782732
+model:Transformer, snr:14 , Self-supervised: 600/1500, Average SER 0.00022222210963567099
+model:Transformer, snr:13 , Self-supervised: 600/900, Average SER 0.00020833313465118408
+model:Transformer, snr:13 , Self-supervised: 630/900, Average SER 0.0002513226062532455
+model:Transformer, snr:14 , Self-supervised: 630/1500, Average SER 0.00021164010441492473
+model:Transformer, snr:13 , Self-supervised: 660/900, Average SER 0.00023989885142355254
+model:Transformer, snr:14 , Self-supervised: 660/1500, Average SER 0.0002020200996687918
+model:Transformer, snr:13 , Self-supervised: 690/900, Average SER 0.00022946846657905025
+model:Transformer, snr:14 , Self-supervised: 690/1500, Average SER 0.0001932366170744965
+model:Transformer, snr:13 , Self-supervised: 720/900, Average SER 0.00021990728047158984
+model:Transformer, snr:14 , Self-supervised: 720/1500, Average SER 0.00018518509136305914
+model:Transformer, snr:13 , Self-supervised: 750/900, Average SER 0.00021111098925272623
+model:Transformer, snr:14 , Self-supervised: 750/1500, Average SER 0.0001777776877085368
+model:Transformer, snr:14 , Self-supervised: 780/1500, Average SER 0.00017094008433513153
+model:Transformer, snr:13 , Self-supervised: 780/900, Average SER 0.00020299133581992907
+model:Transformer, snr:13 , Self-supervised: 810/900, Average SER 0.00019547313819696875
+model:Transformer, snr:14 , Self-supervised: 810/1500, Average SER 0.000164608970100497
+model:Transformer, snr:14 , Self-supervised: 840/1500, Average SER 0.00015873007831119357
+model:Transformer, snr:13 , Self-supervised: 840/900, Average SER 0.00018849195468993414
+model:Transformer, snr:13 , Self-supervised: 870/900, Average SER 0.00018199223211441917
+model:Transformer, snr:14 , Self-supervised: 870/1500, Average SER 0.0001532566273349455
+model:Transformer, snr:13 , Self-supervised: 900/900, Average SER 0.000212962892320421
+model: Transformer, SNR: 13, Final SER: 0.000212962892320421
+0.000212962892320421
+model:Transformer, snr:14 , Self-supervised: 900/1500, Average SER 0.00014814807309044731
+model:Transformer, snr:14 , Self-supervised: 930/1500, Average SER 0.00014336910299075548
+model:Transformer, snr:14 , Self-supervised: 960/1500, Average SER 0.00013888881852229437
+model:Transformer, snr:14 , Self-supervised: 990/1500, Average SER 0.0001346800664458612
+model:Transformer, snr:14 , Self-supervised: 1020/1500, Average SER 0.00018790843440037147
+model:Transformer, snr:14 , Self-supervised: 1050/1500, Average SER 0.0001825396219889323
+model:Transformer, snr:14 , Self-supervised: 1080/1500, Average SER 0.00017746907693368417
+model:Transformer, snr:14 , Self-supervised: 1110/1500, Average SER 0.00017267261539493595
+model:Transformer, snr:14 , Self-supervised: 1140/1500, Average SER 0.00016812859920033236
+model:Transformer, snr:14 , Self-supervised: 1170/1500, Average SER 0.00016381760947724693
+model:Transformer, snr:14 , Self-supervised: 1200/1500, Average SER 0.00015972216924031574
+model:Transformer, snr:14 , Self-supervised: 1230/1500, Average SER 0.00015582650657591782
+model:Transformer, snr:14 , Self-supervised: 1260/1500, Average SER 0.00015211635165744358
+model:Transformer, snr:14 , Self-supervised: 1290/1500, Average SER 0.00014857876208401467
+model:Transformer, snr:14 , Self-supervised: 1320/1500, Average SER 0.00014520197203665068
+model:Transformer, snr:14 , Self-supervised: 1350/1500, Average SER 0.00014197526154694734
+model:Transformer, snr:14 , Self-supervised: 1380/1500, Average SER 0.00013888884281766588
+model:Transformer, snr:14 , Self-supervised: 1410/1500, Average SER 0.0001654846025696883
+model:Transformer, snr:14 , Self-supervised: 1440/1500, Average SER 0.0001620370066828198
+model:Transformer, snr:14 , Self-supervised: 1470/1500, Average SER 0.0001587301289954153
+model:Transformer, snr:14 , Self-supervised: 1500/1500, Average SER 0.000155555526415507
+model: Transformer, SNR: 14, Final SER: 0.000155555526415507
+0.000155555526415507
+iteration: 2,snr=12, block-length=120, num-symbols=2, model=Transformer
+iteration: 2,snr=12, block-length=120, num-symbols=2, model=ViterbiNet
+iteration: 2,snr=13, block-length=120, num-symbols=2, model=Transformer
+iteration: 2,snr=13, block-length=120, num-symbols=2, model=ViterbiNet
+iteration: 2,snr=14, block-length=120, num-symbols=2, model=Transformer
+iteration: 2,snr=14, block-length=120, num-symbols=2, model=ViterbiNet
+cpucpu
+
+cpu
+cpu
+cpu
+cpu
+ViterbiNet: num parameters: 7002ViterbiNet: num parameters: 7002
+
+ViterbiNet: num parameters: 7002ViterbiNet_ModelBasedViterbiNet_ModelBased
+
+
+ViterbiNet_ModelBased
+model:ViterbiNet, snr:13 *** New: number of pilots for training : model:ViterbiNet, snr:14 *** New: number of pilots for training :   75125
+
+ViterbiNet_ModelBased_cost2100_13_120_2
+ViterbiNet_ModelBased_cost2100_14_120_2
+model:ViterbiNet, snr:12 *** New: number of pilots for training :  25
+ViterbiNet_ModelBased_cost2100_12_120_2
+C:\viterbitransformed\Code\../Results\plots\ViterbiNet_ModelBased_cost2100_14_120_2_ISI_AWGN.pklC:\viterbitransformed\Code\../Results\plots\ViterbiNet_ModelBased_cost2100_13_120_2_ISI_AWGN.pkl
+
+C:\viterbitransformed\Code\../Results\plots\ViterbiNet_ModelBased_cost2100_12_120_2_ISI_AWGN.pkl
+calculating freshcalculating fresh
+
+loading model from SNR 14 and gamma 0.2
+loading model from SNR 13 and gamma 0.2
+calculating fresh
+loading model from SNR 12 and gamma 0.2
+Transformer: num parameters: 6960
+ECC_Transformer_ModelBased
+Transformer: num parameters: 6960Transformer: num parameters: 6960
+
+ECC_Transformer_ModelBased
+ECC_Transformer_ModelBased
+model:Transformer, snr:13 *** New: number of pilots for training :  75
+Transformer_ModelBased_cost2100_13_120_2
+C:\viterbitransformed\Code\../Results\plots\Transformer_ModelBased_cost2100_13_120_2_ISI_AWGN.pkl
+calculating fresh
+loading model from SNR 13 and gamma 0.2
+model:Transformer, snr:12 *** New: number of pilots for training :  25
+Transformer_ModelBased_cost2100_12_120_2
+C:\viterbitransformed\Code\../Results\plots\Transformer_ModelBased_cost2100_12_120_2_ISI_AWGN.pkl
+calculating fresh
+loading model from SNR 12 and gamma 0.2
+model:Transformer, snr:14 *** New: number of pilots for training :  125
+Transformer_ModelBased_cost2100_14_120_2
+C:\viterbitransformed\Code\../Results\plots\Transformer_ModelBased_cost2100_14_120_2_ISI_AWGN.pkl
+calculating fresh
+loading model from SNR 14 and gamma 0.2
+model:ViterbiNet, snr:13  Start training model - ViterbiNet,SNR - 13, Gamma - 0.2, Channel Cost - cost2100model:ViterbiNet, snr:14  Start training model - ViterbiNet,SNR - 14, Gamma - 0.2, Channel Cost - cost2100model:Transformer, snr:12  Start training model - Transformer,SNR - 12, Gamma - 0.2, Channel Cost - cost2100
+
+
+model:Transformer, snr:14  Start training model - Transformer,SNR - 14, Gamma - 0.2, Channel Cost - cost2100
+model:ViterbiNet, snr:12  Start training model - ViterbiNet,SNR - 12, Gamma - 0.2, Channel Cost - cost2100
+model:Transformer, snr:13  Start training model - Transformer,SNR - 13, Gamma - 0.2, Channel Cost - cost2100
+model:ViterbiNet, snr:12Best Validation SER - 0.003732621669769287 (saved)
+**************************************************
+model:ViterbiNet, snr:12, Start online evaluation using 1 repetitions
+model:ViterbiNet, snr:13Best Validation SER - 0.0019425749778747559 (saved)
+**************************************************
+model:ViterbiNet, snr:13, Start online evaluation using 3 repetitions
+model:ViterbiNet, snr:14Best Validation SER - 0.0014029145240783691 (saved)
+**************************************************
+model:ViterbiNet, snr:14, Start online evaluation using 5 repetitions
+model:ViterbiNet, snr:12 , Self-supervised: 30/300, Average SER 0.0
+model:ViterbiNet, snr:13 , Self-supervised: 30/900, Average SER 0.0
+model:ViterbiNet, snr:14 , Self-supervised: 30/1500, Average SER 0.0
+model:ViterbiNet, snr:12 , Self-supervised: 60/300, Average SER 0.0002777775128682454
+model:ViterbiNet, snr:14 , Self-supervised: 60/1500, Average SER 0.0
+model:ViterbiNet, snr:13 , Self-supervised: 60/900, Average SER 0.0
+model:ViterbiNet, snr:12 , Self-supervised: 90/300, Average SER 0.0005555556880103217
+model:ViterbiNet, snr:13 , Self-supervised: 90/900, Average SER 0.00037037067943149145
+model:ViterbiNet, snr:14 , Self-supervised: 90/1500, Average SER 0.00037037067943149145
+model:ViterbiNet, snr:12 , Self-supervised: 120/300, Average SER 0.000555555522441864
+model:ViterbiNet, snr:12 , Self-supervised: 150/300, Average SER 0.0004444444179534912
+model:ViterbiNet, snr:13 , Self-supervised: 120/900, Average SER 0.00027777800957361855
+model:ViterbiNet, snr:14 , Self-supervised: 120/1500, Average SER 0.00027777800957361855
+model:ViterbiNet, snr:12 , Self-supervised: 180/300, Average SER 0.00037037034829457603
+model:ViterbiNet, snr:13 , Self-supervised: 150/900, Average SER 0.00022222240765889487
+model:ViterbiNet, snr:14 , Self-supervised: 150/1500, Average SER 0.00022222240765889487
+model:ViterbiNet, snr:12 , Self-supervised: 210/300, Average SER 0.00031746029853820803
+model:ViterbiNet, snr:13 , Self-supervised: 180/900, Average SER 0.00018518533971574572
+model:ViterbiNet, snr:14 , Self-supervised: 180/1500, Average SER 0.00018518533971574572
+model:ViterbiNet, snr:12 , Self-supervised: 240/300, Average SER 0.000277777761220932
+model:Transformer, snr:14Best Validation SER - 5.608797073364258e-05 (saved)
+**************************************************
+model:Transformer, snr:14, Start online evaluation using 5 repetitions
+model:ViterbiNet, snr:13 , Self-supervised: 210/900, Average SER 0.0001587302911849249
+model:ViterbiNet, snr:14 , Self-supervised: 210/1500, Average SER 0.0001587302911849249
+model:ViterbiNet, snr:12 , Self-supervised: 270/300, Average SER 0.0005555552464944345
+model:ViterbiNet, snr:12 , Self-supervised: 300/300, Average SER 0.0006666662295659383
+model: ViterbiNet, SNR: 12, Final SER: 0.0006666662295659383
+0.0006666662295659383
+model:ViterbiNet, snr:13 , Self-supervised: 240/900, Average SER 0.00013888900478680927
+model:ViterbiNet, snr:14 , Self-supervised: 240/1500, Average SER 0.00013888900478680927
+model:Transformer, snr:13Best Validation SER - 0.0010416507720947266 (saved)
+**************************************************
+model:Transformer, snr:13, Start online evaluation using 3 repetitions
+model:Transformer, snr:12Best Validation SER - 0.002604186534881592 (saved)
+**************************************************
+model:Transformer, snr:12, Start online evaluation using 1 repetitions
+model:ViterbiNet, snr:13 , Self-supervised: 270/900, Average SER 0.00027777773362618903
+model:ViterbiNet, snr:14 , Self-supervised: 270/1500, Average SER 0.0002469135655297173
+model:ViterbiNet, snr:13 , Self-supervised: 300/900, Average SER 0.000499999721844991
+model:ViterbiNet, snr:14 , Self-supervised: 300/1500, Average SER 0.0002222222089767456
+model:ViterbiNet, snr:13 , Self-supervised: 330/900, Average SER 0.0004545452016772646
+model:ViterbiNet, snr:14 , Self-supervised: 330/1500, Average SER 0.00020202018997885965
+model:ViterbiNet, snr:13 , Self-supervised: 360/900, Average SER 0.00041666643487082587
+model:ViterbiNet, snr:14 , Self-supervised: 360/1500, Average SER 0.00018518517414728802
+model:Transformer, snr:14 , Self-supervised: 30/1500, Average SER 0.0
+model:ViterbiNet, snr:13 , Self-supervised: 390/900, Average SER 0.0003846151706499931
+model:ViterbiNet, snr:14 , Self-supervised: 390/1500, Average SER 0.00017094016075134278
+model:ViterbiNet, snr:13 , Self-supervised: 420/900, Average SER 0.0003571426584607079
+model:ViterbiNet, snr:14 , Self-supervised: 420/1500, Average SER 0.00015873014926910401
+model:ViterbiNet, snr:13 , Self-supervised: 450/900, Average SER 0.0003333331478966607
+model:ViterbiNet, snr:14 , Self-supervised: 450/1500, Average SER 0.0001481481393178304
+model:Transformer, snr:13 , Self-supervised: 30/900, Average SER 0.0011111120382944742
+model:Transformer, snr:12 , Self-supervised: 30/300, Average SER 0.0011111120382944742
+model:ViterbiNet, snr:13 , Self-supervised: 480/900, Average SER 0.00031249982615311943
+model:ViterbiNet, snr:14 , Self-supervised: 480/1500, Average SER 0.000138888880610466
+model:ViterbiNet, snr:13 , Self-supervised: 510/900, Average SER 0.00029411748343823003
+model:ViterbiNet, snr:14 , Self-supervised: 510/1500, Average SER 0.00013071894645690917
+model:ViterbiNet, snr:13 , Self-supervised: 540/900, Average SER 0.00027777762324721723
+model:ViterbiNet, snr:14 , Self-supervised: 540/1500, Average SER 0.00012345678276485866
+model:Transformer, snr:14 , Self-supervised: 60/1500, Average SER 0.0
+model:ViterbiNet, snr:13 , Self-supervised: 570/900, Average SER 0.0002923974865361264
+model:ViterbiNet, snr:14 , Self-supervised: 570/1500, Average SER 0.0001169590573561819
+model:ViterbiNet, snr:13 , Self-supervised: 600/900, Average SER 0.0006111107269922892
+model:ViterbiNet, snr:14 , Self-supervised: 600/1500, Average SER 0.00013888885577519736
+model:ViterbiNet, snr:13 , Self-supervised: 630/900, Average SER 0.0005820102161831326
+model:ViterbiNet, snr:14 , Self-supervised: 630/1500, Average SER 0.0001322751007382832
+model:ViterbiNet, snr:13 , Self-supervised: 660/900, Average SER 0.0005555552063566266
+model:ViterbiNet, snr:14 , Self-supervised: 660/1500, Average SER 0.0001262625961592703
+model:ViterbiNet, snr:13 , Self-supervised: 690/900, Average SER 0.000531400632167208
+model:Transformer, snr:13 , Self-supervised: 60/900, Average SER 0.0005555560191472371
+model:ViterbiNet, snr:14 , Self-supervised: 690/1500, Average SER 0.000120772918065389
+model:Transformer, snr:12 , Self-supervised: 60/300, Average SER 0.0005555560191472371
+model:ViterbiNet, snr:13 , Self-supervised: 720/900, Average SER 0.0005092589391602411
+model:ViterbiNet, snr:14 , Self-supervised: 720/1500, Average SER 0.0001157407131459978
+model:Transformer, snr:14 , Self-supervised: 90/1500, Average SER 0.0
+model:ViterbiNet, snr:13 , Self-supervised: 750/900, Average SER 0.0004888885815938314
+model:ViterbiNet, snr:14 , Self-supervised: 750/1500, Average SER 0.00011111108462015787
+model:ViterbiNet, snr:13 , Self-supervised: 780/900, Average SER 0.0004700851746094533
+model:ViterbiNet, snr:14 , Self-supervised: 780/1500, Average SER 0.00010683758136553642
+model:ViterbiNet, snr:13 , Self-supervised: 810/900, Average SER 0.00045267461258688093
+model:ViterbiNet, snr:14 , Self-supervised: 810/1500, Average SER 0.0001028806339075536
+model:ViterbiNet, snr:13 , Self-supervised: 840/900, Average SER 0.00043650766213734944
+model:ViterbiNet, snr:14 , Self-supervised: 840/1500, Average SER 9.920632555371239e-05
+model:ViterbiNet, snr:13 , Self-supervised: 870/900, Average SER 0.0006034479059022048
+model:ViterbiNet, snr:14 , Self-supervised: 870/1500, Average SER 0.0001053639527024894
+model:ViterbiNet, snr:13 , Self-supervised: 900/900, Average SER 0.0006296292278501723
+model: ViterbiNet, SNR: 13, Final SER: 0.0006296292278501723
+0.0006296292278501723
+model:Transformer, snr:13 , Self-supervised: 90/900, Average SER 0.0007407413588629829
+model:ViterbiNet, snr:14 , Self-supervised: 900/1500, Average SER 0.0002592592106925117
+model:Transformer, snr:12 , Self-supervised: 90/300, Average SER 0.0007407413588629829
+model:ViterbiNet, snr:14 , Self-supervised: 930/1500, Average SER 0.00025089601034759194
+model:Transformer, snr:14 , Self-supervised: 120/1500, Average SER 0.0
+model:ViterbiNet, snr:14 , Self-supervised: 960/1500, Average SER 0.0002430555100242297
+model:ViterbiNet, snr:14 , Self-supervised: 990/1500, Average SER 0.00023569019153864696
+model:ViterbiNet, snr:14 , Self-supervised: 1020/1500, Average SER 0.00022875812708162793
+model:ViterbiNet, snr:14 , Self-supervised: 1050/1500, Average SER 0.00022222218059358143
+model:ViterbiNet, snr:14 , Self-supervised: 1080/1500, Average SER 0.00021604934224375973
+model:Transformer, snr:13 , Self-supervised: 120/900, Average SER 0.0006944447755813599
+model:ViterbiNet, snr:14 , Self-supervised: 1110/1500, Average SER 0.00021021017083176622
+model:Transformer, snr:12 , Self-supervised: 120/300, Average SER 0.0005555560191472371
+model:Transformer, snr:14 , Self-supervised: 150/1500, Average SER 0.0
+model:ViterbiNet, snr:14 , Self-supervised: 1140/1500, Average SER 0.00020467832423093027
+model:ViterbiNet, snr:14 , Self-supervised: 1170/1500, Average SER 0.00042022792702047233
+model:ViterbiNet, snr:14 , Self-supervised: 1200/1500, Average SER 0.0005694443980852763
+model:ViterbiNet, snr:14 , Self-supervised: 1230/1500, Average SER 0.0005555555103270988
+model:ViterbiNet, snr:14 , Self-supervised: 1260/1500, Average SER 0.0005555554987892272
+model:Transformer, snr:13 , Self-supervised: 150/900, Average SER 0.0005555558204650879
+model:ViterbiNet, snr:14 , Self-supervised: 1290/1500, Average SER 0.0005426356034685475
+model:Transformer, snr:14 , Self-supervised: 180/1500, Average SER 0.0
+model:Transformer, snr:12 , Self-supervised: 150/300, Average SER 0.00044444481531778974
+model:ViterbiNet, snr:14 , Self-supervised: 1320/1500, Average SER 0.0005303029761169896
+model:ViterbiNet, snr:14 , Self-supervised: 1350/1500, Average SER 0.000518518465536612
+model:ViterbiNet, snr:14 , Self-supervised: 1380/1500, Average SER 0.000531400934509609
+model:ViterbiNet, snr:14 , Self-supervised: 1410/1500, Average SER 0.0005200945316477024
+model:ViterbiNet, snr:14 , Self-supervised: 1440/1500, Average SER 0.000509259228905042
+model:ViterbiNet, snr:14 , Self-supervised: 1470/1500, Average SER 0.0005839001970226262
+model:Transformer, snr:13 , Self-supervised: 180/900, Average SER 0.0004629631837209066
+model:Transformer, snr:14 , Self-supervised: 210/1500, Average SER 0.0
+model:ViterbiNet, snr:14 , Self-supervised: 1500/1500, Average SER 0.0007388887405395507
+model: ViterbiNet, SNR: 14, Final SER: 0.0007388887405395507
+0.0007388887405395507
+model:Transformer, snr:12 , Self-supervised: 180/300, Average SER 0.00037037067943149145
+model:Transformer, snr:13 , Self-supervised: 210/900, Average SER 0.00039682558604649135
+model:Transformer, snr:14 , Self-supervised: 240/1500, Average SER 0.00010416656732559204
+model:Transformer, snr:12 , Self-supervised: 210/300, Average SER 0.0008333333900996617
+model:Transformer, snr:13 , Self-supervised: 240/900, Average SER 0.000451388955116272
+model:Transformer, snr:14 , Self-supervised: 270/1500, Average SER 0.00015432084048235857
+model:Transformer, snr:12 , Self-supervised: 240/300, Average SER 0.0008333332836627961
+model:Transformer, snr:13 , Self-supervised: 270/900, Average SER 0.0005555554672523781
+model:Transformer, snr:14 , Self-supervised: 300/1500, Average SER 0.0001388887564341227
+model:Transformer, snr:12 , Self-supervised: 270/300, Average SER 0.0009567900940223976
+model:Transformer, snr:13 , Self-supervised: 300/900, Average SER 0.0006944441795349121
+model:Transformer, snr:12 , Self-supervised: 300/300, Average SER 0.0011666665474573772
+model: Transformer, SNR: 12, Final SER: 0.0011666665474573772
+0.0011666665474573772
+model:Transformer, snr:14 , Self-supervised: 330/1500, Average SER 0.00012626250584920248
+model:Transformer, snr:13 , Self-supervised: 330/900, Average SER 0.0006313128904862838
+model:Transformer, snr:14 , Self-supervised: 360/1500, Average SER 0.00011574063036176894
+model:Transformer, snr:13 , Self-supervised: 360/900, Average SER 0.0005787034829457601
+model:Transformer, snr:14 , Self-supervised: 390/1500, Average SER 0.00010683750494932517
+model:Transformer, snr:13 , Self-supervised: 390/900, Average SER 0.0005341878304114708
+model:Transformer, snr:14 , Self-supervised: 420/1500, Average SER 9.920625459580195e-05
+model:Transformer, snr:13 , Self-supervised: 420/900, Average SER 0.0005555553095681326
+model:Transformer, snr:14 , Self-supervised: 450/1500, Average SER 9.259250428941514e-05
+model:Transformer, snr:13 , Self-supervised: 450/900, Average SER 0.0005185182889302571
+model:Transformer, snr:14 , Self-supervised: 480/1500, Average SER 0.00012152766187985738
+model:Transformer, snr:13 , Self-supervised: 480/900, Average SER 0.00048611089587211607
+model:Transformer, snr:14 , Self-supervised: 510/1500, Average SER 0.0001143789758869246
+model:Transformer, snr:13 , Self-supervised: 510/900, Average SER 0.0004575161372914034
+model:Transformer, snr:14 , Self-supervised: 540/1500, Average SER 0.00016975303490956623
+model:Transformer, snr:13 , Self-supervised: 540/900, Average SER 0.00043209857410854766
+model:Transformer, snr:14 , Self-supervised: 570/1500, Average SER 0.00016081866465116802
+model:Transformer, snr:13 , Self-supervised: 570/900, Average SER 0.0004093565438923083
+model:Transformer, snr:14 , Self-supervised: 600/1500, Average SER 0.00015277773141860962
+model:Transformer, snr:13 , Self-supervised: 600/900, Average SER 0.0004305553436279297
+model:Transformer, snr:13 , Self-supervised: 630/900, Average SER 0.0004100527082170759
+model:Transformer, snr:14 , Self-supervised: 630/1500, Average SER 0.00014550260135105678
+model:Transformer, snr:13 , Self-supervised: 660/900, Average SER 0.00039141394875266336
+model:Transformer, snr:14 , Self-supervised: 660/1500, Average SER 0.00013888884674419057
+model:Transformer, snr:13 , Self-supervised: 690/900, Average SER 0.00037439595098080845
+model:Transformer, snr:14 , Self-supervised: 690/1500, Average SER 0.0001328502012335736
+model:Transformer, snr:13 , Self-supervised: 720/900, Average SER 0.00035879611968994143
+model:Transformer, snr:14 , Self-supervised: 720/1500, Average SER 0.0001273147761821747
+model:Transformer, snr:13 , Self-supervised: 750/900, Average SER 0.00034444427490234374
+model:Transformer, snr:14 , Self-supervised: 750/1500, Average SER 0.00012222218513488768
+model:Transformer, snr:13 , Self-supervised: 780/900, Average SER 0.00033119641817533054
+model:Transformer, snr:14 , Self-supervised: 780/1500, Average SER 0.00011752133186046894
+model:Transformer, snr:13 , Self-supervised: 810/900, Average SER 0.0003189298841688368
+model:Transformer, snr:14 , Self-supervised: 810/1500, Average SER 0.00011316868993971083
+model:Transformer, snr:13 , Self-supervised: 840/900, Average SER 0.00030753953116280695
+model:Transformer, snr:14 , Self-supervised: 840/1500, Average SER 0.00010912695101329258
+model:Transformer, snr:13 , Self-supervised: 870/900, Average SER 0.0002969347197433998
+model:Transformer, snr:14 , Self-supervised: 870/1500, Average SER 0.0001053639527024894
+model:Transformer, snr:13 , Self-supervised: 900/900, Average SER 0.00036111103163825143
+model: Transformer, SNR: 13, Final SER: 0.00036111103163825143
+0.00036111103163825143
+model:Transformer, snr:14 , Self-supervised: 900/1500, Average SER 0.00010185182094573974
+model:Transformer, snr:14 , Self-supervised: 930/1500, Average SER 9.856627833458686e-05
+model:Transformer, snr:14 , Self-supervised: 960/1500, Average SER 9.5486082136631e-05
+model:Transformer, snr:14 , Self-supervised: 990/1500, Average SER 9.259256449612704e-05
+model:Transformer, snr:14 , Self-supervised: 1020/1500, Average SER 8.986925377565272e-05
+model:Transformer, snr:14 , Self-supervised: 1050/1500, Average SER 8.730156081063407e-05
+model:Transformer, snr:14 , Self-supervised: 1080/1500, Average SER 8.487651745478312e-05
+model:Transformer, snr:14 , Self-supervised: 1110/1500, Average SER 8.258255752357276e-05
+model:Transformer, snr:14 , Self-supervised: 1140/1500, Average SER 8.040933232558401e-05
+model:Transformer, snr:14 , Self-supervised: 1170/1500, Average SER 7.834755457364596e-05
+model:Transformer, snr:14 , Self-supervised: 1200/1500, Average SER 7.638886570930481e-05
+model:Transformer, snr:14 , Self-supervised: 1230/1500, Average SER 7.45257226432242e-05
+model:Transformer, snr:14 , Self-supervised: 1260/1500, Average SER 7.275130067552839e-05
+model:Transformer, snr:14 , Self-supervised: 1290/1500, Average SER 7.105940996214401e-05
+model:Transformer, snr:14 , Self-supervised: 1320/1500, Average SER 6.944442337209528e-05
+model:Transformer, snr:14 , Self-supervised: 1350/1500, Average SER 6.79012139638265e-05
+model:Transformer, snr:14 , Self-supervised: 1380/1500, Average SER 9.057971014492754e-05
+model:Transformer, snr:14 , Self-supervised: 1410/1500, Average SER 8.865248226950355e-05
+model:Transformer, snr:14 , Self-supervised: 1440/1500, Average SER 8.680555555555556e-05
+model:Transformer, snr:14 , Self-supervised: 1470/1500, Average SER 8.503401360544217e-05
+model:Transformer, snr:14 , Self-supervised: 1500/1500, Average SER 8.333333333333333e-05
+model: Transformer, SNR: 14, Final SER: 8.333333333333333e-05
+8.333333333333333e-05
+iteration: 3,snr=12, block-length=120, num-symbols=2, model=Transformer
+iteration: 3,snr=12, block-length=120, num-symbols=2, model=ViterbiNet
+iteration: 3,snr=13, block-length=120, num-symbols=2, model=Transformer
+iteration: 3,snr=13, block-length=120, num-symbols=2, model=ViterbiNet
+iteration: 3,snr=14, block-length=120, num-symbols=2, model=Transformer
+iteration: 3,snr=14, block-length=120, num-symbols=2, model=ViterbiNet
+cpu
+cpucpu
+
+cpu
+cpu
+cpu
+ViterbiNet: num parameters: 7002ViterbiNet: num parameters: 7002
+
+ViterbiNet: num parameters: 7002ViterbiNet_ModelBasedViterbiNet_ModelBased
+
+
+ViterbiNet_ModelBased
+model:ViterbiNet, snr:13 *** New: number of pilots for training : model:ViterbiNet, snr:14 *** New: number of pilots for training :   75125
+
+model:ViterbiNet, snr:12 *** New: number of pilots for training : ViterbiNet_ModelBased_cost2100_13_120_2 ViterbiNet_ModelBased_cost2100_14_120_2
+
+25
+ViterbiNet_ModelBased_cost2100_12_120_2
+C:\viterbitransformed\Code\../Results\plots\ViterbiNet_ModelBased_cost2100_14_120_2_ISI_AWGN.pkl
+C:\viterbitransformed\Code\../Results\plots\ViterbiNet_ModelBased_cost2100_13_120_2_ISI_AWGN.pkl
+calculating freshC:\viterbitransformed\Code\../Results\plots\ViterbiNet_ModelBased_cost2100_12_120_2_ISI_AWGN.pkl
+
+calculating freshloading model from SNR 14 and gamma 0.2calculating fresh
+
+
+loading model from SNR 12 and gamma 0.2
+loading model from SNR 13 and gamma 0.2
+Transformer: num parameters: 6960Transformer: num parameters: 6960
+
+Transformer: num parameters: 6960
+ECC_Transformer_ModelBased
+ECC_Transformer_ModelBased
+ECC_Transformer_ModelBased
+model:Transformer, snr:14 *** New: number of pilots for training :  model:Transformer, snr:12 *** New: number of pilots for training : 125 
+25
+Transformer_ModelBased_cost2100_14_120_2
+Transformer_ModelBased_cost2100_12_120_2
+model:Transformer, snr:13 *** New: number of pilots for training :  75
+C:\viterbitransformed\Code\../Results\plots\Transformer_ModelBased_cost2100_14_120_2_ISI_AWGN.pklTransformer_ModelBased_cost2100_13_120_2
+
+C:\viterbitransformed\Code\../Results\plots\Transformer_ModelBased_cost2100_12_120_2_ISI_AWGN.pkl
+calculating freshcalculating fresh
+
+C:\viterbitransformed\Code\../Results\plots\Transformer_ModelBased_cost2100_13_120_2_ISI_AWGN.pklloading model from SNR 14 and gamma 0.2
+
+loading model from SNR 12 and gamma 0.2
+calculating fresh
+loading model from SNR 13 and gamma 0.2
+model:ViterbiNet, snr:13  Start training model - ViterbiNet,SNR - 13, Gamma - 0.2, Channel Cost - cost2100
+model:Transformer, snr:13  Start training model - Transformer,SNR - 13, Gamma - 0.2, Channel Cost - cost2100
+model:ViterbiNet, snr:14  Start training model - ViterbiNet,SNR - 14, Gamma - 0.2, Channel Cost - cost2100
+model:Transformer, snr:12  Start training model - Transformer,SNR - 12, Gamma - 0.2, Channel Cost - cost2100
+model:ViterbiNet, snr:12  Start training model - ViterbiNet,SNR - 12, Gamma - 0.2, Channel Cost - cost2100
+model:Transformer, snr:14  Start training model - Transformer,SNR - 14, Gamma - 0.2, Channel Cost - cost2100
+model:ViterbiNet, snr:12Best Validation SER - 0.004311323165893555 (saved)
+**************************************************
+model:ViterbiNet, snr:12, Start online evaluation using 1 repetitions
+model:ViterbiNet, snr:13Best Validation SER - 0.002618253231048584 (saved)
+**************************************************
+model:ViterbiNet, snr:13, Start online evaluation using 3 repetitions
+model:ViterbiNet, snr:14Best Validation SER - 0.0020201802253723145 (saved)
+**************************************************
+model:ViterbiNet, snr:14, Start online evaluation using 5 repetitions
+model:ViterbiNet, snr:12 , Self-supervised: 30/300, Average SER 0.0
+model:ViterbiNet, snr:13 , Self-supervised: 30/900, Average SER 0.0
+model:ViterbiNet, snr:14 , Self-supervised: 30/1500, Average SER 0.0
+model:ViterbiNet, snr:12 , Self-supervised: 60/300, Average SER 0.0
+model:ViterbiNet, snr:13 , Self-supervised: 60/900, Average SER 0.0
+model:ViterbiNet, snr:14 , Self-supervised: 60/1500, Average SER 0.0
+model:ViterbiNet, snr:12 , Self-supervised: 90/300, Average SER 0.00037037067943149145
+model:ViterbiNet, snr:13 , Self-supervised: 90/900, Average SER 0.00037037067943149145
+model:ViterbiNet, snr:14 , Self-supervised: 90/1500, Average SER 0.00037037067943149145
+model:ViterbiNet, snr:12 , Self-supervised: 120/300, Average SER 0.00027777800957361855
+model:ViterbiNet, snr:13 , Self-supervised: 120/900, Average SER 0.00027777800957361855
+model:ViterbiNet, snr:14 , Self-supervised: 120/1500, Average SER 0.00027777800957361855
+model:ViterbiNet, snr:12 , Self-supervised: 150/300, Average SER 0.00022222240765889487
+model:ViterbiNet, snr:13 , Self-supervised: 150/900, Average SER 0.00022222240765889487
+model:ViterbiNet, snr:14 , Self-supervised: 150/1500, Average SER 0.00022222240765889487
+model:ViterbiNet, snr:12 , Self-supervised: 180/300, Average SER 0.00018518533971574572
+model:ViterbiNet, snr:13 , Self-supervised: 180/900, Average SER 0.00018518533971574572
+model:ViterbiNet, snr:14 , Self-supervised: 180/1500, Average SER 0.00027777784400516084
+model:ViterbiNet, snr:12 , Self-supervised: 210/300, Average SER 0.0001587302911849249
+model:ViterbiNet, snr:13 , Self-supervised: 210/900, Average SER 0.0001587302911849249
+model:ViterbiNet, snr:14 , Self-supervised: 210/1500, Average SER 0.00023809529486156644
+model:Transformer, snr:14Best Validation SER - 0.00016832351684570312 (saved)
+**************************************************
+model:Transformer, snr:14, Start online evaluation using 5 repetitions
+model:Transformer, snr:13Best Validation SER - 0.0007320046424865723 (saved)
+**************************************************
+model:Transformer, snr:13, Start online evaluation using 3 repetitions
+model:ViterbiNet, snr:12 , Self-supervised: 240/300, Average SER 0.00020833338300387064
+model:ViterbiNet, snr:13 , Self-supervised: 240/900, Average SER 0.00013888900478680927
+model:ViterbiNet, snr:14 , Self-supervised: 240/1500, Average SER 0.00020833338300387064
+model:Transformer, snr:12Best Validation SER - 0.003038167953491211 (saved)
+**************************************************
+model:Transformer, snr:12, Start online evaluation using 1 repetitions
+model:ViterbiNet, snr:12 , Self-supervised: 270/300, Average SER 0.00037037023791560423
+model:ViterbiNet, snr:13 , Self-supervised: 270/900, Average SER 0.00027777773362618903
+model:ViterbiNet, snr:14 , Self-supervised: 270/1500, Average SER 0.00018518522933677392
+model:ViterbiNet, snr:12 , Self-supervised: 300/300, Average SER 0.000499999721844991
+model: ViterbiNet, SNR: 12, Final SER: 0.000499999721844991
+0.000499999721844991
+model:ViterbiNet, snr:13 , Self-supervised: 300/900, Average SER 0.00030555546283721923
+model:ViterbiNet, snr:14 , Self-supervised: 300/1500, Average SER 0.00024999996026357015
+model:ViterbiNet, snr:13 , Self-supervised: 330/900, Average SER 0.00027777769348838113
+model:ViterbiNet, snr:14 , Self-supervised: 330/1500, Average SER 0.00022727269114870014
+model:ViterbiNet, snr:13 , Self-supervised: 360/900, Average SER 0.0002546295523643494
+model:ViterbiNet, snr:14 , Self-supervised: 360/1500, Average SER 0.0002083333002196418
+model:ViterbiNet, snr:13 , Self-supervised: 390/900, Average SER 0.0002350426637209379
+model:ViterbiNet, snr:14 , Self-supervised: 390/1500, Average SER 0.0001923076617412078
+model:ViterbiNet, snr:13 , Self-supervised: 420/900, Average SER 0.00021825390202658517
+model:ViterbiNet, snr:14 , Self-supervised: 420/1500, Average SER 0.0001785714001882644
+model:Transformer, snr:14 , Self-supervised: 30/1500, Average SER 0.0
+model:Transformer, snr:13 , Self-supervised: 30/900, Average SER 0.0
+model:ViterbiNet, snr:13 , Self-supervised: 450/900, Average SER 0.0002037036418914795
+model:ViterbiNet, snr:14 , Self-supervised: 450/1500, Average SER 0.00016666664017571343
+model:Transformer, snr:12 , Self-supervised: 30/300, Average SER 0.0
+model:ViterbiNet, snr:13 , Self-supervised: 480/900, Average SER 0.000190972164273262
+model:ViterbiNet, snr:14 , Self-supervised: 480/1500, Average SER 0.00015624997516473134
+model:ViterbiNet, snr:13 , Self-supervised: 510/900, Average SER 0.00017973850755130543
+model:ViterbiNet, snr:14 , Self-supervised: 510/1500, Average SER 0.00014705880015504125
+model:ViterbiNet, snr:13 , Self-supervised: 540/900, Average SER 0.00016975303490956623
+model:ViterbiNet, snr:14 , Self-supervised: 540/1500, Average SER 0.00013888886681309452
+model:ViterbiNet, snr:13 , Self-supervised: 570/900, Average SER 0.00020467827194615415
+model:ViterbiNet, snr:14 , Self-supervised: 570/1500, Average SER 0.0001315789264545106
+model:ViterbiNet, snr:13 , Self-supervised: 600/900, Average SER 0.00019444435834884644
+model:ViterbiNet, snr:14 , Self-supervised: 600/1500, Average SER 0.00015277773141860962
+model:Transformer, snr:13 , Self-supervised: 60/900, Average SER 0.00041666626930236816
+model:Transformer, snr:14 , Self-supervised: 60/1500, Average SER 0.0
+model:ViterbiNet, snr:13 , Self-supervised: 630/900, Average SER 0.00018518510318937754
+model:ViterbiNet, snr:14 , Self-supervised: 630/1500, Average SER 0.00014550260135105678
+model:Transformer, snr:12 , Self-supervised: 60/300, Average SER 0.0009722222884496053
+model:ViterbiNet, snr:13 , Self-supervised: 660/900, Average SER 0.0001767675984989513
+model:ViterbiNet, snr:14 , Self-supervised: 660/1500, Average SER 0.00013888884674419057
+model:ViterbiNet, snr:13 , Self-supervised: 690/900, Average SER 0.00016908205073812733
+model:ViterbiNet, snr:14 , Self-supervised: 690/1500, Average SER 0.0001328502012335736
+model:ViterbiNet, snr:13 , Self-supervised: 720/900, Average SER 0.00016203696529070536
+model:ViterbiNet, snr:14 , Self-supervised: 720/1500, Average SER 0.0001273147761821747
+model:ViterbiNet, snr:13 , Self-supervised: 750/900, Average SER 0.00015555548667907715
+model:ViterbiNet, snr:14 , Self-supervised: 750/1500, Average SER 0.00012222218513488768
+model:ViterbiNet, snr:13 , Self-supervised: 780/900, Average SER 0.000160256333840199
+model:ViterbiNet, snr:14 , Self-supervised: 780/1500, Average SER 0.00011752133186046894
+model:ViterbiNet, snr:13 , Self-supervised: 810/900, Average SER 0.0001543209140683398
+model:ViterbiNet, snr:14 , Self-supervised: 810/1500, Average SER 0.00011316868993971083
+model:Transformer, snr:13 , Self-supervised: 90/900, Average SER 0.0002777775128682454
+model:Transformer, snr:14 , Self-supervised: 90/1500, Average SER 0.0
+model:Transformer, snr:12 , Self-supervised: 90/300, Average SER 0.0011111107137468125
+model:ViterbiNet, snr:13 , Self-supervised: 840/900, Average SER 0.00014880945285161335
+model:ViterbiNet, snr:14 , Self-supervised: 840/1500, Average SER 0.00010912695101329258
+model:ViterbiNet, snr:13 , Self-supervised: 870/900, Average SER 0.0001436780924084543
+model:ViterbiNet, snr:14 , Self-supervised: 870/1500, Average SER 0.0001053639527024894
+model:ViterbiNet, snr:13 , Self-supervised: 900/900, Average SER 0.00022222214274936252
+model: ViterbiNet, SNR: 13, Final SER: 0.00022222214274936252
+0.00022222214274936252
+model:ViterbiNet, snr:14 , Self-supervised: 900/1500, Average SER 0.00016666657394833034
+model:ViterbiNet, snr:14 , Self-supervised: 930/1500, Average SER 0.00016129023285322292
+model:ViterbiNet, snr:14 , Self-supervised: 960/1500, Average SER 0.00015624991307655972
+model:ViterbiNet, snr:14 , Self-supervised: 990/1500, Average SER 0.00015151506722575487
+model:Transformer, snr:13 , Self-supervised: 120/900, Average SER 0.00020833313465118408
+model:Transformer, snr:14 , Self-supervised: 120/1500, Average SER 0.0
+model:Transformer, snr:12 , Self-supervised: 120/300, Average SER 0.0008333330353101094
+model:ViterbiNet, snr:14 , Self-supervised: 1020/1500, Average SER 0.00014705874171911501
+model:ViterbiNet, snr:14 , Self-supervised: 1050/1500, Average SER 0.00014285706338428315
+model:ViterbiNet, snr:14 , Self-supervised: 1080/1500, Average SER 0.00015432089567184447
+model:ViterbiNet, snr:14 , Self-supervised: 1110/1500, Average SER 0.00015015006065368652
+model:ViterbiNet, snr:14 , Self-supervised: 1140/1500, Average SER 0.0001461987432680632
+model:ViterbiNet, snr:14 , Self-supervised: 1170/1500, Average SER 0.00022792011244684204
+model:Transformer, snr:13 , Self-supervised: 150/900, Average SER 0.00016666650772094725
+model:Transformer, snr:14 , Self-supervised: 150/1500, Average SER 0.0
+model:ViterbiNet, snr:14 , Self-supervised: 1200/1500, Average SER 0.00027083322405815126
+model:Transformer, snr:12 , Self-supervised: 150/300, Average SER 0.0006666664282480876
+model:ViterbiNet, snr:14 , Self-supervised: 1230/1500, Average SER 0.00026422753566648905
+model:ViterbiNet, snr:14 , Self-supervised: 1260/1500, Average SER 0.00025793640386490593
+model:ViterbiNet, snr:14 , Self-supervised: 1290/1500, Average SER 0.00025193788284479183
+model:ViterbiNet, snr:14 , Self-supervised: 1320/1500, Average SER 0.0002462120218710466
+model:ViterbiNet, snr:14 , Self-supervised: 1350/1500, Average SER 0.00024074064360724554
+model:Transformer, snr:13 , Self-supervised: 180/900, Average SER 0.0002777775128682454
+model:ViterbiNet, snr:14 , Self-supervised: 1380/1500, Average SER 0.000283816327219424
+model:Transformer, snr:14 , Self-supervised: 180/1500, Average SER 0.0
+model:Transformer, snr:12 , Self-supervised: 180/300, Average SER 0.0005555553568734063
+model:ViterbiNet, snr:14 , Self-supervised: 1410/1500, Average SER 0.0002777776819594363
+model:ViterbiNet, snr:14 , Self-supervised: 1440/1500, Average SER 0.0002719906469186147
+model:ViterbiNet, snr:14 , Self-supervised: 1470/1500, Average SER 0.0003741496274260437
+model:ViterbiNet, snr:14 , Self-supervised: 1500/1500, Average SER 0.0006555554469426473
+model: ViterbiNet, SNR: 14, Final SER: 0.0006555554469426473
+0.0006555554469426473
+model:Transformer, snr:13 , Self-supervised: 210/900, Average SER 0.00023809501102992466
+model:Transformer, snr:14 , Self-supervised: 210/1500, Average SER 0.0
+model:Transformer, snr:12 , Self-supervised: 210/300, Average SER 0.0005555553095681326
+model:Transformer, snr:13 , Self-supervised: 240/900, Average SER 0.0003472221394379934
+model:Transformer, snr:14 , Self-supervised: 240/1500, Average SER 0.0
+model:Transformer, snr:12 , Self-supervised: 240/300, Average SER 0.0006249999006589254
+model:Transformer, snr:13 , Self-supervised: 270/900, Average SER 0.00030864190172266075
+model:Transformer, snr:14 , Self-supervised: 270/1500, Average SER 9.259250428941514e-05
+model:Transformer, snr:12 , Self-supervised: 270/300, Average SER 0.0007098763077347367
+model:Transformer, snr:13 , Self-supervised: 300/900, Average SER 0.0004722221692403158
+model:Transformer, snr:12 , Self-supervised: 300/300, Average SER 0.0008888886372248331
+model: Transformer, SNR: 12, Final SER: 0.0008888886372248331
+0.0008888886372248331
+model:Transformer, snr:14 , Self-supervised: 300/1500, Average SER 0.0001388887564341227
+model:Transformer, snr:13 , Self-supervised: 330/900, Average SER 0.00042929288112755976
+model:Transformer, snr:14 , Self-supervised: 330/1500, Average SER 0.00012626250584920248
+model:Transformer, snr:13 , Self-supervised: 360/900, Average SER 0.0004398147265116374
+model:Transformer, snr:14 , Self-supervised: 360/1500, Average SER 0.00011574063036176894
+model:Transformer, snr:13 , Self-supervised: 390/900, Average SER 0.00040598282447228064
+model:Transformer, snr:14 , Self-supervised: 390/1500, Average SER 0.00010683750494932517
+model:Transformer, snr:13 , Self-supervised: 420/900, Average SER 0.0003769840512956892
+model:Transformer, snr:14 , Self-supervised: 420/1500, Average SER 9.920625459580195e-05
+model:Transformer, snr:13 , Self-supervised: 450/900, Average SER 0.0003518517812093099
+model:Transformer, snr:14 , Self-supervised: 450/1500, Average SER 9.259250428941514e-05
+model:Transformer, snr:13 , Self-supervised: 480/900, Average SER 0.000329861044883728
+model:Transformer, snr:14 , Self-supervised: 480/1500, Average SER 0.00012152766187985738
+model:Transformer, snr:13 , Self-supervised: 510/900, Average SER 0.00031045745400821464
+model:Transformer, snr:14 , Self-supervised: 510/1500, Average SER 0.0001143789758869246
+model:Transformer, snr:13 , Self-supervised: 540/900, Average SER 0.0002932098176744249
+model:Transformer, snr:14 , Self-supervised: 540/1500, Average SER 0.00010802458833765101
+model:Transformer, snr:13 , Self-supervised: 570/900, Average SER 0.0003070174602040073
+model:Transformer, snr:14 , Self-supervised: 570/1500, Average SER 0.00010233908368830096
+model:Transformer, snr:13 , Self-supervised: 600/900, Average SER 0.000291666587193807
+model:Transformer, snr:14 , Self-supervised: 600/1500, Average SER 9.72221295038859e-05
+model:Transformer, snr:13 , Self-supervised: 630/900, Average SER 0.00027777770208933995
+model:Transformer, snr:14 , Self-supervised: 630/1500, Average SER 9.259250428941514e-05
+model:Transformer, snr:13 , Self-supervised: 660/900, Average SER 0.00030303019465822165
+model:Transformer, snr:14 , Self-supervised: 660/1500, Average SER 8.838375409444173e-05
+model:Transformer, snr:13 , Self-supervised: 690/900, Average SER 0.00028985496880351634
+model:Transformer, snr:14 , Self-supervised: 690/1500, Average SER 8.45409821772921e-05
+model:Transformer, snr:13 , Self-supervised: 720/900, Average SER 0.00027777767843670313
+model:Transformer, snr:14 , Self-supervised: 720/1500, Average SER 8.101844125323826e-05
+model:Transformer, snr:13 , Self-supervised: 750/900, Average SER 0.000266666571299235
+model:Transformer, snr:14 , Self-supervised: 750/1500, Average SER 7.777770360310873e-05
+model:Transformer, snr:13 , Self-supervised: 780/900, Average SER 0.0002991452431067442
+model:Transformer, snr:14 , Self-supervised: 780/1500, Average SER 7.478625346452762e-05
+model:Transformer, snr:13 , Self-supervised: 810/900, Average SER 0.0002880657896583463
+model:Transformer, snr:14 , Self-supervised: 810/1500, Average SER 7.201639222510067e-05
+model:Transformer, snr:13 , Self-supervised: 840/900, Average SER 0.00027777772574197676
+model:Transformer, snr:14 , Self-supervised: 840/1500, Average SER 6.944437821706136e-05
+model:Transformer, snr:13 , Self-supervised: 870/900, Average SER 0.0002681991834750121
+model:Transformer, snr:14 , Self-supervised: 870/1500, Average SER 6.704974448543855e-05
+model:Transformer, snr:13 , Self-supervised: 900/900, Average SER 0.0002962962786356608
+model: Transformer, SNR: 13, Final SER: 0.0002962962786356608
+0.0002962962786356608
+model:Transformer, snr:14 , Self-supervised: 900/1500, Average SER 6.48147530025906e-05
+model:Transformer, snr:14 , Self-supervised: 930/1500, Average SER 6.272395451863606e-05
+model:Transformer, snr:14 , Self-supervised: 960/1500, Average SER 7.812492549419403e-05
+model:Transformer, snr:14 , Self-supervised: 990/1500, Average SER 7.575750350952148e-05
+model:Transformer, snr:14 , Self-supervised: 1020/1500, Average SER 7.352934164159438e-05
+model:Transformer, snr:14 , Self-supervised: 1050/1500, Average SER 7.14285033089774e-05
+model:Transformer, snr:14 , Self-supervised: 1080/1500, Average SER 6.944437821706136e-05
+model:Transformer, snr:14 , Self-supervised: 1110/1500, Average SER 6.756750313011376e-05
+model:Transformer, snr:14 , Self-supervised: 1140/1500, Average SER 6.578941094247919e-05
+model:Transformer, snr:14 , Self-supervised: 1170/1500, Average SER 6.410250296959511e-05
+model:Transformer, snr:14 , Self-supervised: 1200/1500, Average SER 6.249994039535523e-05
+model:Transformer, snr:14 , Self-supervised: 1230/1500, Average SER 6.097555160522461e-05
+model:Transformer, snr:14 , Self-supervised: 1260/1500, Average SER 5.9523752757481164e-05
+model:Transformer, snr:14 , Self-supervised: 1290/1500, Average SER 5.8139479437539745e-05
+model:Transformer, snr:14 , Self-supervised: 1320/1500, Average SER 5.681812763214111e-05
+model:Transformer, snr:14 , Self-supervised: 1350/1500, Average SER 5.555550257364909e-05
+model:Transformer, snr:14 , Self-supervised: 1380/1500, Average SER 5.434777425683063e-05
+model:Transformer, snr:14 , Self-supervised: 1410/1500, Average SER 5.319143863434487e-05
+model:Transformer, snr:14 , Self-supervised: 1440/1500, Average SER 5.208328366279602e-05
+model:Transformer, snr:14 , Self-supervised: 1470/1500, Average SER 5.102035950641243e-05
+model:Transformer, snr:14 , Self-supervised: 1500/1500, Average SER 7.222219308217366e-05
+model: Transformer, SNR: 14, Final SER: 7.222219308217366e-05
+7.222219308217366e-05
+iteration: 4,snr=12, block-length=120, num-symbols=2, model=Transformer
+iteration: 4,snr=12, block-length=120, num-symbols=2, model=ViterbiNet
+iteration: 4,snr=13, block-length=120, num-symbols=2, model=Transformer
+iteration: 4,snr=13, block-length=120, num-symbols=2, model=ViterbiNet
+iteration: 4,snr=14, block-length=120, num-symbols=2, model=Transformer
+iteration: 4,snr=14, block-length=120, num-symbols=2, model=ViterbiNet
+cpu
+cpu
+cpucpu
+
+cpu
+cpu
+ViterbiNet: num parameters: 7002
+ViterbiNet_ModelBased
+ViterbiNet: num parameters: 7002ViterbiNet: num parameters: 7002
+
+ViterbiNet_ModelBased
+ViterbiNet_ModelBased
+model:ViterbiNet, snr:14 *** New: number of pilots for training :  model:ViterbiNet, snr:12 *** New: number of pilots for training : 125 25
+
+ViterbiNet_ModelBased_cost2100_14_120_2ViterbiNet_ModelBased_cost2100_12_120_2
+
+model:ViterbiNet, snr:13 *** New: number of pilots for training :  75
+ViterbiNet_ModelBased_cost2100_13_120_2
+C:\viterbitransformed\Code\../Results\plots\ViterbiNet_ModelBased_cost2100_14_120_2_ISI_AWGN.pklC:\viterbitransformed\Code\../Results\plots\ViterbiNet_ModelBased_cost2100_12_120_2_ISI_AWGN.pkl
+
+C:\viterbitransformed\Code\../Results\plots\ViterbiNet_ModelBased_cost2100_13_120_2_ISI_AWGN.pkl
+calculating fresh
+calculating fresh
+calculating fresh
+loading model from SNR 14 and gamma 0.2
+loading model from SNR 12 and gamma 0.2
+loading model from SNR 13 and gamma 0.2
+Transformer: num parameters: 6960
+ECC_Transformer_ModelBased
+Transformer: num parameters: 6960
+ECC_Transformer_ModelBased
+model:Transformer, snr:14 *** New: number of pilots for training :  125
+Transformer_ModelBased_cost2100_14_120_2
+Transformer: num parameters: 6960C:\viterbitransformed\Code\../Results\plots\Transformer_ModelBased_cost2100_14_120_2_ISI_AWGN.pkl
+
+model:Transformer, snr:12 *** New: number of pilots for training :  25
+Transformer_ModelBased_cost2100_12_120_2
+calculating fresh
+ECC_Transformer_ModelBased
+loading model from SNR 14 and gamma 0.2
+C:\viterbitransformed\Code\../Results\plots\Transformer_ModelBased_cost2100_12_120_2_ISI_AWGN.pkl
+calculating fresh
+loading model from SNR 12 and gamma 0.2
+model:Transformer, snr:13 *** New: number of pilots for training :  75
+Transformer_ModelBased_cost2100_13_120_2
+C:\viterbitransformed\Code\../Results\plots\Transformer_ModelBased_cost2100_13_120_2_ISI_AWGN.pkl
+calculating fresh
+loading model from SNR 13 and gamma 0.2
+model:ViterbiNet, snr:12  Start training model - ViterbiNet,SNR - 12, Gamma - 0.2, Channel Cost - cost2100model:ViterbiNet, snr:14  Start training model - ViterbiNet,SNR - 14, Gamma - 0.2, Channel Cost - cost2100
+
+model:Transformer, snr:13  Start training model - Transformer,SNR - 13, Gamma - 0.2, Channel Cost - cost2100
+model:Transformer, snr:12  Start training model - Transformer,SNR - 12, Gamma - 0.2, Channel Cost - cost2100
+model:ViterbiNet, snr:13  Start training model - ViterbiNet,SNR - 13, Gamma - 0.2, Channel Cost - cost2100
+model:Transformer, snr:14  Start training model - Transformer,SNR - 14, Gamma - 0.2, Channel Cost - cost2100
+model:ViterbiNet, snr:12Best Validation SER - 0.004976868629455566 (saved)
+**************************************************
+model:ViterbiNet, snr:12, Start online evaluation using 1 repetitions
+model:ViterbiNet, snr:14Best Validation SER - 0.000925898551940918 (saved)
+**************************************************
+model:ViterbiNet, snr:14, Start online evaluation using 5 repetitions
+model:ViterbiNet, snr:13Best Validation SER - 0.0012668967247009277 (saved)
+**************************************************
+model:ViterbiNet, snr:13, Start online evaluation using 3 repetitions
+model:ViterbiNet, snr:12 , Self-supervised: 30/300, Average SER 0.0
+model:ViterbiNet, snr:14 , Self-supervised: 30/1500, Average SER 0.0
+model:ViterbiNet, snr:13 , Self-supervised: 30/900, Average SER 0.0
+model:ViterbiNet, snr:12 , Self-supervised: 60/300, Average SER 0.0
+model:ViterbiNet, snr:14 , Self-supervised: 60/1500, Average SER 0.0
+model:ViterbiNet, snr:13 , Self-supervised: 60/900, Average SER 0.0
+model:ViterbiNet, snr:12 , Self-supervised: 90/300, Average SER 0.00037037067943149145
+model:ViterbiNet, snr:14 , Self-supervised: 90/1500, Average SER 0.00037037067943149145
+model:ViterbiNet, snr:13 , Self-supervised: 90/900, Average SER 0.00037037067943149145
+model:ViterbiNet, snr:12 , Self-supervised: 120/300, Average SER 0.00027777800957361855
+model:ViterbiNet, snr:14 , Self-supervised: 120/1500, Average SER 0.00027777800957361855
+model:ViterbiNet, snr:13 , Self-supervised: 120/900, Average SER 0.00027777800957361855
+model:ViterbiNet, snr:12 , Self-supervised: 150/300, Average SER 0.00022222240765889487
+model:ViterbiNet, snr:14 , Self-supervised: 150/1500, Average SER 0.00022222240765889487
+model:ViterbiNet, snr:12 , Self-supervised: 180/300, Average SER 0.00032407409614986844
+model:ViterbiNet, snr:14 , Self-supervised: 180/1500, Average SER 0.00018518533971574572
+model:ViterbiNet, snr:13 , Self-supervised: 150/900, Average SER 0.00022222240765889487
+model:ViterbiNet, snr:12 , Self-supervised: 210/300, Average SER 0.00031746029853820803
+model:ViterbiNet, snr:14 , Self-supervised: 210/1500, Average SER 0.0001587302911849249
+model:ViterbiNet, snr:13 , Self-supervised: 180/900, Average SER 0.00018518533971574572
+model:ViterbiNet, snr:12 , Self-supervised: 240/300, Average SER 0.000277777761220932
+model:ViterbiNet, snr:14 , Self-supervised: 240/1500, Average SER 0.00013888900478680927
+model:ViterbiNet, snr:13 , Self-supervised: 210/900, Average SER 0.0001587302911849249
+model:Transformer, snr:12Best Validation SER - 0.0025463104248046875 (saved)
+**************************************************
+model:Transformer, snr:12, Start online evaluation using 1 repetitions
+model:Transformer, snr:13Best Validation SER - 0.0008445978164672852 (saved)
+**************************************************
+model:Transformer, snr:13, Start online evaluation using 3 repetitions
+model:ViterbiNet, snr:12 , Self-supervised: 270/300, Average SER 0.00043209857410854766
+model:ViterbiNet, snr:14 , Self-supervised: 270/1500, Average SER 0.00012345689314383046
+model:Transformer, snr:14Best Validation SER - 0.0001963973045349121 (saved)
+**************************************************
+model:Transformer, snr:14, Start online evaluation using 5 repetitions
+model:ViterbiNet, snr:13 , Self-supervised: 240/900, Average SER 0.00013888900478680927
+model:ViterbiNet, snr:12 , Self-supervised: 300/300, Average SER 0.0006111107269922892
+model: ViterbiNet, SNR: 12, Final SER: 0.0006111107269922892
+0.0006111107269922892
+model:ViterbiNet, snr:14 , Self-supervised: 300/1500, Average SER 0.00011111120382944743
+model:ViterbiNet, snr:13 , Self-supervised: 270/900, Average SER 0.00012345689314383046
+model:ViterbiNet, snr:14 , Self-supervised: 330/1500, Average SER 0.00010101018529949767
+model:ViterbiNet, snr:13 , Self-supervised: 300/900, Average SER 0.00011111120382944743
+model:ViterbiNet, snr:14 , Self-supervised: 360/1500, Average SER 9.259266985787286e-05
+model:ViterbiNet, snr:13 , Self-supervised: 330/900, Average SER 0.00010101018529949767
+model:ViterbiNet, snr:14 , Self-supervised: 390/1500, Average SER 8.547015679188264e-05
+model:ViterbiNet, snr:13 , Self-supervised: 360/900, Average SER 9.259266985787286e-05
+model:ViterbiNet, snr:14 , Self-supervised: 420/1500, Average SER 7.936514559246245e-05
+model:ViterbiNet, snr:13 , Self-supervised: 390/900, Average SER 8.547015679188264e-05
+model:ViterbiNet, snr:14 , Self-supervised: 450/1500, Average SER 7.407413588629829e-05
+model:ViterbiNet, snr:13 , Self-supervised: 420/900, Average SER 7.936514559246245e-05
+model:ViterbiNet, snr:14 , Self-supervised: 480/1500, Average SER 6.944450239340464e-05
+model:Transformer, snr:13 , Self-supervised: 30/900, Average SER 0.0
+model:Transformer, snr:12 , Self-supervised: 30/300, Average SER 0.0
+model:Transformer, snr:14 , Self-supervised: 30/1500, Average SER 0.0
+model:ViterbiNet, snr:13 , Self-supervised: 450/900, Average SER 7.407413588629829e-05
+model:ViterbiNet, snr:14 , Self-supervised: 510/1500, Average SER 6.535953166438084e-05
+model:ViterbiNet, snr:14 , Self-supervised: 540/1500, Average SER 6.172844657191523e-05
+model:ViterbiNet, snr:13 , Self-supervised: 480/900, Average SER 0.00010416669150193532
+model:ViterbiNet, snr:14 , Self-supervised: 570/1500, Average SER 0.00014619879555283932
+model:ViterbiNet, snr:13 , Self-supervised: 510/900, Average SER 9.8039239060645e-05
+model:ViterbiNet, snr:14 , Self-supervised: 600/1500, Average SER 0.00023611098527908324
+model:ViterbiNet, snr:13 , Self-supervised: 540/900, Average SER 9.259261466838696e-05
+model:ViterbiNet, snr:14 , Self-supervised: 630/1500, Average SER 0.00027777770208933995
+model:ViterbiNet, snr:13 , Self-supervised: 570/900, Average SER 8.771931915952448e-05
+model:ViterbiNet, snr:14 , Self-supervised: 660/1500, Average SER 0.0002651514429034609
+model:ViterbiNet, snr:13 , Self-supervised: 600/900, Average SER 0.00015277773141860962
+model:ViterbiNet, snr:14 , Self-supervised: 690/1500, Average SER 0.0002536231192989626
+model:Transformer, snr:13 , Self-supervised: 60/900, Average SER 0.0002777775128682454
+model:Transformer, snr:12 , Self-supervised: 60/300, Average SER 0.0005555550257364908
+model:ViterbiNet, snr:13 , Self-supervised: 630/900, Average SER 0.00018518510318937754
+model:Transformer, snr:14 , Self-supervised: 60/1500, Average SER 0.0002777775128682454
+model:ViterbiNet, snr:14 , Self-supervised: 720/1500, Average SER 0.00024305548932817246
+model:ViterbiNet, snr:13 , Self-supervised: 660/900, Average SER 0.0001767675984989513
+model:ViterbiNet, snr:14 , Self-supervised: 750/1500, Average SER 0.00023333326975504557
+model:ViterbiNet, snr:13 , Self-supervised: 690/900, Average SER 0.00016908205073812733
+model:ViterbiNet, snr:14 , Self-supervised: 780/1500, Average SER 0.00022435891322600536
+model:ViterbiNet, snr:14 , Self-supervised: 810/1500, Average SER 0.0002160493238472644
+model:ViterbiNet, snr:13 , Self-supervised: 720/900, Average SER 0.00016203696529070536
+model:ViterbiNet, snr:14 , Self-supervised: 840/1500, Average SER 0.00020833327656700497
+model:ViterbiNet, snr:13 , Self-supervised: 750/900, Average SER 0.00015555548667907715
+model:ViterbiNet, snr:14 , Self-supervised: 870/1500, Average SER 0.00020114937047848756
+model:ViterbiNet, snr:13 , Self-supervised: 780/900, Average SER 0.00014957258334526648
+model:ViterbiNet, snr:14 , Self-supervised: 900/1500, Average SER 0.00024999996026357015
+model:ViterbiNet, snr:13 , Self-supervised: 810/900, Average SER 0.00014403285803618254
+model:Transformer, snr:13 , Self-supervised: 90/900, Average SER 0.00046296252144707576
+model:Transformer, snr:12 , Self-supervised: 90/300, Average SER 0.000648147530025906
+model:ViterbiNet, snr:14 , Self-supervised: 930/1500, Average SER 0.0002419354454163582
+model:Transformer, snr:14 , Self-supervised: 90/1500, Average SER 0.00018518500857883028
+model:ViterbiNet, snr:13 , Self-supervised: 840/900, Average SER 0.00013888882739203316
+model:ViterbiNet, snr:14 , Self-supervised: 960/1500, Average SER 0.00023437496274709703
+model:ViterbiNet, snr:13 , Self-supervised: 870/900, Average SER 0.0012164748948195886
+model:ViterbiNet, snr:13 , Self-supervised: 900/900, Average SER 0.0034629627731111315
+model: ViterbiNet, SNR: 13, Final SER: 0.0034629627731111315
+0.0034629627731111315
+model:ViterbiNet, snr:14 , Self-supervised: 990/1500, Average SER 0.00022727269114870014
+model:ViterbiNet, snr:14 , Self-supervised: 1020/1500, Average SER 0.0002205882002325619
+model:ViterbiNet, snr:14 , Self-supervised: 1050/1500, Average SER 0.00021428568022591727
+model:ViterbiNet, snr:14 , Self-supervised: 1080/1500, Average SER 0.0002083333002196418
+model:ViterbiNet, snr:14 , Self-supervised: 1110/1500, Average SER 0.0002027026704839758
+model:Transformer, snr:13 , Self-supervised: 120/900, Average SER 0.0003472218910853068
+model:Transformer, snr:12 , Self-supervised: 120/300, Average SER 0.0004861106475194295
+model:Transformer, snr:14 , Self-supervised: 120/1500, Average SER 0.0001388887564341227
+model:ViterbiNet, snr:14 , Self-supervised: 1140/1500, Average SER 0.0001973683896817659
+model:ViterbiNet, snr:14 , Self-supervised: 1170/1500, Average SER 0.00022079766306102786
+model:ViterbiNet, snr:14 , Self-supervised: 1200/1500, Average SER 0.0002499999105930328
+model:ViterbiNet, snr:14 , Self-supervised: 1230/1500, Average SER 0.00024390235179808082
+model:ViterbiNet, snr:14 , Self-supervised: 1260/1500, Average SER 0.00023809515294574555
+model:ViterbiNet, snr:14 , Self-supervised: 1290/1500, Average SER 0.00023255805636561194
+model:Transformer, snr:13 , Self-supervised: 150/900, Average SER 0.0002777775128682454
+model:Transformer, snr:12 , Self-supervised: 150/300, Average SER 0.0003888885180155436
+model:ViterbiNet, snr:14 , Self-supervised: 1320/1500, Average SER 0.0002272726459936662
+model:Transformer, snr:14 , Self-supervised: 150/1500, Average SER 0.00011111100514729818
+model:ViterbiNet, snr:14 , Self-supervised: 1350/1500, Average SER 0.00022222214274936252
+model:ViterbiNet, snr:14 , Self-supervised: 1380/1500, Average SER 0.000241545836130778
+model:ViterbiNet, snr:14 , Self-supervised: 1410/1500, Average SER 0.0002364065630216125
+model:ViterbiNet, snr:14 , Self-supervised: 1440/1500, Average SER 0.0002314814262919956
+model:ViterbiNet, snr:14 , Self-supervised: 1470/1500, Average SER 0.0009126983937763032
+model:ViterbiNet, snr:14 , Self-supervised: 1500/1500, Average SER 0.0026555554072062175
+model: ViterbiNet, SNR: 14, Final SER: 0.0026555554072062175
+0.0026555554072062175
+model:Transformer, snr:12 , Self-supervised: 180/300, Average SER 0.0005092591047286988
+model:Transformer, snr:13 , Self-supervised: 180/900, Average SER 0.00023148126072353788
+model:Transformer, snr:14 , Self-supervised: 180/1500, Average SER 9.259250428941514e-05
+model:Transformer, snr:12 , Self-supervised: 210/300, Average SER 0.0009920633974529447
+model:Transformer, snr:13 , Self-supervised: 210/900, Average SER 0.0003571428003765288
+model:Transformer, snr:14 , Self-supervised: 210/1500, Average SER 7.936500367664156e-05
+model:Transformer, snr:12 , Self-supervised: 240/300, Average SER 0.0009722220400969187
+model:Transformer, snr:13 , Self-supervised: 240/900, Average SER 0.0003124999503294627
+model:Transformer, snr:14 , Self-supervised: 240/1500, Average SER 6.944437821706136e-05
+model:Transformer, snr:12 , Self-supervised: 270/300, Average SER 0.000956789873264454
+model:Transformer, snr:13 , Self-supervised: 270/900, Average SER 0.00027777773362618903
+model:Transformer, snr:14 , Self-supervised: 270/1500, Average SER 0.00012345667238588686
+model:Transformer, snr:12 , Self-supervised: 300/300, Average SER 0.0011388885974884034
+model: Transformer, SNR: 12, Final SER: 0.0011388885974884034
+0.0011388885974884034
+model:Transformer, snr:13 , Self-supervised: 300/900, Average SER 0.0003333332141240438
+model:Transformer, snr:14 , Self-supervised: 300/1500, Average SER 0.00016666650772094725
+model:Transformer, snr:13 , Self-supervised: 330/900, Average SER 0.00030303019465822165
+model:Transformer, snr:14 , Self-supervised: 330/1500, Average SER 0.00015151500701904297
+model:Transformer, snr:13 , Self-supervised: 360/900, Average SER 0.00027777767843670313
+model:Transformer, snr:14 , Self-supervised: 360/1500, Average SER 0.0001388887564341227
+model:Transformer, snr:13 , Self-supervised: 390/900, Average SER 0.00025641016471080293
+model:Transformer, snr:14 , Self-supervised: 390/1500, Average SER 0.00012820500593919022
+model:Transformer, snr:13 , Self-supervised: 420/900, Average SER 0.00023809515294574555
+model:Transformer, snr:14 , Self-supervised: 420/1500, Average SER 0.00011904750551496233
+model:Transformer, snr:13 , Self-supervised: 450/900, Average SER 0.00025925914446512857
+model:Transformer, snr:14 , Self-supervised: 450/1500, Average SER 0.00011111100514729818
+model:Transformer, snr:13 , Self-supervised: 480/900, Average SER 0.00024305544793605803
+model:Transformer, snr:14 , Self-supervised: 480/1500, Average SER 0.00010416656732559204
+model:Transformer, snr:13 , Self-supervised: 510/900, Average SER 0.0002287580686457017
+model:Transformer, snr:14 , Self-supervised: 510/1500, Average SER 0.00013071882958505667
+model:Transformer, snr:13 , Self-supervised: 540/900, Average SER 0.00021604928705427383
+model:Transformer, snr:14 , Self-supervised: 540/1500, Average SER 0.00012345667238588686
+model:Transformer, snr:13 , Self-supervised: 570/900, Average SER 0.0002777777220073499
+model:Transformer, snr:14 , Self-supervised: 570/1500, Average SER 0.00011695895278662966
+model:Transformer, snr:13 , Self-supervised: 600/900, Average SER 0.00036111106475194296
+model:Transformer, snr:14 , Self-supervised: 600/1500, Average SER 0.00011111100514729818
+model:Transformer, snr:13 , Self-supervised: 630/900, Average SER 0.0003439152997637552
+model:Transformer, snr:14 , Self-supervised: 630/1500, Average SER 0.00010582000490218874
+model:Transformer, snr:13 , Self-supervised: 660/900, Average SER 0.00032828278613812996
+model:Transformer, snr:14 , Self-supervised: 660/1500, Average SER 0.00010101000467936198
+model:Transformer, snr:13 , Self-supervised: 690/900, Average SER 0.00031400962152342867
+model:Transformer, snr:14 , Self-supervised: 690/1500, Average SER 9.661826534547667e-05
+model:Transformer, snr:13 , Self-supervised: 720/900, Average SER 0.0003009258872932858
+model:Transformer, snr:14 , Self-supervised: 720/1500, Average SER 9.259250428941514e-05
+model:Transformer, snr:13 , Self-supervised: 750/900, Average SER 0.00028888885180155437
+model:Transformer, snr:14 , Self-supervised: 750/1500, Average SER 8.888880411783854e-05
+model:Transformer, snr:13 , Self-supervised: 780/900, Average SER 0.00027777774211687917
+model:Transformer, snr:14 , Self-supervised: 780/1500, Average SER 8.547000395946014e-05
+model:Transformer, snr:13 , Self-supervised: 810/900, Average SER 0.0002674896775940318
+model:Transformer, snr:14 , Self-supervised: 810/1500, Average SER 8.230444825725791e-05
+model:Transformer, snr:13 , Self-supervised: 840/900, Average SER 0.0002579364748228164
+model:Transformer, snr:14 , Self-supervised: 840/1500, Average SER 7.936500367664156e-05
+model:Transformer, snr:13 , Self-supervised: 870/900, Average SER 0.00024904211362202964
+model:Transformer, snr:14 , Self-supervised: 870/1500, Average SER 7.662827941192978e-05
+model:Transformer, snr:13 , Self-supervised: 900/900, Average SER 0.0002777777777777778
+model: Transformer, SNR: 13, Final SER: 0.0002777777777777778
+0.0002777777777777778
+model:Transformer, snr:14 , Self-supervised: 900/1500, Average SER 7.407400343153211e-05
+model:Transformer, snr:14 , Self-supervised: 930/1500, Average SER 7.16845194498698e-05
+model:Transformer, snr:14 , Self-supervised: 960/1500, Average SER 6.944437821706136e-05
+model:Transformer, snr:14 , Self-supervised: 990/1500, Average SER 6.734000311957466e-05
+model:Transformer, snr:14 , Self-supervised: 1020/1500, Average SER 9.803918062471876e-05
+model:Transformer, snr:14 , Self-supervised: 1050/1500, Average SER 9.523806117829823e-05
+model:Transformer, snr:14 , Self-supervised: 1080/1500, Average SER 9.259255947890106e-05
+model:Transformer, snr:14 , Self-supervised: 1110/1500, Average SER 9.009005787136318e-05
+model:Transformer, snr:14 , Self-supervised: 1140/1500, Average SER 8.771926687474837e-05
+model:Transformer, snr:14 , Self-supervised: 1170/1500, Average SER 8.547005490360097e-05
+model:Transformer, snr:14 , Self-supervised: 1200/1500, Average SER 8.333330353101095e-05
+model:Transformer, snr:14 , Self-supervised: 1230/1500, Average SER 8.13007839326936e-05
+model:Transformer, snr:14 , Self-supervised: 1260/1500, Average SER 7.936505098191519e-05
+model:Transformer, snr:14 , Self-supervised: 1290/1500, Average SER 7.751935212187064e-05
+model:Transformer, snr:14 , Self-supervised: 1320/1500, Average SER 7.575754866455541e-05
+model:Transformer, snr:14 , Self-supervised: 1350/1500, Average SER 7.407404758312084e-05
+model:Transformer, snr:14 , Self-supervised: 1380/1500, Average SER 7.246374220087908e-05
+model:Transformer, snr:14 , Self-supervised: 1410/1500, Average SER 7.09219604519242e-05
+model:Transformer, snr:14 , Self-supervised: 1440/1500, Average SER 6.944441960917578e-05
+model:Transformer, snr:14 , Self-supervised: 1470/1500, Average SER 6.80271865559273e-05
+model:Transformer, snr:14 , Self-supervised: 1500/1500, Average SER 6.666664282480875e-05
+model: Transformer, SNR: 14, Final SER: 6.666664282480875e-05
+6.666664282480875e-05
+iteration: 5,snr=12, block-length=120, num-symbols=2, model=Transformer
+iteration: 5,snr=12, block-length=120, num-symbols=2, model=ViterbiNet
+iteration: 5,snr=13, block-length=120, num-symbols=2, model=Transformer
+iteration: 5,snr=13, block-length=120, num-symbols=2, model=ViterbiNet
+iteration: 5,snr=14, block-length=120, num-symbols=2, model=Transformer
+iteration: 5,snr=14, block-length=120, num-symbols=2, model=ViterbiNet
+cpu
+cpu
+cpu
+cpu
+cpu
+cpu
+ViterbiNet: num parameters: 7002
+ViterbiNet_ModelBased
+ViterbiNet: num parameters: 7002
+ViterbiNet_ModelBased
+ViterbiNet: num parameters: 7002
+ViterbiNet_ModelBased
+model:ViterbiNet, snr:14 *** New: number of pilots for training :  125
+ViterbiNet_ModelBased_cost2100_14_120_2
+C:\viterbitransformed\Code\../Results\plots\ViterbiNet_ModelBased_cost2100_14_120_2_ISI_AWGN.pkl
+calculating fresh
+loading model from SNR 14 and gamma 0.2
+model:ViterbiNet, snr:13 *** New: number of pilots for training :  75
+ViterbiNet_ModelBased_cost2100_13_120_2
+C:\viterbitransformed\Code\../Results\plots\ViterbiNet_ModelBased_cost2100_13_120_2_ISI_AWGN.pkl
+calculating fresh
+model:ViterbiNet, snr:12 *** New: number of pilots for training :  25loading model from SNR 13 and gamma 0.2
+
+ViterbiNet_ModelBased_cost2100_12_120_2
+C:\viterbitransformed\Code\../Results\plots\ViterbiNet_ModelBased_cost2100_12_120_2_ISI_AWGN.pkl
+calculating fresh
+loading model from SNR 12 and gamma 0.2
+Transformer: num parameters: 6960
+ECC_Transformer_ModelBased
+Transformer: num parameters: 6960
+ECC_Transformer_ModelBased
+Transformer: num parameters: 6960
+ECC_Transformer_ModelBased
+model:Transformer, snr:12 *** New: number of pilots for training :  25
+model:Transformer, snr:13 *** New: number of pilots for training :  Transformer_ModelBased_cost2100_12_120_275
+
+Transformer_ModelBased_cost2100_13_120_2
+C:\viterbitransformed\Code\../Results\plots\Transformer_ModelBased_cost2100_12_120_2_ISI_AWGN.pklC:\viterbitransformed\Code\../Results\plots\Transformer_ModelBased_cost2100_13_120_2_ISI_AWGN.pkl
+
+model:Transformer, snr:14 *** New: number of pilots for training :  125calculating fresh
+calculating fresh
+
+Transformer_ModelBased_cost2100_14_120_2
+loading model from SNR 12 and gamma 0.2loading model from SNR 13 and gamma 0.2
+
+C:\viterbitransformed\Code\../Results\plots\Transformer_ModelBased_cost2100_14_120_2_ISI_AWGN.pkl
+calculating fresh
+loading model from SNR 14 and gamma 0.2
+model:ViterbiNet, snr:13  Start training model - ViterbiNet,SNR - 13, Gamma - 0.2, Channel Cost - cost2100
+model:Transformer, snr:14  Start training model - Transformer,SNR - 14, Gamma - 0.2, Channel Cost - cost2100
+model:Transformer, snr:12  Start training model - Transformer,SNR - 12, Gamma - 0.2, Channel Cost - cost2100
+model:ViterbiNet, snr:14  Start training model - ViterbiNet,SNR - 14, Gamma - 0.2, Channel Cost - cost2100
+model:ViterbiNet, snr:12  Start training model - ViterbiNet,SNR - 12, Gamma - 0.2, Channel Cost - cost2100
+model:Transformer, snr:13  Start training model - Transformer,SNR - 13, Gamma - 0.2, Channel Cost - cost2100
+model:ViterbiNet, snr:13Best Validation SER - 0.0012668967247009277 (saved)
+**************************************************
+model:ViterbiNet, snr:13, Start online evaluation using 3 repetitions
+model:ViterbiNet, snr:14Best Validation SER - 0.0017957091331481934 (saved)
+**************************************************
+model:ViterbiNet, snr:14, Start online evaluation using 5 repetitions
+model:ViterbiNet, snr:12Best Validation SER - 0.0051215291023254395 (saved)
+**************************************************
+model:ViterbiNet, snr:12, Start online evaluation using 1 repetitions
+model:ViterbiNet, snr:13 , Self-supervised: 30/900, Average SER 0.0
+model:ViterbiNet, snr:14 , Self-supervised: 30/1500, Average SER 0.0
+model:ViterbiNet, snr:12 , Self-supervised: 30/300, Average SER 0.0
+model:ViterbiNet, snr:13 , Self-supervised: 60/900, Average SER 0.0
+model:ViterbiNet, snr:14 , Self-supervised: 60/1500, Average SER 0.0
+model:ViterbiNet, snr:12 , Self-supervised: 60/300, Average SER 0.0001388887564341227
+model:ViterbiNet, snr:13 , Self-supervised: 90/900, Average SER 0.00037037067943149145
+model:ViterbiNet, snr:14 , Self-supervised: 90/1500, Average SER 0.00037037067943149145
+model:ViterbiNet, snr:12 , Self-supervised: 90/300, Average SER 0.0007407406965891521
+model:ViterbiNet, snr:13 , Self-supervised: 120/900, Average SER 0.00027777800957361855
+model:ViterbiNet, snr:14 , Self-supervised: 120/1500, Average SER 0.00027777800957361855
+model:ViterbiNet, snr:12 , Self-supervised: 120/300, Average SER 0.000555555522441864
+model:ViterbiNet, snr:13 , Self-supervised: 150/900, Average SER 0.00022222240765889487
+model:ViterbiNet, snr:14 , Self-supervised: 150/1500, Average SER 0.00022222240765889487
+model:ViterbiNet, snr:12 , Self-supervised: 150/300, Average SER 0.0004444444179534912
+model:ViterbiNet, snr:13 , Self-supervised: 180/900, Average SER 0.00018518533971574572
+model:ViterbiNet, snr:14 , Self-supervised: 180/1500, Average SER 0.00018518533971574572
+model:ViterbiNet, snr:12 , Self-supervised: 180/300, Average SER 0.00037037034829457603
+model:Transformer, snr:12Best Validation SER - 0.0021411776542663574 (saved)
+**************************************************
+model:Transformer, snr:12, Start online evaluation using 1 repetitions
+model:ViterbiNet, snr:13 , Self-supervised: 210/900, Average SER 0.0001587302911849249
+model:ViterbiNet, snr:14 , Self-supervised: 210/1500, Average SER 0.0001587302911849249
+model:ViterbiNet, snr:12 , Self-supervised: 210/300, Average SER 0.00031746029853820803
+model:ViterbiNet, snr:13 , Self-supervised: 240/900, Average SER 0.00013888900478680927
+model:ViterbiNet, snr:14 , Self-supervised: 240/1500, Average SER 0.00013888900478680927
+model:ViterbiNet, snr:12 , Self-supervised: 240/300, Average SER 0.000277777761220932
+model:Transformer, snr:13Best Validation SER - 0.0015766024589538574 (saved)
+**************************************************
+model:Transformer, snr:13, Start online evaluation using 3 repetitions
+model:Transformer, snr:14Best Validation SER - 0.0003647804260253906 (saved)
+**************************************************
+model:Transformer, snr:14, Start online evaluation using 5 repetitions
+model:ViterbiNet, snr:13 , Self-supervised: 270/900, Average SER 0.00037037045867354784
+model:ViterbiNet, snr:14 , Self-supervised: 270/1500, Average SER 0.00021604939743324563
+model:ViterbiNet, snr:12 , Self-supervised: 270/300, Average SER 0.00037037023791560423
+model:ViterbiNet, snr:13 , Self-supervised: 300/900, Average SER 0.0004444444179534912
+model:ViterbiNet, snr:14 , Self-supervised: 300/1500, Average SER 0.00019444445768992106
+model:ViterbiNet, snr:12 , Self-supervised: 300/300, Average SER 0.0005833329757054647
+model: ViterbiNet, SNR: 12, Final SER: 0.0005833329757054647
+0.0005833329757054647
+model:ViterbiNet, snr:13 , Self-supervised: 330/900, Average SER 0.0004040403799577193
+model:ViterbiNet, snr:14 , Self-supervised: 330/1500, Average SER 0.00017676768880901914
+model:ViterbiNet, snr:13 , Self-supervised: 360/900, Average SER 0.00037037034829457603
+model:ViterbiNet, snr:14 , Self-supervised: 360/1500, Average SER 0.00016203704807493422
+model:ViterbiNet, snr:13 , Self-supervised: 390/900, Average SER 0.00034188032150268556
+model:ViterbiNet, snr:14 , Self-supervised: 390/1500, Average SER 0.00014957265976147773
+model:Transformer, snr:12 , Self-supervised: 30/300, Average SER 0.0
+model:ViterbiNet, snr:13 , Self-supervised: 420/900, Average SER 0.00031746029853820803
+model:ViterbiNet, snr:14 , Self-supervised: 420/1500, Average SER 0.0001388888983499436
+model:ViterbiNet, snr:13 , Self-supervised: 450/900, Average SER 0.0002962962786356608
+model:ViterbiNet, snr:14 , Self-supervised: 450/1500, Average SER 0.00012962963845994737
+model:ViterbiNet, snr:13 , Self-supervised: 480/900, Average SER 0.000277777761220932
+model:Transformer, snr:13 , Self-supervised: 30/900, Average SER 0.0
+model:Transformer, snr:14 , Self-supervised: 30/1500, Average SER 0.0
+model:ViterbiNet, snr:14 , Self-supervised: 480/1500, Average SER 0.00012152778605620066
+model:ViterbiNet, snr:13 , Self-supervised: 510/900, Average SER 0.00026143789291381835
+model:ViterbiNet, snr:14 , Self-supervised: 510/1500, Average SER 0.0001143790927587771
+model:ViterbiNet, snr:13 , Self-supervised: 540/900, Average SER 0.0002469135655297173
+model:ViterbiNet, snr:14 , Self-supervised: 540/1500, Average SER 0.00010802469871662282
+model:ViterbiNet, snr:13 , Self-supervised: 570/900, Average SER 0.0002339181147123638
+model:ViterbiNet, snr:14 , Self-supervised: 570/1500, Average SER 0.00010233918825785319
+model:Transformer, snr:12 , Self-supervised: 60/300, Average SER 0.0002777775128682454
+model:ViterbiNet, snr:13 , Self-supervised: 600/900, Average SER 0.00024999996026357015
+model:ViterbiNet, snr:14 , Self-supervised: 600/1500, Average SER 0.00015277773141860962
+model:ViterbiNet, snr:13 , Self-supervised: 630/900, Average SER 0.00023809520025101918
+model:ViterbiNet, snr:14 , Self-supervised: 630/1500, Average SER 0.00014550260135105678
+model:ViterbiNet, snr:13 , Self-supervised: 660/900, Average SER 0.00022727269114870014
+model:ViterbiNet, snr:14 , Self-supervised: 660/1500, Average SER 0.00013888884674419057
+model:ViterbiNet, snr:13 , Self-supervised: 690/900, Average SER 0.00021739126979440884
+model:ViterbiNet, snr:14 , Self-supervised: 690/1500, Average SER 0.0001328502012335736
+model:Transformer, snr:13 , Self-supervised: 60/900, Average SER 0.0
+model:Transformer, snr:14 , Self-supervised: 60/1500, Average SER 0.0
+model:ViterbiNet, snr:13 , Self-supervised: 720/900, Average SER 0.0002083333002196418
+model:ViterbiNet, snr:14 , Self-supervised: 720/1500, Average SER 0.0001273147761821747
+model:ViterbiNet, snr:13 , Self-supervised: 750/900, Average SER 0.00019999996821085613
+model:ViterbiNet, snr:14 , Self-supervised: 750/1500, Average SER 0.00012222218513488768
+model:ViterbiNet, snr:13 , Self-supervised: 780/900, Average SER 0.0001923076617412078
+model:Transformer, snr:12 , Self-supervised: 90/300, Average SER 0.0005555556880103217
+model:ViterbiNet, snr:14 , Self-supervised: 780/1500, Average SER 0.00011752133186046894
+model:ViterbiNet, snr:13 , Self-supervised: 810/900, Average SER 0.0001851851557507927
+model:ViterbiNet, snr:14 , Self-supervised: 810/1500, Average SER 0.00011316868993971083
+model:ViterbiNet, snr:13 , Self-supervised: 840/900, Average SER 0.0001785714001882644
+model:ViterbiNet, snr:14 , Self-supervised: 840/1500, Average SER 0.00010912695101329258
+model:ViterbiNet, snr:13 , Self-supervised: 870/900, Average SER 0.0003448275313980278
+model:ViterbiNet, snr:14 , Self-supervised: 870/1500, Average SER 0.0001436780924084543
+model:ViterbiNet, snr:13 , Self-supervised: 900/900, Average SER 0.00039814809958140055
+model: ViterbiNet, SNR: 13, Final SER: 0.00039814809958140055
+0.00039814809958140055
+model:ViterbiNet, snr:14 , Self-supervised: 900/1500, Average SER 0.0002777777115503947
+model:Transformer, snr:13 , Self-supervised: 90/900, Average SER 0.0
+model:Transformer, snr:14 , Self-supervised: 90/1500, Average SER 0.0
+model:ViterbiNet, snr:14 , Self-supervised: 930/1500, Average SER 0.0002688171402100594
+model:ViterbiNet, snr:14 , Self-supervised: 960/1500, Average SER 0.00026041660457849504
+model:Transformer, snr:12 , Self-supervised: 120/300, Average SER 0.0004166667660077413
+model:ViterbiNet, snr:14 , Self-supervised: 990/1500, Average SER 0.0002525251923185406
+model:ViterbiNet, snr:14 , Self-supervised: 1020/1500, Average SER 0.0002777777466119504
+model:ViterbiNet, snr:14 , Self-supervised: 1050/1500, Average SER 0.00026984123956589473
+model:ViterbiNet, snr:14 , Self-supervised: 1080/1500, Average SER 0.0002932098728639108
+model:ViterbiNet, snr:14 , Self-supervised: 1110/1500, Average SER 0.00028528528170542676
+model:Transformer, snr:13 , Self-supervised: 120/900, Average SER 0.0
+model:Transformer, snr:14 , Self-supervised: 120/1500, Average SER 0.0
+model:ViterbiNet, snr:14 , Self-supervised: 1140/1500, Average SER 0.0002997075779396191
+model:Transformer, snr:12 , Self-supervised: 150/300, Average SER 0.00033333341280619304
+model:ViterbiNet, snr:14 , Self-supervised: 1170/1500, Average SER 0.0003347577702285897
+model:ViterbiNet, snr:14 , Self-supervised: 1200/1500, Average SER 0.0003749998907248179
+model:ViterbiNet, snr:14 , Self-supervised: 1230/1500, Average SER 0.00037940367450559043
+model:ViterbiNet, snr:14 , Self-supervised: 1260/1500, Average SER 0.0003703702536840288
+model:ViterbiNet, snr:14 , Self-supervised: 1290/1500, Average SER 0.00036175699197044667
+model:Transformer, snr:13 , Self-supervised: 150/900, Average SER 0.0
+model:Transformer, snr:14 , Self-supervised: 150/1500, Average SER 0.0
+model:ViterbiNet, snr:14 , Self-supervised: 1320/1500, Average SER 0.0003535352421529365
+model:Transformer, snr:12 , Self-supervised: 180/300, Average SER 0.0007407406965891521
+model:ViterbiNet, snr:14 , Self-supervised: 1350/1500, Average SER 0.0003456789034384268
+model:ViterbiNet, snr:14 , Self-supervised: 1380/1500, Average SER 0.00043478258278058923
+model:ViterbiNet, snr:14 , Self-supervised: 1410/1500, Average SER 0.0004669030084677622
+model:ViterbiNet, snr:14 , Self-supervised: 1440/1500, Average SER 0.00046874992549419405
+model:ViterbiNet, snr:14 , Self-supervised: 1470/1500, Average SER 0.0007142856007530576
+model:ViterbiNet, snr:14 , Self-supervised: 1500/1500, Average SER 0.0007666665712992351
+model: ViterbiNet, SNR: 14, Final SER: 0.0007666665712992351
+0.0007666665712992351
+model:Transformer, snr:12 , Self-supervised: 210/300, Average SER 0.0007936508882613409
+model:Transformer, snr:13 , Self-supervised: 180/900, Average SER 0.0
+model:Transformer, snr:14 , Self-supervised: 180/1500, Average SER 0.0
+model:Transformer, snr:12 , Self-supervised: 240/300, Average SER 0.0007638889054457347
+model:Transformer, snr:13 , Self-supervised: 210/900, Average SER 0.00023809529486156644
+model:Transformer, snr:14 , Self-supervised: 210/1500, Average SER 0.0
+model:Transformer, snr:12 , Self-supervised: 270/300, Average SER 0.0008024690327820955
+model:Transformer, snr:13 , Self-supervised: 240/900, Average SER 0.00020833338300387064
+model:Transformer, snr:14 , Self-supervised: 240/1500, Average SER 0.0
+model:Transformer, snr:12 , Self-supervised: 300/300, Average SER 0.0009999998410542806
+model: Transformer, SNR: 12, Final SER: 0.0009999998410542806
+0.0009999998410542806
+model:Transformer, snr:13 , Self-supervised: 270/900, Average SER 0.00027777773362618903
+model:Transformer, snr:14 , Self-supervised: 270/1500, Average SER 0.0
+model:Transformer, snr:13 , Self-supervised: 300/900, Average SER 0.0005277776718139648
+model:Transformer, snr:14 , Self-supervised: 300/1500, Average SER 8.333325386047363e-05
+model:Transformer, snr:13 , Self-supervised: 330/900, Average SER 0.0004797978834672408
+model:Transformer, snr:14 , Self-supervised: 330/1500, Average SER 7.575750350952148e-05
+model:Transformer, snr:13 , Self-supervised: 360/900, Average SER 0.0004398147265116374
+model:Transformer, snr:14 , Self-supervised: 360/1500, Average SER 6.944437821706136e-05
+model:Transformer, snr:13 , Self-supervised: 390/900, Average SER 0.00040598282447228064
+model:Transformer, snr:14 , Self-supervised: 390/1500, Average SER 6.410250296959511e-05
+model:Transformer, snr:13 , Self-supervised: 420/900, Average SER 0.0003769840512956892
+model:Transformer, snr:14 , Self-supervised: 420/1500, Average SER 5.9523752757481164e-05
+model:Transformer, snr:13 , Self-supervised: 450/900, Average SER 0.000407407283782959
+model:Transformer, snr:14 , Self-supervised: 450/1500, Average SER 5.555550257364909e-05
+model:Transformer, snr:13 , Self-supervised: 480/900, Average SER 0.000381944328546524
+model:Transformer, snr:14 , Self-supervised: 480/1500, Average SER 5.208328366279602e-05
+model:Transformer, snr:13 , Self-supervised: 510/900, Average SER 0.00035947701510261087
+model:Transformer, snr:14 , Self-supervised: 510/1500, Average SER 4.901956109439625e-05
+model:Transformer, snr:13 , Self-supervised: 540/900, Average SER 0.00033950606981913246
+model:Transformer, snr:14 , Self-supervised: 540/1500, Average SER 4.629625214470757e-05
+model:Transformer, snr:13 , Self-supervised: 570/900, Average SER 0.00032163732930233605
+model:Transformer, snr:14 , Self-supervised: 570/1500, Average SER 4.3859607294986124e-05
+model:Transformer, snr:13 , Self-supervised: 600/900, Average SER 0.00030555546283721923
+model:Transformer, snr:14 , Self-supervised: 600/1500, Average SER 4.1666626930236814e-05
+model:Transformer, snr:13 , Self-supervised: 630/900, Average SER 0.0003571428003765288
+model:Transformer, snr:14 , Self-supervised: 630/1500, Average SER 3.968250183832078e-05
+model:Transformer, snr:13 , Self-supervised: 660/900, Average SER 0.0003409090367230502
+model:Transformer, snr:14 , Self-supervised: 660/1500, Average SER 3.787875175476074e-05
+model:Transformer, snr:13 , Self-supervised: 690/900, Average SER 0.00032608690469161324
+model:Transformer, snr:14 , Self-supervised: 690/1500, Average SER 3.623184950455375e-05
+model:Transformer, snr:13 , Self-supervised: 720/900, Average SER 0.0003124999503294627
+model:Transformer, snr:14 , Self-supervised: 720/1500, Average SER 3.472218910853068e-05
+model:Transformer, snr:13 , Self-supervised: 750/900, Average SER 0.00029999995231628417
+model:Transformer, snr:14 , Self-supervised: 750/1500, Average SER 3.3333301544189454e-05
+model:Transformer, snr:13 , Self-supervised: 780/900, Average SER 0.0002884614926118117
+model:Transformer, snr:14 , Self-supervised: 780/1500, Average SER 3.2051251484797554e-05
+model:Transformer, snr:13 , Self-supervised: 810/900, Average SER 0.00027777773362618903
+model:Transformer, snr:14 , Self-supervised: 810/1500, Average SER 3.0864168096471714e-05
+model:Transformer, snr:13 , Self-supervised: 840/900, Average SER 0.00026785710028239657
+model:Transformer, snr:14 , Self-supervised: 840/1500, Average SER 2.9761876378740582e-05
+model:Transformer, snr:13 , Self-supervised: 870/900, Average SER 0.00025862064854852086
+model:Transformer, snr:14 , Self-supervised: 870/1500, Average SER 2.8735604779473668e-05
+model:Transformer, snr:13 , Self-supervised: 900/900, Average SER 0.0002962962786356608
+model: Transformer, SNR: 13, Final SER: 0.0002962962786356608
+0.0002962962786356608
+model:Transformer, snr:14 , Self-supervised: 900/1500, Average SER 2.7777751286824546e-05
+model:Transformer, snr:14 , Self-supervised: 930/1500, Average SER 2.6881694793701172e-05
+model:Transformer, snr:14 , Self-supervised: 960/1500, Average SER 5.208328366279602e-05
+model:Transformer, snr:14 , Self-supervised: 990/1500, Average SER 5.050500233968099e-05
+model:Transformer, snr:14 , Self-supervised: 1020/1500, Average SER 4.901956109439625e-05
+model:Transformer, snr:14 , Self-supervised: 1050/1500, Average SER 4.761900220598493e-05
+model:Transformer, snr:14 , Self-supervised: 1080/1500, Average SER 8.487651745478312e-05
+model:Transformer, snr:14 , Self-supervised: 1110/1500, Average SER 8.258255752357276e-05
+model:Transformer, snr:14 , Self-supervised: 1140/1500, Average SER 8.040933232558401e-05
+model:Transformer, snr:14 , Self-supervised: 1170/1500, Average SER 7.834755457364596e-05
+model:Transformer, snr:14 , Self-supervised: 1200/1500, Average SER 7.638886570930481e-05
+model:Transformer, snr:14 , Self-supervised: 1230/1500, Average SER 7.45257226432242e-05
+model:Transformer, snr:14 , Self-supervised: 1260/1500, Average SER 7.275130067552839e-05
+model:Transformer, snr:14 , Self-supervised: 1290/1500, Average SER 7.105940996214401e-05
+model:Transformer, snr:14 , Self-supervised: 1320/1500, Average SER 6.944442337209528e-05
+model:Transformer, snr:14 , Self-supervised: 1350/1500, Average SER 6.79012139638265e-05
+model:Transformer, snr:14 , Self-supervised: 1380/1500, Average SER 6.64251006167868e-05
+model:Transformer, snr:14 , Self-supervised: 1410/1500, Average SER 6.501180060366366e-05
+model:Transformer, snr:14 , Self-supervised: 1440/1500, Average SER 6.365738809108735e-05
+model:Transformer, snr:14 , Self-supervised: 1470/1500, Average SER 6.235825772188148e-05
+model:Transformer, snr:14 , Self-supervised: 1500/1500, Average SER 6.111109256744384e-05
+model: Transformer, SNR: 14, Final SER: 6.111109256744384e-05
+6.111109256744384e-05
+iteration: 6,snr=12, block-length=120, num-symbols=2, model=Transformer
+iteration: 6,snr=12, block-length=120, num-symbols=2, model=ViterbiNet
+iteration: 6,snr=13, block-length=120, num-symbols=2, model=Transformer
+iteration: 6,snr=13, block-length=120, num-symbols=2, model=ViterbiNet
+iteration: 6,snr=14, block-length=120, num-symbols=2, model=Transformer
+iteration: 6,snr=14, block-length=120, num-symbols=2, model=ViterbiNet
+cpu
+cpucpu
+
+cpu
+cpu
+cpu
+ViterbiNet: num parameters: 7002ViterbiNet: num parameters: 7002
+
+ViterbiNet_ModelBasedViterbiNet_ModelBased
+
+ViterbiNet: num parameters: 7002
+ViterbiNet_ModelBased
+model:ViterbiNet, snr:12 *** New: number of pilots for training : model:ViterbiNet, snr:14 *** New: number of pilots for training :   25125
+
+ViterbiNet_ModelBased_cost2100_12_120_2
+ViterbiNet_ModelBased_cost2100_14_120_2
+C:\viterbitransformed\Code\../Results\plots\ViterbiNet_ModelBased_cost2100_12_120_2_ISI_AWGN.pkl
+C:\viterbitransformed\Code\../Results\plots\ViterbiNet_ModelBased_cost2100_14_120_2_ISI_AWGN.pkl
+calculating fresh
+model:ViterbiNet, snr:13 *** New: number of pilots for training :  75calculating fresh
+
+loading model from SNR 12 and gamma 0.2ViterbiNet_ModelBased_cost2100_13_120_2
+
+loading model from SNR 14 and gamma 0.2
+C:\viterbitransformed\Code\../Results\plots\ViterbiNet_ModelBased_cost2100_13_120_2_ISI_AWGN.pkl
+calculating fresh
+loading model from SNR 13 and gamma 0.2
+Transformer: num parameters: 6960Transformer: num parameters: 6960
+
+ECC_Transformer_ModelBased
+ECC_Transformer_ModelBased
+Transformer: num parameters: 6960
+model:Transformer, snr:14 *** New: number of pilots for training :  125
+Transformer_ModelBased_cost2100_14_120_2
+C:\viterbitransformed\Code\../Results\plots\Transformer_ModelBased_cost2100_14_120_2_ISI_AWGN.pkl
+ECC_Transformer_ModelBased
+calculating fresh
+model:Transformer, snr:12 *** New: number of pilots for training : loading model from SNR 14 and gamma 0.2
+ 25
+Transformer_ModelBased_cost2100_12_120_2
+C:\viterbitransformed\Code\../Results\plots\Transformer_ModelBased_cost2100_12_120_2_ISI_AWGN.pkl
+calculating fresh
+loading model from SNR 12 and gamma 0.2
+model:Transformer, snr:13 *** New: number of pilots for training :  75
+Transformer_ModelBased_cost2100_13_120_2
+C:\viterbitransformed\Code\../Results\plots\Transformer_ModelBased_cost2100_13_120_2_ISI_AWGN.pkl
+calculating fresh
+loading model from SNR 13 and gamma 0.2
+model:Transformer, snr:13  Start training model - Transformer,SNR - 13, Gamma - 0.2, Channel Cost - cost2100model:ViterbiNet, snr:14  Start training model - ViterbiNet,SNR - 14, Gamma - 0.2, Channel Cost - cost2100
+
+model:ViterbiNet, snr:12  Start training model - ViterbiNet,SNR - 12, Gamma - 0.2, Channel Cost - cost2100model:ViterbiNet, snr:13  Start training model - ViterbiNet,SNR - 13, Gamma - 0.2, Channel Cost - cost2100
+
+model:Transformer, snr:14  Start training model - Transformer,SNR - 14, Gamma - 0.2, Channel Cost - cost2100
+model:Transformer, snr:12  Start training model - Transformer,SNR - 12, Gamma - 0.2, Channel Cost - cost2100
+model:ViterbiNet, snr:12Best Validation SER - 0.003993034362792969 (saved)
+**************************************************
+model:ViterbiNet, snr:12, Start online evaluation using 1 repetitions
+model:ViterbiNet, snr:13Best Validation SER - 0.0032094717025756836 (saved)
+**************************************************
+model:ViterbiNet, snr:13, Start online evaluation using 3 repetitions
+model:ViterbiNet, snr:14Best Validation SER - 0.0010662078857421875 (saved)
+**************************************************
+model:ViterbiNet, snr:14, Start online evaluation using 5 repetitions
+model:ViterbiNet, snr:12 , Self-supervised: 30/300, Average SER 0.0
+model:ViterbiNet, snr:13 , Self-supervised: 30/900, Average SER 0.0
+model:ViterbiNet, snr:14 , Self-supervised: 30/1500, Average SER 0.0
+model:ViterbiNet, snr:12 , Self-supervised: 60/300, Average SER 0.0
+model:ViterbiNet, snr:13 , Self-supervised: 60/900, Average SER 0.0
+model:ViterbiNet, snr:14 , Self-supervised: 60/1500, Average SER 0.0
+model:ViterbiNet, snr:12 , Self-supervised: 90/300, Average SER 0.00037037067943149145
+model:ViterbiNet, snr:13 , Self-supervised: 90/900, Average SER 0.00037037067943149145
+model:ViterbiNet, snr:14 , Self-supervised: 90/1500, Average SER 0.00037037067943149145
+model:ViterbiNet, snr:12 , Self-supervised: 120/300, Average SER 0.0004166667660077413
+model:ViterbiNet, snr:13 , Self-supervised: 120/900, Average SER 0.00027777800957361855
+model:ViterbiNet, snr:14 , Self-supervised: 120/1500, Average SER 0.00027777800957361855
+model:ViterbiNet, snr:12 , Self-supervised: 150/300, Average SER 0.00033333341280619304
+model:ViterbiNet, snr:13 , Self-supervised: 150/900, Average SER 0.00022222240765889487
+model:ViterbiNet, snr:14 , Self-supervised: 150/1500, Average SER 0.00022222240765889487
+model:ViterbiNet, snr:12 , Self-supervised: 180/300, Average SER 0.00027777784400516084
+model:ViterbiNet, snr:13 , Self-supervised: 180/900, Average SER 0.00018518533971574572
+model:ViterbiNet, snr:14 , Self-supervised: 180/1500, Average SER 0.00018518533971574572
+model:ViterbiNet, snr:12 , Self-supervised: 210/300, Average SER 0.00023809529486156644
+model:ViterbiNet, snr:13 , Self-supervised: 210/900, Average SER 0.0001587302911849249
+model:ViterbiNet, snr:14 , Self-supervised: 210/1500, Average SER 0.0001587302911849249
+model:ViterbiNet, snr:12 , Self-supervised: 240/300, Average SER 0.00020833338300387064
+model:Transformer, snr:14Best Validation SER - 0.0003927946090698242 (saved)
+**************************************************
+model:Transformer, snr:14, Start online evaluation using 5 repetitions
+model:ViterbiNet, snr:13 , Self-supervised: 240/900, Average SER 0.00013888900478680927
+model:ViterbiNet, snr:14 , Self-supervised: 240/1500, Average SER 0.00013888900478680927
+model:Transformer, snr:12Best Validation SER - 0.002112269401550293 (saved)
+**************************************************
+model:Transformer, snr:12, Start online evaluation using 1 repetitions
+model:Transformer, snr:13Best Validation SER - 0.0009009242057800293 (saved)
+**************************************************
+model:Transformer, snr:13, Start online evaluation using 3 repetitions
+model:ViterbiNet, snr:12 , Self-supervised: 270/300, Average SER 0.0007407404758312085
+model:ViterbiNet, snr:13 , Self-supervised: 270/900, Average SER 0.00018518522933677392
+model:ViterbiNet, snr:14 , Self-supervised: 270/1500, Average SER 0.00012345689314383046
+model:ViterbiNet, snr:12 , Self-supervised: 300/300, Average SER 0.001166666348775228
+model: ViterbiNet, SNR: 12, Final SER: 0.001166666348775228
+0.001166666348775228
+model:ViterbiNet, snr:13 , Self-supervised: 300/900, Average SER 0.00030555546283721923
+model:ViterbiNet, snr:14 , Self-supervised: 300/1500, Average SER 0.00011111120382944743
+model:ViterbiNet, snr:13 , Self-supervised: 330/900, Average SER 0.00027777769348838113
+model:ViterbiNet, snr:14 , Self-supervised: 330/1500, Average SER 0.00010101018529949767
+model:ViterbiNet, snr:13 , Self-supervised: 360/900, Average SER 0.0002546295523643494
+model:ViterbiNet, snr:14 , Self-supervised: 360/1500, Average SER 9.259266985787286e-05
+model:ViterbiNet, snr:13 , Self-supervised: 390/900, Average SER 0.0002350426637209379
+model:ViterbiNet, snr:14 , Self-supervised: 390/1500, Average SER 8.547015679188264e-05
+model:ViterbiNet, snr:13 , Self-supervised: 420/900, Average SER 0.00021825390202658517
+model:ViterbiNet, snr:14 , Self-supervised: 420/1500, Average SER 7.936514559246245e-05
+model:Transformer, snr:14 , Self-supervised: 30/1500, Average SER 0.0
+model:Transformer, snr:12 , Self-supervised: 30/300, Average SER 0.0011111120382944742
+model:ViterbiNet, snr:13 , Self-supervised: 450/900, Average SER 0.0002037036418914795
+model:ViterbiNet, snr:14 , Self-supervised: 450/1500, Average SER 7.407413588629829e-05
+model:Transformer, snr:13 , Self-supervised: 30/900, Average SER 0.0
+model:ViterbiNet, snr:13 , Self-supervised: 480/900, Average SER 0.000190972164273262
+model:ViterbiNet, snr:14 , Self-supervised: 480/1500, Average SER 6.944450239340464e-05
+model:ViterbiNet, snr:13 , Self-supervised: 510/900, Average SER 0.00017973850755130543
+model:ViterbiNet, snr:14 , Self-supervised: 510/1500, Average SER 6.535953166438084e-05
+model:ViterbiNet, snr:13 , Self-supervised: 540/900, Average SER 0.00016975303490956623
+model:ViterbiNet, snr:14 , Self-supervised: 540/1500, Average SER 6.172844657191523e-05
+model:ViterbiNet, snr:13 , Self-supervised: 570/900, Average SER 0.00016081866465116802
+model:ViterbiNet, snr:14 , Self-supervised: 570/1500, Average SER 5.847958096286707e-05
+model:ViterbiNet, snr:13 , Self-supervised: 600/900, Average SER 0.00015277773141860962
+model:ViterbiNet, snr:14 , Self-supervised: 600/1500, Average SER 8.333335320154826e-05
+model:ViterbiNet, snr:13 , Self-supervised: 630/900, Average SER 0.00014550260135105678
+model:ViterbiNet, snr:14 , Self-supervised: 630/1500, Average SER 7.936509828718882e-05
+model:Transformer, snr:14 , Self-supervised: 60/1500, Average SER 0.0
+model:Transformer, snr:12 , Self-supervised: 60/300, Average SER 0.0009722222884496053
+model:Transformer, snr:13 , Self-supervised: 60/900, Average SER 0.0
+model:ViterbiNet, snr:13 , Self-supervised: 660/900, Average SER 0.00013888884674419057
+model:ViterbiNet, snr:14 , Self-supervised: 660/1500, Average SER 7.575759381958933e-05
+model:ViterbiNet, snr:13 , Self-supervised: 690/900, Average SER 0.0001328502012335736
+model:ViterbiNet, snr:14 , Self-supervised: 690/1500, Average SER 7.246378539265066e-05
+model:ViterbiNet, snr:13 , Self-supervised: 720/900, Average SER 0.0001273147761821747
+model:ViterbiNet, snr:14 , Self-supervised: 720/1500, Average SER 6.944446100129021e-05
+model:ViterbiNet, snr:13 , Self-supervised: 750/900, Average SER 0.00012222218513488768
+model:ViterbiNet, snr:14 , Self-supervised: 750/1500, Average SER 6.666668256123861e-05
+model:ViterbiNet, snr:13 , Self-supervised: 780/900, Average SER 0.00012820508235540147
+model:ViterbiNet, snr:14 , Self-supervised: 780/1500, Average SER 6.410257938580636e-05
+model:ViterbiNet, snr:13 , Self-supervised: 810/900, Average SER 0.00012345674597186808
+model:ViterbiNet, snr:14 , Self-supervised: 810/1500, Average SER 6.172840977892464e-05
+model:Transformer, snr:14 , Self-supervised: 90/1500, Average SER 0.0
+model:Transformer, snr:12 , Self-supervised: 90/300, Average SER 0.0010185188717312284
+model:ViterbiNet, snr:13 , Self-supervised: 840/900, Average SER 0.00011904757647287277
+model:ViterbiNet, snr:14 , Self-supervised: 840/1500, Average SER 5.952382371539161e-05
+model:Transformer, snr:13 , Self-supervised: 90/900, Average SER 0.00037037067943149145
+model:ViterbiNet, snr:13 , Self-supervised: 870/900, Average SER 0.00013409955748196306
+model:ViterbiNet, snr:14 , Self-supervised: 870/1500, Average SER 5.747127807003328e-05
+model:ViterbiNet, snr:13 , Self-supervised: 900/900, Average SER 0.00022222214274936252
+model: ViterbiNet, SNR: 13, Final SER: 0.00022222214274936252
+0.00022222214274936252
+model:ViterbiNet, snr:14 , Self-supervised: 900/1500, Average SER 0.00010185182094573974
+model:ViterbiNet, snr:14 , Self-supervised: 930/1500, Average SER 9.856627833458686e-05
+model:ViterbiNet, snr:14 , Self-supervised: 960/1500, Average SER 9.5486082136631e-05
+model:ViterbiNet, snr:14 , Self-supervised: 990/1500, Average SER 9.259256449612704e-05
+model:ViterbiNet, snr:14 , Self-supervised: 1020/1500, Average SER 8.986925377565272e-05
+model:Transformer, snr:12 , Self-supervised: 120/300, Average SER 0.0009722222884496053
+model:Transformer, snr:14 , Self-supervised: 120/1500, Average SER 0.0
+model:Transformer, snr:13 , Self-supervised: 120/900, Average SER 0.00027777800957361855
+model:ViterbiNet, snr:14 , Self-supervised: 1050/1500, Average SER 8.730156081063407e-05
+model:ViterbiNet, snr:14 , Self-supervised: 1080/1500, Average SER 8.487651745478312e-05
+model:ViterbiNet, snr:14 , Self-supervised: 1110/1500, Average SER 8.258255752357276e-05
+model:ViterbiNet, snr:14 , Self-supervised: 1140/1500, Average SER 8.040933232558401e-05
+model:ViterbiNet, snr:14 , Self-supervised: 1170/1500, Average SER 0.00012108255655337602
+model:ViterbiNet, snr:14 , Self-supervised: 1200/1500, Average SER 0.0001319443682829539
+model:Transformer, snr:12 , Self-supervised: 150/300, Average SER 0.0010000002384185792
+model:Transformer, snr:14 , Self-supervised: 150/1500, Average SER 0.0
+model:ViterbiNet, snr:14 , Self-supervised: 1230/1500, Average SER 0.0001287262129589794
+model:Transformer, snr:13 , Self-supervised: 150/900, Average SER 0.00022222240765889487
+model:ViterbiNet, snr:14 , Self-supervised: 1260/1500, Average SER 0.00012566130312662276
+model:ViterbiNet, snr:14 , Self-supervised: 1290/1500, Average SER 0.0001227389472399571
+model:ViterbiNet, snr:14 , Self-supervised: 1320/1500, Average SER 0.00011994942571177627
+model:ViterbiNet, snr:14 , Self-supervised: 1350/1500, Average SER 0.00011728388291818124
+model:ViterbiNet, snr:14 , Self-supervised: 1380/1500, Average SER 0.000132850158041802
+model:Transformer, snr:12 , Self-supervised: 180/300, Average SER 0.0010648147927390206
+model:Transformer, snr:14 , Self-supervised: 180/1500, Average SER 0.0
+model:ViterbiNet, snr:14 , Self-supervised: 1410/1500, Average SER 0.00013002355893452963
+model:Transformer, snr:13 , Self-supervised: 180/900, Average SER 0.00018518533971574572
+model:ViterbiNet, snr:14 , Self-supervised: 1440/1500, Average SER 0.00012731473479006027
+model:ViterbiNet, snr:14 , Self-supervised: 1470/1500, Average SER 0.00012471647489638557
+model:ViterbiNet, snr:14 , Self-supervised: 1500/1500, Average SER 0.00013333324591318767
+model: ViterbiNet, SNR: 14, Final SER: 0.00013333324591318767
+0.00013333324591318767
+model:Transformer, snr:12 , Self-supervised: 210/300, Average SER 0.0011904761904761906
+model:Transformer, snr:14 , Self-supervised: 210/1500, Average SER 0.0
+model:Transformer, snr:13 , Self-supervised: 210/900, Average SER 0.0001587302911849249
+model:Transformer, snr:12 , Self-supervised: 240/300, Average SER 0.0012152778605620067
+model:Transformer, snr:14 , Self-supervised: 240/1500, Average SER 6.944437821706136e-05
+model:Transformer, snr:13 , Self-supervised: 240/900, Average SER 0.00024305557211240131
+model:Transformer, snr:12 , Self-supervised: 270/300, Average SER 0.0014197532777433042
+model:Transformer, snr:13 , Self-supervised: 270/900, Average SER 0.00021604939743324563
+model:Transformer, snr:14 , Self-supervised: 270/1500, Average SER 6.172833619294343e-05
+model:Transformer, snr:12 , Self-supervised: 300/300, Average SER 0.0016666666666666668
+model: Transformer, SNR: 12, Final SER: 0.0016666666666666668
+0.0016666666666666668
+model:Transformer, snr:13 , Self-supervised: 300/900, Average SER 0.0005277776718139648
+model:Transformer, snr:14 , Self-supervised: 300/1500, Average SER 0.0001388887564341227
+model:Transformer, snr:13 , Self-supervised: 330/900, Average SER 0.0004797978834672408
+model:Transformer, snr:14 , Self-supervised: 330/1500, Average SER 0.00012626250584920248
+model:Transformer, snr:13 , Self-supervised: 360/900, Average SER 0.0005092591047286988
+model:Transformer, snr:14 , Self-supervised: 360/1500, Average SER 0.00011574063036176894
+model:Transformer, snr:13 , Self-supervised: 390/900, Average SER 0.0004700853274418758
+model:Transformer, snr:14 , Self-supervised: 390/1500, Average SER 0.00010683750494932517
+model:Transformer, snr:13 , Self-supervised: 420/900, Average SER 0.00043650780405317033
+model:Transformer, snr:14 , Self-supervised: 420/1500, Average SER 9.920625459580195e-05
+model:Transformer, snr:13 , Self-supervised: 450/900, Average SER 0.000407407283782959
+model:Transformer, snr:14 , Self-supervised: 450/1500, Average SER 9.259250428941514e-05
+model:Transformer, snr:13 , Self-supervised: 480/900, Average SER 0.000381944328546524
+model:Transformer, snr:14 , Self-supervised: 480/1500, Average SER 8.68054727713267e-05
+model:Transformer, snr:13 , Self-supervised: 510/900, Average SER 0.00035947701510261087
+model:Transformer, snr:14 , Self-supervised: 510/1500, Average SER 8.169926849066043e-05
+model:Transformer, snr:13 , Self-supervised: 540/900, Average SER 0.00033950606981913246
+model:Transformer, snr:14 , Self-supervised: 540/1500, Average SER 7.716042024117928e-05
+model:Transformer, snr:13 , Self-supervised: 570/900, Average SER 0.00036549693659732214
+model:Transformer, snr:14 , Self-supervised: 570/1500, Average SER 7.309934549164354e-05
+model:Transformer, snr:13 , Self-supervised: 600/900, Average SER 0.0003888887166976929
+model:Transformer, snr:13 , Self-supervised: 630/900, Average SER 0.0003703702063787551
+model:Transformer, snr:14 , Self-supervised: 600/1500, Average SER 6.944437821706136e-05
+model:Transformer, snr:13 , Self-supervised: 660/900, Average SER 0.0003535351969979026
+model:Transformer, snr:14 , Self-supervised: 630/1500, Average SER 6.613750306386797e-05
+model:Transformer, snr:13 , Self-supervised: 690/900, Average SER 0.00033816410147625466
+model:Transformer, snr:14 , Self-supervised: 660/1500, Average SER 6.313125292460124e-05
+model:Transformer, snr:13 , Self-supervised: 720/900, Average SER 0.00035879611968994143
+model:Transformer, snr:14 , Self-supervised: 690/1500, Average SER 6.038641584092292e-05
+model:Transformer, snr:13 , Self-supervised: 750/900, Average SER 0.00034444427490234374
+model:Transformer, snr:14 , Self-supervised: 720/1500, Average SER 5.787031518088447e-05
+model:Transformer, snr:13 , Self-supervised: 780/900, Average SER 0.00033119641817533054
+model:Transformer, snr:14 , Self-supervised: 750/1500, Average SER 5.555550257364909e-05
+model:Transformer, snr:13 , Self-supervised: 810/900, Average SER 0.0003189298841688368
+model:Transformer, snr:14 , Self-supervised: 780/1500, Average SER 5.3418752474662586e-05
+model:Transformer, snr:13 , Self-supervised: 840/900, Average SER 0.00030753953116280695
+model:Transformer, snr:14 , Self-supervised: 810/1500, Average SER 5.1440280160786194e-05
+model:Transformer, snr:13 , Self-supervised: 870/900, Average SER 0.0002969347197433998
+model:Transformer, snr:14 , Self-supervised: 840/1500, Average SER 4.960312729790097e-05
+model:Transformer, snr:13 , Self-supervised: 900/900, Average SER 0.00032407396369510226
+model: Transformer, SNR: 13, Final SER: 0.00032407396369510226
+0.00032407396369510226
+model:Transformer, snr:14 , Self-supervised: 870/1500, Average SER 4.789267463245611e-05
+model:Transformer, snr:14 , Self-supervised: 900/1500, Average SER 4.629625214470757e-05
+model:Transformer, snr:14 , Self-supervised: 930/1500, Average SER 4.480282465616862e-05
+model:Transformer, snr:14 , Self-supervised: 960/1500, Average SER 8.680553485949835e-05
+model:Transformer, snr:14 , Self-supervised: 990/1500, Average SER 8.417506410618022e-05
+model:Transformer, snr:14 , Self-supervised: 1020/1500, Average SER 8.169932692658668e-05
+model:Transformer, snr:14 , Self-supervised: 1050/1500, Average SER 7.936506044296991e-05
+model:Transformer, snr:14 , Self-supervised: 1080/1500, Average SER 7.716047543066519e-05
+model:Transformer, snr:14 , Self-supervised: 1110/1500, Average SER 7.507505717578235e-05
+model:Transformer, snr:14 , Self-supervised: 1140/1500, Average SER 7.309939777641966e-05
+model:Transformer, snr:14 , Self-supervised: 1170/1500, Average SER 7.122505424369094e-05
+model:Transformer, snr:14 , Self-supervised: 1200/1500, Average SER 6.944442788759868e-05
+model:Transformer, snr:14 , Self-supervised: 1230/1500, Average SER 6.775066135375481e-05
+model:Transformer, snr:14 , Self-supervised: 1260/1500, Average SER 6.61375503691416e-05
+model:Transformer, snr:14 , Self-supervised: 1290/1500, Average SER 6.459946780241736e-05
+model:Transformer, snr:14 , Self-supervised: 1320/1500, Average SER 6.313129807963516e-05
+model:Transformer, snr:14 , Self-supervised: 1350/1500, Average SER 6.172838034453216e-05
+model:Transformer, snr:14 , Self-supervised: 1380/1500, Average SER 6.03864590326945e-05
+model:Transformer, snr:14 , Self-supervised: 1410/1500, Average SER 5.9101640755403125e-05
+model:Transformer, snr:14 , Self-supervised: 1440/1500, Average SER 5.78703565729989e-05
+model:Transformer, snr:14 , Self-supervised: 1470/1500, Average SER 5.668932888783565e-05
+model:Transformer, snr:14 , Self-supervised: 1500/1500, Average SER 9.999998410542806e-05
+model: Transformer, SNR: 14, Final SER: 9.999998410542806e-05
+9.999998410542806e-05
+iteration: 7,snr=12, block-length=120, num-symbols=2, model=Transformer
+iteration: 7,snr=12, block-length=120, num-symbols=2, model=ViterbiNet
+iteration: 7,snr=13, block-length=120, num-symbols=2, model=Transformer
+iteration: 7,snr=13, block-length=120, num-symbols=2, model=ViterbiNet
+iteration: 7,snr=14, block-length=120, num-symbols=2, model=Transformer
+iteration: 7,snr=14, block-length=120, num-symbols=2, model=ViterbiNet
+cpu
+cpu
+cpu
+cpu
+cpu
+cpu
+ViterbiNet: num parameters: 7002ViterbiNet: num parameters: 7002
+ViterbiNet: num parameters: 7002
+
+ViterbiNet_ModelBasedViterbiNet_ModelBased
+
+ViterbiNet_ModelBased
+model:ViterbiNet, snr:12 *** New: number of pilots for training : model:ViterbiNet, snr:14 *** New: number of pilots for training :   25125
+
+ViterbiNet_ModelBased_cost2100_12_120_2ViterbiNet_ModelBased_cost2100_14_120_2
+
+C:\viterbitransformed\Code\../Results\plots\ViterbiNet_ModelBased_cost2100_14_120_2_ISI_AWGN.pkl
+C:\viterbitransformed\Code\../Results\plots\ViterbiNet_ModelBased_cost2100_12_120_2_ISI_AWGN.pkl
+calculating freshcalculating fresh
+
+model:ViterbiNet, snr:13 *** New: number of pilots for training : loading model from SNR 14 and gamma 0.2 75loading model from SNR 12 and gamma 0.2
+
+
+ViterbiNet_ModelBased_cost2100_13_120_2
+C:\viterbitransformed\Code\../Results\plots\ViterbiNet_ModelBased_cost2100_13_120_2_ISI_AWGN.pkl
+calculating fresh
+loading model from SNR 13 and gamma 0.2
+Transformer: num parameters: 6960Transformer: num parameters: 6960
+
+ECC_Transformer_ModelBased
+ECC_Transformer_ModelBased
+Transformer: num parameters: 6960
+ECC_Transformer_ModelBased
+model:Transformer, snr:13 *** New: number of pilots for training : model:Transformer, snr:12 *** New: number of pilots for training :   7525
+
+Transformer_ModelBased_cost2100_13_120_2Transformer_ModelBased_cost2100_12_120_2
+
+C:\viterbitransformed\Code\../Results\plots\Transformer_ModelBased_cost2100_12_120_2_ISI_AWGN.pkl
+C:\viterbitransformed\Code\../Results\plots\Transformer_ModelBased_cost2100_13_120_2_ISI_AWGN.pklmodel:Transformer, snr:14 *** New: number of pilots for training : 
+ 125
+calculating fresh
+Transformer_ModelBased_cost2100_14_120_2
+calculating fresh
+loading model from SNR 12 and gamma 0.2
+C:\viterbitransformed\Code\../Results\plots\Transformer_ModelBased_cost2100_14_120_2_ISI_AWGN.pklloading model from SNR 13 and gamma 0.2
+
+calculating fresh
+loading model from SNR 14 and gamma 0.2
+model:Transformer, snr:13  Start training model - Transformer,SNR - 13, Gamma - 0.2, Channel Cost - cost2100model:Transformer, snr:12  Start training model - Transformer,SNR - 12, Gamma - 0.2, Channel Cost - cost2100
+
+model:ViterbiNet, snr:14  Start training model - ViterbiNet,SNR - 14, Gamma - 0.2, Channel Cost - cost2100
+model:ViterbiNet, snr:13  Start training model - ViterbiNet,SNR - 13, Gamma - 0.2, Channel Cost - cost2100
+model:Transformer, snr:14  Start training model - Transformer,SNR - 14, Gamma - 0.2, Channel Cost - cost2100
+model:ViterbiNet, snr:12  Start training model - ViterbiNet,SNR - 12, Gamma - 0.2, Channel Cost - cost2100
+model:ViterbiNet, snr:12Best Validation SER - 0.004600703716278076 (saved)
+**************************************************
+model:ViterbiNet, snr:12, Start online evaluation using 1 repetitions
+model:ViterbiNet, snr:13Best Validation SER - 0.0032657384872436523 (saved)
+**************************************************
+model:ViterbiNet, snr:13, Start online evaluation using 3 repetitions
+model:ViterbiNet, snr:14Best Validation SER - 0.001234591007232666 (saved)
+**************************************************
+model:ViterbiNet, snr:14, Start online evaluation using 5 repetitions
+model:ViterbiNet, snr:12 , Self-supervised: 30/300, Average SER 0.0
+model:ViterbiNet, snr:13 , Self-supervised: 30/900, Average SER 0.0
+model:ViterbiNet, snr:14 , Self-supervised: 30/1500, Average SER 0.0
+model:ViterbiNet, snr:12 , Self-supervised: 60/300, Average SER 0.0
+model:ViterbiNet, snr:13 , Self-supervised: 60/900, Average SER 0.0
+model:ViterbiNet, snr:14 , Self-supervised: 60/1500, Average SER 0.0
+model:ViterbiNet, snr:12 , Self-supervised: 90/300, Average SER 0.00037037067943149145
+model:ViterbiNet, snr:13 , Self-supervised: 90/900, Average SER 0.00037037067943149145
+model:ViterbiNet, snr:14 , Self-supervised: 90/1500, Average SER 0.0
+model:ViterbiNet, snr:12 , Self-supervised: 120/300, Average SER 0.00027777800957361855
+model:ViterbiNet, snr:13 , Self-supervised: 120/900, Average SER 0.00027777800957361855
+model:ViterbiNet, snr:14 , Self-supervised: 120/1500, Average SER 0.0
+model:ViterbiNet, snr:12 , Self-supervised: 150/300, Average SER 0.00022222240765889487
+model:ViterbiNet, snr:13 , Self-supervised: 150/900, Average SER 0.00022222240765889487
+model:ViterbiNet, snr:14 , Self-supervised: 150/1500, Average SER 0.0
+model:ViterbiNet, snr:12 , Self-supervised: 180/300, Average SER 0.00018518533971574572
+model:ViterbiNet, snr:12 , Self-supervised: 210/300, Average SER 0.0001587302911849249
+model:ViterbiNet, snr:13 , Self-supervised: 180/900, Average SER 0.00018518533971574572
+model:ViterbiNet, snr:14 , Self-supervised: 180/1500, Average SER 0.0
+model:ViterbiNet, snr:12 , Self-supervised: 240/300, Average SER 0.00024305557211240131
+model:Transformer, snr:14Best Validation SER - 5.608797073364258e-05 (saved)
+**************************************************
+model:Transformer, snr:14, Start online evaluation using 5 repetitions
+model:ViterbiNet, snr:13 , Self-supervised: 210/900, Average SER 0.0001587302911849249
+model:ViterbiNet, snr:14 , Self-supervised: 210/1500, Average SER 0.0
+model:ViterbiNet, snr:12 , Self-supervised: 270/300, Average SER 0.0008641971482170953
+model:ViterbiNet, snr:12 , Self-supervised: 300/300, Average SER 0.0015833324193954468
+model: ViterbiNet, SNR: 12, Final SER: 0.0015833324193954468
+0.0015833324193954468
+model:ViterbiNet, snr:13 , Self-supervised: 240/900, Average SER 0.00020833338300387064
+model:ViterbiNet, snr:14 , Self-supervised: 240/1500, Average SER 0.0
+model:Transformer, snr:13Best Validation SER - 0.0007320046424865723 (saved)
+**************************************************
+model:Transformer, snr:13, Start online evaluation using 3 repetitions
+model:Transformer, snr:12Best Validation SER - 0.003269672393798828 (saved)
+**************************************************
+model:Transformer, snr:12, Start online evaluation using 1 repetitions
+model:ViterbiNet, snr:13 , Self-supervised: 270/900, Average SER 0.00018518522933677392
+model:ViterbiNet, snr:14 , Self-supervised: 270/1500, Average SER 0.00015432084048235857
+model:ViterbiNet, snr:13 , Self-supervised: 300/900, Average SER 0.00016666670640309652
+model:ViterbiNet, snr:14 , Self-supervised: 300/1500, Average SER 0.0001388887564341227
+model:ViterbiNet, snr:13 , Self-supervised: 330/900, Average SER 0.00015151518763917865
+model:ViterbiNet, snr:14 , Self-supervised: 330/1500, Average SER 0.00012626250584920248
+model:ViterbiNet, snr:13 , Self-supervised: 360/900, Average SER 0.00013888892200258042
+model:ViterbiNet, snr:14 , Self-supervised: 360/1500, Average SER 0.00011574063036176894
+model:ViterbiNet, snr:13 , Self-supervised: 390/900, Average SER 0.00012820515877161272
+model:ViterbiNet, snr:14 , Self-supervised: 390/1500, Average SER 0.00010683750494932517
+model:Transformer, snr:14 , Self-supervised: 30/1500, Average SER 0.0
+model:ViterbiNet, snr:13 , Self-supervised: 420/900, Average SER 0.00011904764743078322
+model:ViterbiNet, snr:14 , Self-supervised: 420/1500, Average SER 9.920625459580195e-05
+model:Transformer, snr:12 , Self-supervised: 30/300, Average SER 0.002777777115503947
+model:Transformer, snr:13 , Self-supervised: 30/900, Average SER 0.0
+model:ViterbiNet, snr:13 , Self-supervised: 450/900, Average SER 0.00011111113760206435
+model:ViterbiNet, snr:14 , Self-supervised: 450/1500, Average SER 9.259250428941514e-05
+model:ViterbiNet, snr:13 , Self-supervised: 480/900, Average SER 0.00010416669150193532
+model:ViterbiNet, snr:14 , Self-supervised: 480/1500, Average SER 8.68054727713267e-05
+model:ViterbiNet, snr:13 , Self-supervised: 510/900, Average SER 9.8039239060645e-05
+model:ViterbiNet, snr:14 , Self-supervised: 510/1500, Average SER 8.169926849066043e-05
+model:ViterbiNet, snr:13 , Self-supervised: 540/900, Average SER 0.00012345678276485866
+model:ViterbiNet, snr:14 , Self-supervised: 540/1500, Average SER 7.716042024117928e-05
+model:ViterbiNet, snr:13 , Self-supervised: 570/900, Average SER 0.0001169590573561819
+model:ViterbiNet, snr:14 , Self-supervised: 570/1500, Average SER 7.309934549164354e-05
+model:Transformer, snr:14 , Self-supervised: 60/1500, Average SER 0.0
+model:ViterbiNet, snr:13 , Self-supervised: 600/900, Average SER 0.00013888885577519736
+model:ViterbiNet, snr:14 , Self-supervised: 600/1500, Average SER 6.944437821706136e-05
+model:ViterbiNet, snr:13 , Self-supervised: 630/900, Average SER 0.00015873010196383038
+model:ViterbiNet, snr:14 , Self-supervised: 630/1500, Average SER 6.613750306386797e-05
+model:Transformer, snr:12 , Self-supervised: 60/300, Average SER 0.0013888885577519735
+model:Transformer, snr:13 , Self-supervised: 60/900, Average SER 0.00041666626930236816
+model:ViterbiNet, snr:13 , Self-supervised: 660/900, Average SER 0.00015151509732911082
+model:ViterbiNet, snr:14 , Self-supervised: 660/1500, Average SER 6.313125292460124e-05
+model:ViterbiNet, snr:13 , Self-supervised: 690/900, Average SER 0.00014492748440175817
+model:ViterbiNet, snr:14 , Self-supervised: 690/1500, Average SER 6.038641584092292e-05
+model:ViterbiNet, snr:13 , Self-supervised: 720/900, Average SER 0.00013888883921835157
+model:ViterbiNet, snr:14 , Self-supervised: 720/1500, Average SER 5.787031518088447e-05
+model:ViterbiNet, snr:13 , Self-supervised: 750/900, Average SER 0.0001333332856496175
+model:ViterbiNet, snr:14 , Self-supervised: 750/1500, Average SER 5.555550257364909e-05
+model:ViterbiNet, snr:13 , Self-supervised: 780/900, Average SER 0.00012820508235540147
+model:ViterbiNet, snr:14 , Self-supervised: 780/1500, Average SER 5.3418752474662586e-05
+model:Transformer, snr:14 , Self-supervised: 90/1500, Average SER 0.0
+model:ViterbiNet, snr:13 , Self-supervised: 810/900, Average SER 0.00012345674597186808
+model:ViterbiNet, snr:14 , Self-supervised: 810/1500, Average SER 5.1440280160786194e-05
+model:Transformer, snr:12 , Self-supervised: 90/300, Average SER 0.0012037032180362277
+model:ViterbiNet, snr:13 , Self-supervised: 840/900, Average SER 0.00011904757647287277
+model:ViterbiNet, snr:14 , Self-supervised: 840/1500, Average SER 4.960312729790097e-05
+model:Transformer, snr:13 , Self-supervised: 90/900, Average SER 0.0002777775128682454
+model:ViterbiNet, snr:13 , Self-supervised: 870/900, Average SER 0.00011494248762898061
+model:ViterbiNet, snr:14 , Self-supervised: 870/1500, Average SER 4.789267463245611e-05
+model:ViterbiNet, snr:13 , Self-supervised: 900/900, Average SER 0.00020370370811886258
+model: ViterbiNet, SNR: 13, Final SER: 0.00020370370811886258
+0.00020370370811886258
+model:ViterbiNet, snr:14 , Self-supervised: 900/1500, Average SER 6.48147530025906e-05
+model:ViterbiNet, snr:14 , Self-supervised: 930/1500, Average SER 6.272395451863606e-05
+model:ViterbiNet, snr:14 , Self-supervised: 960/1500, Average SER 6.076383093992869e-05
+model:Transformer, snr:14 , Self-supervised: 120/1500, Average SER 0.0
+model:ViterbiNet, snr:14 , Self-supervised: 990/1500, Average SER 5.892250272962782e-05
+model:ViterbiNet, snr:14 , Self-supervised: 1020/1500, Average SER 5.71894879434623e-05
+model:Transformer, snr:12 , Self-supervised: 120/300, Average SER 0.001111110548178355
+model:Transformer, snr:13 , Self-supervised: 120/900, Average SER 0.00020833313465118408
+model:ViterbiNet, snr:14 , Self-supervised: 1050/1500, Average SER 5.555550257364909e-05
+model:ViterbiNet, snr:14 , Self-supervised: 1080/1500, Average SER 5.4012294168825506e-05
+model:ViterbiNet, snr:14 , Self-supervised: 1110/1500, Average SER 5.2552502434532924e-05
+model:ViterbiNet, snr:14 , Self-supervised: 1140/1500, Average SER 5.116954184415048e-05
+model:Transformer, snr:14 , Self-supervised: 150/1500, Average SER 0.0
+model:ViterbiNet, snr:14 , Self-supervised: 1170/1500, Average SER 0.0011965811762035402
+model:ViterbiNet, snr:14 , Self-supervised: 1200/1500, Average SER 0.0059930554529031115
+model:ViterbiNet, snr:14 , Self-supervised: 1230/1500, Average SER 0.005846883368685963
+model:Transformer, snr:12 , Self-supervised: 150/300, Average SER 0.0008888884385426839
+model:ViterbiNet, snr:14 , Self-supervised: 1260/1500, Average SER 0.005707671859907726
+model:Transformer, snr:13 , Self-supervised: 150/900, Average SER 0.00016666650772094725
+model:ViterbiNet, snr:14 , Self-supervised: 1290/1500, Average SER 0.005574935305026151
+model:ViterbiNet, snr:14 , Self-supervised: 1320/1500, Average SER 0.00544823222991192
+model:ViterbiNet, snr:14 , Self-supervised: 1350/1500, Average SER 0.005327160402580544
+model:Transformer, snr:14 , Self-supervised: 180/1500, Average SER 0.0
+model:ViterbiNet, snr:14 , Self-supervised: 1380/1500, Average SER 0.005259661786798118
+model:ViterbiNet, snr:14 , Self-supervised: 1410/1500, Average SER 0.005159574408903189
+model:ViterbiNet, snr:14 , Self-supervised: 1440/1500, Average SER 0.005052083275384373
+model:Transformer, snr:12 , Self-supervised: 180/300, Average SER 0.0007407403654522365
+model:ViterbiNet, snr:14 , Self-supervised: 1470/1500, Average SER 0.005085033989277015
+model:Transformer, snr:13 , Self-supervised: 180/900, Average SER 0.0001388887564341227
+model:ViterbiNet, snr:14 , Self-supervised: 1500/1500, Average SER 0.005505555589993795
+model: ViterbiNet, SNR: 14, Final SER: 0.005505555589993795
+0.005505555589993795
+model:Transformer, snr:14 , Self-supervised: 210/1500, Average SER 0.0
+model:Transformer, snr:12 , Self-supervised: 210/300, Average SER 0.0008333328224363781
+model:Transformer, snr:13 , Self-supervised: 210/900, Average SER 0.0001984125091916039
+model:Transformer, snr:14 , Self-supervised: 240/1500, Average SER 0.0
+model:Transformer, snr:12 , Self-supervised: 240/300, Average SER 0.0007986105978488922
+model:Transformer, snr:13 , Self-supervised: 240/900, Average SER 0.0001736109455426534
+model:Transformer, snr:14 , Self-supervised: 270/1500, Average SER 0.00015432084048235857
+model:Transformer, snr:12 , Self-supervised: 270/300, Average SER 0.0008641969274591517
+model:Transformer, snr:13 , Self-supervised: 270/900, Average SER 0.00021604917667530202
+model:Transformer, snr:14 , Self-supervised: 300/1500, Average SER 0.0001388887564341227
+model:Transformer, snr:12 , Self-supervised: 300/300, Average SER 0.0010555549462636313
+model: Transformer, SNR: 12, Final SER: 0.0010555549462636313
+0.0010555549462636313
+model:Transformer, snr:13 , Self-supervised: 300/900, Average SER 0.0001944442590077718
+model:Transformer, snr:14 , Self-supervised: 330/1500, Average SER 0.00012626250584920248
+model:Transformer, snr:13 , Self-supervised: 330/900, Average SER 0.00017676750818888345
+model:Transformer, snr:14 , Self-supervised: 360/1500, Average SER 0.0001620368825064765
+model:Transformer, snr:13 , Self-supervised: 360/900, Average SER 0.00020833313465118408
+model:Transformer, snr:14 , Self-supervised: 390/1500, Average SER 0.00014957250692905523
+model:Transformer, snr:13 , Self-supervised: 390/900, Average SER 0.0001923075089087853
+model:Transformer, snr:14 , Self-supervised: 420/1500, Average SER 0.0001388887564341227
+model:Transformer, snr:13 , Self-supervised: 420/900, Average SER 0.0001785712582724435
+model:Transformer, snr:14 , Self-supervised: 450/1500, Average SER 0.0001296295060051812
+model:Transformer, snr:13 , Self-supervised: 450/900, Average SER 0.00016666650772094725
+model:Transformer, snr:14 , Self-supervised: 480/1500, Average SER 0.00012152766187985738
+model:Transformer, snr:13 , Self-supervised: 480/900, Average SER 0.0002256943533817927
+model:Transformer, snr:14 , Self-supervised: 510/1500, Average SER 0.0001143789758869246
+model:Transformer, snr:13 , Self-supervised: 510/900, Average SER 0.00021241821494756962
+model:Transformer, snr:13 , Self-supervised: 540/900, Average SER 0.00020061720300603797
+model:Transformer, snr:14 , Self-supervised: 540/1500, Average SER 0.00010802458833765101
+model:Transformer, snr:13 , Self-supervised: 570/900, Average SER 0.00019005840284782544
+model:Transformer, snr:14 , Self-supervised: 570/1500, Average SER 0.00010233908368830096
+model:Transformer, snr:13 , Self-supervised: 600/900, Average SER 0.00022222210963567099
+model:Transformer, snr:14 , Self-supervised: 600/1500, Average SER 9.72221295038859e-05
+model:Transformer, snr:13 , Self-supervised: 630/900, Average SER 0.00021164010441492473
+model:Transformer, snr:14 , Self-supervised: 630/1500, Average SER 9.259250428941514e-05
+model:Transformer, snr:13 , Self-supervised: 660/900, Average SER 0.0002020200996687918
+model:Transformer, snr:14 , Self-supervised: 660/1500, Average SER 8.838375409444173e-05
+model:Transformer, snr:13 , Self-supervised: 690/900, Average SER 0.0001932366170744965
+model:Transformer, snr:14 , Self-supervised: 690/1500, Average SER 8.45409821772921e-05
+model:Transformer, snr:13 , Self-supervised: 720/900, Average SER 0.00018518509136305914
+model:Transformer, snr:14 , Self-supervised: 720/1500, Average SER 8.101844125323826e-05
+model:Transformer, snr:13 , Self-supervised: 750/900, Average SER 0.0001777776877085368
+model:Transformer, snr:14 , Self-supervised: 750/1500, Average SER 7.777770360310873e-05
+model:Transformer, snr:13 , Self-supervised: 780/900, Average SER 0.00019230758532499655
+model:Transformer, snr:14 , Self-supervised: 780/1500, Average SER 7.478625346452762e-05
