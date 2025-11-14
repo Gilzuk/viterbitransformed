@@ -10,9 +10,9 @@ import torch
 
 import pickle
 
-# device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-device = "cpu"
-# print(device)
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+# device = "cpu"
+print(device)
 
 
 class ChannelModelDataset(Dataset):

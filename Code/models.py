@@ -8,8 +8,10 @@ from Code.channel.channel_estimation import estimate_channel
 from Code.channel.modulator import BPSKModulator
 
 
-# device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-device = "cpu"
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+print(device)
+
+# device = "cpu"
 
 
 class ConvBlock(nn.Module):

@@ -90,8 +90,8 @@ if __name__ == '__main__':
                 (16,120*5,25*5),  
                 (17,120*7,25*7)]  
   
-  # torch.backends.cuda.matmul.allow_bf16_reduced_precision_reduction = True
-  # torch.backends.cuda.matmul.allow_fp16_accumulation = True
+  torch.backends.cuda.matmul.allow_bf16_reduced_precision_reduction = True
+  torch.backends.cuda.matmul.allow_fp16_accumulation = True
 
 
   for mc in range(100):

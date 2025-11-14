@@ -16,8 +16,9 @@ import math
 from Code.mamba_lm import MambaLM, MambaLMConfig
 
 
-# device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-device = "cpu"
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+print(device)
+# device = "cpu"
 # if device == "cuda":
 # print(device)
 
@@ -403,7 +404,7 @@ class Trainer(object):
                     # use last word inserted in the buffer for training
                     self.online_training(buffer_tx[-1].reshape(1, -1), buffer_rx[-1].reshape(1, -1))
 
-                if (count + 1) % 30 == 0:
+                if (count + 1) % 300 == 0:
                     print(f'model:{self.model_name}, snr:{self.curr_SNR} , Self-supervised: {rep*transmitted_words.shape[0] + count + 1}/{transmitted_words.shape[0] * num_of_rep}, Average SER {total_ser / (rep*transmitted_words.shape[0] + count + 1)}')
 
         total_ser /= (transmitted_words.shape[0] * num_of_rep)
