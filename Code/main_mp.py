@@ -1,5 +1,5 @@
 from Code.dir_definitions import *
-from Code.plotter import get_ser_data, plot_ser_by_block_index, plot_ser_by_snr, plot_summary_table
+from Code.plotter import get_ser_data, plot_ser_by_snr, plot_summary_table
 from Code.trainer import Trainer
 import torch
 import gc

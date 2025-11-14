@@ -6,7 +6,16 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from pscan import pscan
+# Allow the file to be both imported as a module and run directly
+try:
+    # When run as part of the package
+    from Code.pscan import pscan
+except ImportError:
+    # When run directly
+    import sys
+    import os
+    sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    from Code.pscan import pscan
 
 """
 

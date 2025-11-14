@@ -2,7 +2,8 @@ import torch.nn as nn
 import torch
 import numpy as np
 
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+# device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+device = "cpu"
 
 START_PADDING_VALUE = -100
 

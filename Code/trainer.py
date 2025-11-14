@@ -16,9 +16,10 @@ import math
 from Code.mamba_lm import MambaLM, MambaLMConfig
 
 
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-if device == "cuda":
-  print()
+# device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+device = "cpu"
+# if device == "cuda":
+# print(device)
 
 INPUT_SIZE = 4    # input rolling number
 N_DIM = 16
@@ -162,7 +163,7 @@ class Trainer(object):
             'SionnaAdd': lambda: SionnaViterbiAdd(input_size=1, n_input_channels=1, n_output_channels=N_DIM, n_classes=n_classes),
             'SionnaSkip': lambda: SionnaSkip(input_size=1, n_input_channels=1, n_output_channels=N_DIM, n_classes=n_classes),
             'Transformer': lambda: ECC_Transformer(INPUT_SIZE, N_DIM, N_HEADS, NUM_LAYERS, n_classes),
-            'Mamba': lambda: MambaLM(MambaLMConfig(d_model=4, n_layers=4, vocab_size=n_classes,pad_vocab_size_multiple=n_classes),n_classes,input_size=4)
+            'Mamba': lambda: MambaLM(MambaLMConfig(d_model=4, n_layers=12, vocab_size=n_classes,pad_vocab_size_multiple=n_classes),n_classes,input_size=4)
 
         }
         selected_model = models[self.model_name]().to(device)
@@ -280,6 +281,7 @@ class Trainer(object):
         for param in self.detector.model.parameters():
             param.grad = None
         loss.backward()
+        torch.nn.utils.clip_grad_norm_(self.detector.model.parameters(), max_norm=1.0)
         self.optimizer.step()
         return current_loss
 
