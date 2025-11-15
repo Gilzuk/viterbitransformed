@@ -2,6 +2,7 @@ from Code.channel.channel_estimation import estimate_channel
 from Code.channel.modulator import BPSKModulator
 from Code.channel.channel import ISIAWGNChannel
 from Code.ecc.rs_main import encode
+from Code.channel.data_cache import ChannelDataCache
 from torch.utils.data import Dataset
 from numpy.random import mtrand
 from typing import Tuple, List
@@ -13,6 +14,9 @@ import pickle
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 # device = "cpu"
 print(device)
+
+# Global cache instance
+_data_cache = ChannelDataCache()
 
 
 class ChannelModelDataset(Dataset):
@@ -50,6 +54,7 @@ class ChannelModelDataset(Dataset):
         self.fading_in_decoder = fading_in_decoder
         self.n_symbols = n_symbols
         self.phase = phase
+        self.use_cache = True  # Enable caching by default
         if use_ecc:
             self.encoding = lambda b: encode(b, self.n_symbols)
         else:
@@ -98,8 +103,59 @@ class ChannelModelDataset(Dataset):
         return y
 
     def __getitem__(self, snr_list: List[float], gamma: float) -> Tuple[torch.Tensor, torch.Tensor]:
+        """Get data for given SNRs and gamma. Uses cache if available."""
+        
+        # Check if we can use cache for all SNRs
+        if self.use_cache and len(snr_list) == 1:
+            snr = snr_list[0]
+            cache_filename = _data_cache.get_cache_filename(
+                snr=snr, gamma=gamma, 
+                block_length=self.block_length,
+                transmission_length=self.transmission_length,
+                words=self.words,
+                channel_coefficients=self.channel_coefficients,
+                phase=self.phase
+            )
+            
+            # Validate cache exists and matches parameters
+            cache_valid = _data_cache.validate_cache(
+                cache_filename,
+                snr=snr, gamma=gamma,
+                block_length=self.block_length,
+                transmission_length=self.transmission_length,
+                words=self.words,
+                channel_coefficients=self.channel_coefficients,
+                phase=self.phase
+            )
+            
+            # Load from cache if valid
+            if cache_valid:
+                b, y = _data_cache.load_to_gpu_chunks(cache_filename, device)
+                return b, y
+            else:
+                # Generate data (cache doesn't exist or parameters mismatch)
+                print(f"[DataCache] Generating new data for SNR={snr}, gamma={gamma}, phase={self.phase}")
+                database = []
+                self.get_snr_data(snr, gamma, database)
+                b, y = (np.concatenate(arrays) for arrays in zip(*database))
+                
+                # Save to cache with metadata
+                _data_cache.save_to_cache(
+                    cache_filename, b, y,
+                    snr=snr, gamma=gamma,
+                    block_length=self.block_length,
+                    transmission_length=self.transmission_length,
+                    words=self.words,
+                    channel_coefficients=self.channel_coefficients,
+                    phase=self.phase
+                )
+                
+                # Convert to GPU tensors
+                b, y = torch.Tensor(b).to(device=device), torch.Tensor(y).to(device=device)
+                return b, y
+        
+        # Fallback: original behavior for multiple SNRs or cache disabled
         database = []
-        # do not change max_workers
         [self.get_snr_data(snr, gamma, database) for snr in snr_list]
         b, y = (np.concatenate(arrays) for arrays in zip(*database))
         b, y = torch.Tensor(b).to(device=device), torch.Tensor(y).to(device=device)

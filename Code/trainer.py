@@ -16,11 +16,9 @@ import math
 from Code.mamba_lm import MambaLM, MambaLMConfig
 
 
+# Device will be set from main.py via the run() method
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-print(device)
-# device = "cpu"
-# if device == "cuda":
-# print(device)
+print(f"[Trainer Module] Initial device: {device}")
 
 INPUT_SIZE = 4    # input rolling number
 N_DIM = 16
@@ -222,10 +220,22 @@ class Trainer(object):
                                        fading_in_decoder=self.fading_in_decoder,
                                        phase=phase) for phase in ['train', 'val']}
 
-    def run(self, run_over,num_of_rep) -> np.ndarray:
+    def run(self, run_over, num_of_rep, device_arg=None, dtype=None, use_amp=False, scaler=None) -> np.ndarray:
         """
         Train and evaluation in a word-by-word way
         """
+        # Store AMP settings and update global device for use in training/evaluation
+        self.device = device_arg if device_arg is not None else torch.device("cpu")
+        self.dtype = dtype if dtype is not None else torch.float32
+        self.use_amp = use_amp
+        self.scaler = scaler
+        
+        # Update the module-level device variable so all operations use the correct device
+        if device_arg is not None:
+            global device
+            device = device_arg
+            print(f"[Trainer] Using device: {device}")
+        
         self.load_train_weights(run_over)
         return self.online_evaluation(num_of_rep=num_of_rep)
 
@@ -241,31 +251,62 @@ class Trainer(object):
         self.config_criterion()
 
         print(f'model:{self.model_name}, snr:{self.curr_SNR}  Start training model - {self.model_name},SNR - {self.curr_SNR}, Gamma - {self.gamma}, Channel Cost - {self.channel_coefficients}')
+        
+        from tqdm import tqdm
+        
         best_ser = math.inf
-        for minibatch in range(1, self.train_minibatch_num + 1): # batches loop
+        # Progress bar for training minibatches
+        pbar = tqdm(range(1, self.train_minibatch_num + 1), 
+                    desc=f"🔥 Training (SNR={self.curr_SNR})",
+                    unit="batch",
+                    ncols=120,
+                    colour='green',
+                    bar_format='{l_bar}{bar}| {n_fmt}/{total_fmt} [{elapsed}<{remaining}, {postfix}]')
+        
+        for minibatch in pbar:
             # draw words
             transmitted_words, received_words = self.channel_dataset['train'].__getitem__(snr_list=[self.curr_SNR], gamma=self.gamma)
-
-            # transmitted_words = torch.cat([torch.Tensor(
-            #     encode(transmitted_word.int().cpu().numpy(), self.n_symbols).reshape(1, -1)).to(device)
-            #                                for transmitted_word in transmitted_words], dim=0)
+            
+            # Ensure data is on the correct device
+            transmitted_words = transmitted_words.to(device)
+            received_words = received_words.to(device)
 
             # run training loops
             current_loss = 0
             for i in range(self.train_frames * self.subframes_in_frame):  # train over one minibatch
-                predictions = self.detector(received_words[i].reshape(1, -1), 'train')  # pass through detector
+                # Forward pass in FP32
+                predictions = self.detector(received_words[i].reshape(1, -1), 'train')
                 current_loss += self.backpropagation(predictions, transmitted_words[i].reshape(1, -1))   # calculate loss and update weights
+                
+                # Clean up intermediate tensors to prevent memory buildup
+                del predictions
+            
+            # Clean up batch tensors
+            del transmitted_words, received_words
 
             # evaluate performance - Symbol Error Rate
             ser = self.evaluate()
-            #print(f'Minibatch {minibatch} | Train Loss {current_loss} | Validation SER - {ser}')
+            
+            # Update progress bar with current metrics
+            pbar.set_postfix({
+                'loss': f'{current_loss:.4f}',
+                'SER': f'{ser:.6f}',
+                'best': f'{best_ser:.6f}'
+            })
+            
             if ser < best_ser:
                 self.save_weights(current_loss)  # save best weights
                 best_ser = ser
             # stopping if SER is 0
             if ser == 0:
-              minibatch = self.train_minibatch_num
-              print(f'model:{self.model_name}, snr:{self.curr_SNR} [INFO] stopping as training reached minimum of 0')
+                print(f'\nmodel:{self.model_name}, snr:{self.curr_SNR} [INFO] stopping as training reached minimum of 0')
+                break
+            
+            # Free GPU memory every 10 minibatches to prevent accumulation
+            if minibatch % 10 == 0 and device.type == "cuda":
+                torch.cuda.empty_cache()
+        
+        pbar.close()
 
         print(f'model:{self.model_name}, snr:{self.curr_SNR}Best Validation SER - {best_ser} (saved)')
         print('*' * 50)
@@ -276,14 +317,22 @@ class Trainer(object):
         # if loss is Nan inform the user
         if torch.sum(torch.isnan(loss)):
             print('loss value is Nan')
+            print(f'Predictions stats - min: {predictions.min()}, max: {predictions.max()}, mean: {predictions.mean()}')
             return np.nan
         current_loss = loss.item()
+        
         # back propagation
         for param in self.detector.model.parameters():
             param.grad = None
+        
+        # Backward pass
         loss.backward()
+        
+        # Gradient clipping
         torch.nn.utils.clip_grad_norm_(self.detector.model.parameters(), max_norm=1.0)
+        
         self.optimizer.step()
+        
         return current_loss
 
     # calculate train loss
@@ -323,17 +372,79 @@ class Trainer(object):
         Evaluation at a single snr.
         :return: ser for mini-batch
         """
-        # draw words of given gamma for all SNRs
+        import time
+        
+        # STEP 1: Load data from cache/dataset
+        print(f"  [Eval] Loading validation data... (CPU/Disk)")
+        load_start = time.time()
         transmitted_words, received_words = self.channel_dataset['val'].__getitem__(snr_list=[self.curr_SNR], gamma=self.gamma)
+        load_time = time.time() - load_start
+        
+        # STEP 2: Move data to GPU
+        print(f"  [Eval] Moving data to GPU... (CPU→GPU, loaded in {load_time:.2f}s)")
+        gpu_transfer_start = time.time()
+        transmitted_words = transmitted_words.to(device)
+        received_words = received_words.to(device)
+        gpu_transfer_time = time.time() - gpu_transfer_start
+        
+        if device.type == "cuda":
+            gpu_mem_after_load = torch.cuda.memory_allocated(0) / 1024**3
+            print(f"  [Eval] Data on GPU (transfer: {gpu_transfer_time:.2f}s, GPU mem: {gpu_mem_after_load:.2f} GB)")
 
-        # decode and calculate accuracy
-        detected_words = self.detector(received_words, 'val')
+        # Dynamically determine chunk size based on available GPU memory
+        if device.type == "cuda":
+            # Get available GPU memory in GB
+            gpu_memory_available = (torch.cuda.get_device_properties(0).total_memory - torch.cuda.memory_allocated(0)) / 1024**3
+            total_samples = len(received_words)
+            
+            # Estimate: if we have > 4GB free, process all at once; otherwise chunk
+            if gpu_memory_available > 4.0:
+                chunk_size = total_samples  # Process all at once
+            elif gpu_memory_available > 2.5:
+                chunk_size = max(100, total_samples // 2)  # Process in 2 chunks
+            elif gpu_memory_available > 1.5:
+                chunk_size = max(50, total_samples // 3)  # Process in 3 chunks
+            else:
+                chunk_size = min(25, total_samples)  # Small chunks for low memory
+            
+            print(f"  [Eval] Processing {total_samples} samples in chunks of {chunk_size} ({gpu_memory_available:.2f} GB free)")
+        else:
+            chunk_size = len(received_words)  # CPU - no memory constraints
+        
+        # STEP 3: GPU inference
+        print(f"  [Eval] Running model inference... (GPU)")
+        inference_start = time.time()
+        all_detected_words = []
+        
+        with torch.no_grad():
+            for i in range(0, len(received_words), chunk_size):
+                chunk = received_words[i:i+chunk_size]
+                detected_chunk = self.detector(chunk, 'val')
+                all_detected_words.append(detected_chunk.cpu())  # Move to CPU immediately
+                del detected_chunk, chunk
+        
+        inference_time = time.time() - inference_start        
+        detected_words = torch.cat(all_detected_words, dim=0)
+        print(f"  [Eval] Inference complete (GPU, {inference_time:.2f}s, results moved to CPU)")
 
-        # decode the detected words
-        decoded_words = [decode(detected_word, self.n_symbols) for detected_word in detected_words.cpu().numpy()]
-        detected_words = torch.Tensor(np.array(decoded_words)).to(device)
+        # STEP 4: Decode and move back for SER calculation
+        print(f"  [Eval] Decoding and calculating SER... (CPU→GPU)")
+        decode_start = time.time()
+        decoded_words = [decode(detected_word, self.n_symbols) for detected_word in detected_words.numpy()]  # CPU
+        detected_words = torch.Tensor(np.array(decoded_words)).to(device)  # Back to GPU
 
-        ser, fer, err_indices = self.calculate_error_rates(detected_words[self.data_indices], transmitted_words[self.data_indices])
+        ser, fer, err_indices = self.calculate_error_rates(detected_words[self.data_indices], transmitted_words[self.data_indices])  # GPU
+        decode_time = time.time() - decode_start
+        print(f"  [Eval] SER calculation complete (GPU, {decode_time:.2f}s, SER={ser:.6f})")
+        
+        # Clean up
+        del transmitted_words, received_words, detected_words, all_detected_words
+        if device.type == "cuda":
+            torch.cuda.empty_cache()
+        
+        total_time = load_time + gpu_transfer_time + inference_time + decode_time
+        print(f"  [Eval] Total evaluation time: {total_time:.2f}s")
+        
         return ser
 
     def calculate_error_rates(self, prediction: torch.Tensor, target: torch.Tensor) -> Tuple[float, float, torch.Tensor]:
@@ -349,14 +460,30 @@ class Trainer(object):
 
     def online_evaluation(self, num_of_rep=1) -> Union[float, np.ndarray]:
         print(f'model:{self.model_name}, snr:{self.curr_SNR}, Start online evaluation using {num_of_rep} repetitions')
+        
+        from tqdm import tqdm
+        
         if self.self_supervised:
             self.config_optimizer()
             self.config_criterion()
         total_ser = 0
         first_run = True
-        for rep in range(0, num_of_rep):
+        
+        # Progress bar for repetitions
+        rep_pbar = tqdm(range(0, num_of_rep), 
+                       desc=f"📊 Eval Reps (SNR={self.curr_SNR})",
+                       unit="rep",
+                       ncols=120,
+                       colour='cyan',
+                       bar_format='{l_bar}{bar}| {n_fmt}/{total_fmt} [{elapsed}<{remaining}, {postfix}]')
+        
+        for rep in rep_pbar:
             # draw words of given gamma for all SNRs
             transmitted_words, received_words = self.channel_dataset['val'].__getitem__(snr_list=[self.curr_SNR], gamma=self.gamma)
+            
+            # Ensure data is on the correct device
+            transmitted_words = transmitted_words.to(device)
+            received_words = received_words.to(device)
 
             # received_words = self.get_overlapping_rx(received_words)
             if first_run:
@@ -370,8 +497,9 @@ class Trainer(object):
             for count, (transmitted_word, received_word) in enumerate(zip(transmitted_words, received_words)):
                 transmitted_word, received_word = transmitted_word.reshape(1, -1), received_word.reshape(1, -1)
                 # detect
-                # self.detector.model.eval()
-                detected_word = self.detector(received_word, 'val')
+                with torch.no_grad():
+                    detected_word = self.detector(received_word, 'val')
+                        
                 if count in self.data_indices:
                     # decode
                     decoded_word = [decode(detected_word, self.n_symbols) for detected_word in detected_word.cpu().numpy()]
@@ -392,6 +520,12 @@ class Trainer(object):
                     encoded_word = torch.Tensor(encode(decoded_word_array, self.n_symbols).reshape(1, -1)).to(device)
                     ser = 0
                     errors_num = 0
+                
+                # Update progress bar with running average SER
+                if (rep * transmitted_words.shape[0] + count + 1) > 0:
+                    avg_ser = total_ser / max(1, (rep * len(self.data_indices) + sum(1 for c in range(count+1) if c in self.data_indices)))
+                    rep_pbar.set_postfix({'avg_SER': f'{avg_ser:.6f}'})
+                
                 # save the encoded word in the buffer
                 if ser <= self.ser_thresh:
                     buffer_rx = torch.cat([buffer_rx, received_word])
@@ -407,6 +541,9 @@ class Trainer(object):
                 if (count + 1) % 300 == 0:
                     print(f'model:{self.model_name}, snr:{self.curr_SNR} , Self-supervised: {rep*transmitted_words.shape[0] + count + 1}/{transmitted_words.shape[0] * num_of_rep}, Average SER {total_ser / (rep*transmitted_words.shape[0] + count + 1)}')
 
+        
+        rep_pbar.close()
+        
         total_ser /= (transmitted_words.shape[0] * num_of_rep)
         print(f'model: {self.model_name}, SNR: {self.curr_SNR}, Final SER: {total_ser}')
         return ser_by_word
