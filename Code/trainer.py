@@ -373,21 +373,24 @@ class Trainer(object):
         :return: ser for mini-batch
         """
         import time
+        from Code.dir_definitions import VERBOSE
         
         # STEP 1: Load data from cache/dataset
-        print(f"  [Eval] Loading validation data... (CPU/Disk)")
+        if VERBOSE:
+            print(f"  [Eval] Loading validation data... (CPU/Disk)")
         load_start = time.time()
         transmitted_words, received_words = self.channel_dataset['val'].__getitem__(snr_list=[self.curr_SNR], gamma=self.gamma)
         load_time = time.time() - load_start
         
         # STEP 2: Move data to GPU
-        print(f"  [Eval] Moving data to GPU... (CPU→GPU, loaded in {load_time:.2f}s)")
+        if VERBOSE:
+            print(f"  [Eval] Moving data to GPU... (CPU→GPU, loaded in {load_time:.2f}s)")
         gpu_transfer_start = time.time()
         transmitted_words = transmitted_words.to(device)
         received_words = received_words.to(device)
         gpu_transfer_time = time.time() - gpu_transfer_start
         
-        if device.type == "cuda":
+        if device.type == "cuda" and VERBOSE:
             gpu_mem_after_load = torch.cuda.memory_allocated(0) / 1024**3
             print(f"  [Eval] Data on GPU (transfer: {gpu_transfer_time:.2f}s, GPU mem: {gpu_mem_after_load:.2f} GB)")
 
@@ -407,12 +410,14 @@ class Trainer(object):
             else:
                 chunk_size = min(25, total_samples)  # Small chunks for low memory
             
-            print(f"  [Eval] Processing {total_samples} samples in chunks of {chunk_size} ({gpu_memory_available:.2f} GB free)")
+            if VERBOSE:
+                print(f"  [Eval] Processing {total_samples} samples in chunks of {chunk_size} ({gpu_memory_available:.2f} GB free)")
         else:
             chunk_size = len(received_words)  # CPU - no memory constraints
         
         # STEP 3: GPU inference
-        print(f"  [Eval] Running model inference... (GPU)")
+        if VERBOSE:
+            print(f"  [Eval] Running model inference... (GPU)")
         inference_start = time.time()
         all_detected_words = []
         
@@ -433,9 +438,9 @@ class Trainer(object):
         decoded_words = [decode(detected_word, self.n_symbols) for detected_word in detected_words.numpy()]  # CPU
         detected_words = torch.Tensor(np.array(decoded_words)).to(device)  # Back to GPU
 
-        ser, fer, err_indices = self.calculate_error_rates(detected_words[self.data_indices], transmitted_words[self.data_indices])  # GPU
+        ser, fer, err_indices, total_bits, error_bits = self.calculate_error_rates(detected_words[self.data_indices], transmitted_words[self.data_indices])  # GPU
         decode_time = time.time() - decode_start
-        print(f"  [Eval] SER calculation complete (GPU, {decode_time:.2f}s, SER={ser:.6f})")
+        print(f"  [Eval] SER calculation complete (GPU, {decode_time:.2f}s, SER={ser:.6f}, Errors={error_bits}/{total_bits})")
         
         # Clean up
         del transmitted_words, received_words, detected_words, all_detected_words
@@ -445,18 +450,28 @@ class Trainer(object):
         total_time = load_time + gpu_transfer_time + inference_time + decode_time
         print(f"  [Eval] Total evaluation time: {total_time:.2f}s")
         
+        # Store bit statistics in trainer for reporting
+        self.last_eval_total_bits = total_bits
+        self.last_eval_error_bits = error_bits
+        
         return ser
 
-    def calculate_error_rates(self, prediction: torch.Tensor, target: torch.Tensor) -> Tuple[float, float, torch.Tensor]:
+    def calculate_error_rates(self, prediction: torch.Tensor, target: torch.Tensor) -> Tuple[float, float, torch.Tensor, int, int]:
         """
-        Returns the ber,fer and error indices
+        Returns the ber, fer, error indices, total bits, and error count
         """
         prediction = prediction.long()
         target = target.long()
+        
+        # Calculate total bits and errors
+        total_bits = prediction.numel()
+        error_bits = torch.sum(torch.abs(prediction - target)).item()
+        
         bits_acc = torch.mean(torch.eq(prediction, target).float()).item()
         all_bits_sum_vector = torch.sum(torch.abs(prediction - target), 1).long()
         frames_acc = torch.eq(all_bits_sum_vector, torch.LongTensor(1).fill_(0).to(device=device)).float().mean().item()
-        return max([1 - bits_acc, 0.0]), max([1 - frames_acc, 0.0]), torch.nonzero(all_bits_sum_vector, as_tuple=False).reshape(-1)
+        
+        return max([1 - bits_acc, 0.0]), max([1 - frames_acc, 0.0]), torch.nonzero(all_bits_sum_vector, as_tuple=False).reshape(-1), total_bits, error_bits
 
     def online_evaluation(self, num_of_rep=1) -> Union[float, np.ndarray]:
         print(f'model:{self.model_name}, snr:{self.curr_SNR}, Start online evaluation using {num_of_rep} repetitions')
@@ -505,7 +520,7 @@ class Trainer(object):
                     decoded_word = [decode(detected_word, self.n_symbols) for detected_word in detected_word.cpu().numpy()]
                     decoded_word = torch.Tensor(np.array(decoded_word)).to(device)
                     # calculate accuracy
-                    ser, fer, err_indices = self.calculate_error_rates(decoded_word, transmitted_word)
+                    ser, fer, err_indices, word_total_bits, word_error_bits = self.calculate_error_rates(decoded_word, transmitted_word)
                     # encode word again
                     decoded_word_array = decoded_word.int().cpu().numpy()
                     encoded_word = torch.Tensor(encode(decoded_word_array, self.n_symbols).reshape(1, -1)).to(device)
@@ -575,7 +590,7 @@ class Trainer(object):
                 decoded_word = [decode(detected_word, self.n_symbols) for detected_word in detected_word.cpu().numpy()]
                 decoded_word = torch.Tensor(np.array(decoded_word)).to(device)
                 # calculate accuracy
-                ser, fer, err_indices = self.calculate_error_rates(decoded_word, transmitted_word)
+                ser, fer, err_indices, word_total_bits, word_error_bits = self.calculate_error_rates(decoded_word, transmitted_word)
                 # encode word again
                 decoded_word_array = decoded_word.int().cpu().numpy()
                 encoded_word = torch.Tensor(encode(decoded_word_array, self.n_symbols).reshape(1, -1)).to(device)

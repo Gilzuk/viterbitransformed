@@ -57,7 +57,6 @@ def execute_and_plot(model_name, detector_method, self_supervised, all_curves, c
         model_size=model_size,
         run_time=run_time
     )
-    perf_tracker.save_to_csv(f"model_performance_snr_{snr}_parallel.csv")
     all_curves.append((ser, model_name, HYPERPARAMS_DICT['val_block_length'], HYPERPARAMS_DICT['n_symbols']))
 
 

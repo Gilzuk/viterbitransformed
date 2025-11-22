@@ -1,0 +1,180 @@
+======================================================================
+📝 LOGGING ENABLED
+Log file: c:\Users\gilzu\viterbitransformed\Code\logs\training_log_20251122_121111.log
+All output will be saved to log file and displayed in terminal
+======================================================================
+
+============================================================
+🧹 CLEANING GPU MEMORY FROM PREVIOUS RUNS...
+============================================================
+✅ GPU memory cleaned and reset
+============================================================
+
+============================================================
+GPU DETECTED: NVIDIA GeForce GTX 1660 SUPER
+GPU Memory: 6.00 GB
+CUDA Version: 12.6
+Compute Capability: 7.5
+GPU Memory After Cleanup:
+  Allocated: 0.000 GB
+  Reserved:  0.000 GB
+  Free:      6.000 GB
+============================================================
+PRECISION: Standard Training (FP32)
+============================================================
+
+CPU threads limited to 2 for reduced CPU usage
+[DataCache] Cache directory: C:\Users\gilzu\viterbitransformed\Data_Cache
+[DataCache] Loading from cache: data_snr15_gamma0.2_bl1080_tl1096_w75_chcost2100_train.pkl
+[DataCache] GPU Memory: 6.00 GB free, loading 75 samples in chunks of 75
+[DataCache] Loaded to GPU: torch.Size([75, 1080]), torch.Size([75, 1096])
+[DataCache] Loading from cache: data_snr15_gamma0.2_bl1080_tl1096_w75_chcost2100_val.pkl
+[DataCache] GPU Memory: 6.00 GB free, loading 75 samples in chunks of 75
+[DataCache] Loaded to GPU: torch.Size([75, 1080]), torch.Size([75, 1096])
+[DataCache] Loading from cache: data_snr16_gamma0.2_bl1080_tl1096_w75_chcost2100_train.pkl
+[DataCache] GPU Memory: 6.00 GB free, loading 75 samples in chunks of 75
+[DataCache] Loaded to GPU: torch.Size([75, 1080]), torch.Size([75, 1096])
+[DataCache] Loading from cache: data_snr16_gamma0.2_bl1080_tl1096_w75_chcost2100_val.pkl
+[DataCache] GPU Memory: 6.00 GB free, loading 75 samples in chunks of 75
+[DataCache] Loaded to GPU: torch.Size([75, 1080]), torch.Size([75, 1096])
+[DataCache] Loading from cache: data_snr17_gamma0.2_bl1080_tl1096_w75_chcost2100_train.pkl
+[DataCache] GPU Memory: 6.00 GB free, loading 75 samples in chunks of 75
+[DataCache] Loaded to GPU: torch.Size([75, 1080]), torch.Size([75, 1096])
+[DataCache] Loading from cache: data_snr17_gamma0.2_bl1080_tl1096_w75_chcost2100_val.pkl
+[DataCache] GPU Memory: 6.00 GB free, loading 75 samples in chunks of 75
+[DataCache] Loaded to GPU: torch.Size([75, 1080]), torch.Size([75, 1096])
+
+🔄 🔄 🔄 🔄 🔄 🔄 🔄 🔄 🔄 🔄 🔄 🔄 🔄 🔄 🔄 🔄 🔄 🔄 🔄 🔄 🔄 🔄 🔄 🔄 🔄 🔄 🔄 🔄 🔄 🔄 🔄 🔄 🔄 🔄 🔄 
+======================================================================
+ITERATION 1/100
+======================================================================
+
+──────────────────────────────────────────────────────────────────────
+📍 Parameter Set [1/3]:
+   SNR=15, val_block_length=1080, pilots_length=225, n_symbols=2
+   Iteration: 0, block-length=120
+──────────────────────────────────────────────────────────────────────
+
+🤖 Running 2 models: Transformer, ViterbiNet
+
+   [1/2] Processing model: Transformer
+Transformer: num parameters: 6960
+ECC_Transformer_ModelBased
+model:Transformer, snr:15 *** New: number of pilots for training :  225
+Transformer_ModelBased_cost2100_15_1080_2
+c:\Users\gilzu\viterbitransformed\Code\../Results\plots\Transformer_ModelBased_cost2100_15_1080_2_ISI_AWGN.pkl
+calculating fresh
+loading model from SNR 15 and gamma 0.2
+model:Transformer, snr:15  Start training model - Transformer,SNR - 15, Gamma - 0.2, Channel Cost - cost2100
+🔥 Training (SNR=15):   0%|[32m                                                                          [0m| 0/200 [00:00<?, ][0m[DataCache] Loading from cache: data_snr15_gamma0.2_bl1080_tl1096_w75_chcost2100_train.pkl
+[DataCache] GPU Memory: 6.00 GB free, loading 75 samples in chunks of 75
+[DataCache] Loaded to GPU: torch.Size([75, 1080]), torch.Size([75, 1096])
+  [Eval] Loading validation data... (CPU/Disk)
+[DataCache] Loading from cache: data_snr15_gamma0.2_bl1080_tl1096_w75_chcost2100_val.pkl
+[DataCache] GPU Memory: 5.91 GB free, loading 75 samples in chunks of 75
+[DataCache] Loaded to GPU: torch.Size([75, 1080]), torch.Size([75, 1096])
+  [Eval] Moving data to GPU... (CPU→GPU, loaded in 0.01s)
+  [Eval] Data on GPU (transfer: 0.00s, GPU mem: 0.09 GB)
+  [Eval] Processing 75 samples in chunks of 75 (5.91 GB free)
+  [Eval] Running model inference... (GPU)
+🔥 Training (SNR=15):   0%|[32m                                                                          [0m| 0/200 [01:27<?, ][0m
+Traceback (most recent call last):
+  File "c:\Users\gilzu\viterbitransformed\Code\plotter.py", line 96, in get_ser_data
+    ser_total = trainer.run(run_over, num_of_rep=num_of_rep, 
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+TypeError: Trainer.run() got an unexpected keyword argument 'device'
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "c:\Users\gilzu\viterbitransformed\main.py", line 495, in <module>
+    execute_and_plot(model, detector_method, self_supervised, all_curves, current_params, run_over, num_of_reps[snr-snr_start], perf_tracker)
+  File "c:\Users\gilzu\viterbitransformed\main.py", line 314, in execute_and_plot
+    ser = get_ser_data(trainer, run_over=run_over, num_of_rep=num_rep, 
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "c:\Users\gilzu\viterbitransformed\Code\plotter.py", line 100, in get_ser_data
+    ser_total = trainer.run(run_over, num_of_rep=num_of_rep)
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "c:\Users\gilzu\viterbitransformed\Code\trainer.py", line 239, in run
+    self.load_train_weights(run_over)
+  File "c:\Users\gilzu\viterbitransformed\Code\trainer.py", line 674, in load_train_weights
+    self.train()
+  File "c:\Users\gilzu\viterbitransformed\Code\trainer.py", line 288, in train
+    ser = self.evaluate()
+          ^^^^^^^^^^^^^^^
+  File "c:\Users\gilzu\viterbitransformed\Code\trainer.py", line 427, in evaluate
+    detected_chunk = self.detector(chunk, 'val')
+                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\gilzu\viterbitransformed\.venv\Lib\site-packages\torch\nn\modules\module.py", line 1773, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\gilzu\viterbitransformed\.venv\Lib\site-packages\torch\nn\modules\module.py", line 1784, in _call_impl
+    return forward_call(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "c:\Users\gilzu\viterbitransformed\Code\detector.py", line 47, in forward
+    estimation = self.model(sequence_input)
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\gilzu\viterbitransformed\.venv\Lib\site-packages\torch\nn\modules\module.py", line 1773, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\gilzu\viterbitransformed\.venv\Lib\site-packages\torch\nn\modules\module.py", line 1784, in _call_impl
+    return forward_call(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "c:\Users\gilzu\viterbitransformed\Code\models.py", line 824, in forward
+    y = self.transformer_encoder(x, src_mask)  # src_mask = None
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\gilzu\viterbitransformed\.venv\Lib\site-packages\torch\nn\modules\module.py", line 1773, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\gilzu\viterbitransformed\.venv\Lib\site-packages\torch\nn\modules\module.py", line 1784, in _call_impl
+    return forward_call(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "c:\Users\gilzu\viterbitransformed\Code\models.py", line 728, in forward
+    x = layer(x, mask)
+        ^^^^^^^^^^^^^^
+  File "C:\Users\gilzu\viterbitransformed\.venv\Lib\site-packages\torch\nn\modules\module.py", line 1773, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\gilzu\viterbitransformed\.venv\Lib\site-packages\torch\nn\modules\module.py", line 1784, in _call_impl
+    return forward_call(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "c:\Users\gilzu\viterbitransformed\Code\models.py", line 753, in forward
+    x = self.sublayer[0](x, lambda x: self.self_attn(x, x, x, mask))
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\gilzu\viterbitransformed\.venv\Lib\site-packages\torch\nn\modules\module.py", line 1773, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\gilzu\viterbitransformed\.venv\Lib\site-packages\torch\nn\modules\module.py", line 1784, in _call_impl
+    return forward_call(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "c:\Users\gilzu\viterbitransformed\Code\models.py", line 741, in forward
+    return x + self.dropout(sublayer(self.norm(x)))
+                            ^^^^^^^^^^^^^^^^^^^^^^
+  File "c:\Users\gilzu\viterbitransformed\Code\models.py", line 753, in <lambda>
+    x = self.sublayer[0](x, lambda x: self.self_attn(x, x, x, mask))
+                                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\gilzu\viterbitransformed\.venv\Lib\site-packages\torch\nn\modules\module.py", line 1773, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\gilzu\viterbitransformed\.venv\Lib\site-packages\torch\nn\modules\module.py", line 1784, in _call_impl
+    return forward_call(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "c:\Users\gilzu\viterbitransformed\Code\models.py", line 772, in forward
+    x, self.attn = self.attention(query, key, value, mask=mask)
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "c:\Users\gilzu\viterbitransformed\Code\models.py", line 784, in attention
+    p_attn = self.dropout(p_attn)
+             ^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\gilzu\viterbitransformed\.venv\Lib\site-packages\torch\nn\modules\module.py", line 1773, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\gilzu\viterbitransformed\.venv\Lib\site-packages\torch\nn\modules\module.py", line 1784, in _call_impl
+    return forward_call(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\gilzu\viterbitransformed\.venv\Lib\site-packages\torch\nn\modules\dropout.py", line 70, in forward
+    return F.dropout(input, self.p, self.training, self.inplace)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\gilzu\viterbitransformed\.venv\Lib\site-packages\torch\nn\functional.py", line 1422, in dropout
+    _VF.dropout_(input, p, training) if inplace else _VF.dropout(input, p, training)
+                                                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+torch.OutOfMemoryError: CUDA out of memory. Tried to allocate 2.69 GiB. GPU 0 has a total capacity of 6.00 GiB of which 0 bytes is free. Of the allocated memory 8.81 GiB is allocated by PyTorch, and 33.22 MiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory Management  (https://pytorch.org/docs/stable/notes/cuda.html#environment-variables)

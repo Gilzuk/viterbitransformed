@@ -9,12 +9,75 @@ import time
 from datetime import datetime
 import psutil
 import threading
+import sys
+import logging
 
 # Import data cache for pre-generation
 from Code.channel.data_cache import ChannelDataCache
 
+# ============================================================================
+# Logging Setup - Dual output to console and log file
+# ============================================================================
+
+class TeeLogger:
+    """Captures stdout/stderr to both console and log file"""
+    def __init__(self, log_file, stream):
+        self.log_file = log_file
+        self.stream = stream
+        
+    def write(self, message):
+        self.stream.write(message)
+        self.stream.flush()
+        self.log_file.write(message)
+        self.log_file.flush()
+        
+    def flush(self):
+        self.stream.flush()
+        self.log_file.flush()
+
+# Create logs directory if it doesn't exist
+log_dir = os.path.join(ROOT_DIR, 'logs')
+os.makedirs(log_dir, exist_ok=True)
+
+# Create log filename with timestamp
+log_timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+log_filename = os.path.join(log_dir, f'training_log_{log_timestamp}.log')
+
+# Open log file and redirect stdout/stderr
+log_file = open(log_filename, 'w', encoding='utf-8')
+sys.stdout = TeeLogger(log_file, sys.__stdout__)
+sys.stderr = TeeLogger(log_file, sys.__stderr__)
+
+print(f"{'='*70}")
+print(f"📝 LOGGING ENABLED")
+print(f"Log file: {log_filename}")
+print(f"All output will be saved to log file and displayed in terminal")
+print(f"{'='*70}\n")
+
 # Device selection and CUDA/CPU configuration
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+# GPU Memory Cleanup - Reset and clear memory from previous runs
+if device.type == "cuda":
+    print(f"{'='*60}")
+    print(f"🧹 CLEANING GPU MEMORY FROM PREVIOUS RUNS...")
+    print(f"{'='*60}")
+    
+    # Clear cached memory
+    torch.cuda.empty_cache()
+    
+    # Force garbage collection
+    gc.collect()
+    
+    # Reset CUDA memory allocator stats
+    torch.cuda.reset_peak_memory_stats()
+    torch.cuda.reset_accumulated_memory_stats()
+    
+    # Synchronize to ensure all operations are complete
+    torch.cuda.synchronize()
+    
+    print(f"✅ GPU memory cleaned and reset")
+    print(f"{'='*60}\n")
 
 # Print GPU information
 if device.type == "cuda":
@@ -23,6 +86,15 @@ if device.type == "cuda":
     print(f"GPU Memory: {torch.cuda.get_device_properties(0).total_memory / 1024**3:.2f} GB")
     print(f"CUDA Version: {torch.version.cuda}")
     print(f"Compute Capability: {torch.cuda.get_device_capability()[0]}.{torch.cuda.get_device_capability()[1]}")
+    
+    # Show memory state after cleanup
+    mem_allocated = torch.cuda.memory_allocated(0) / 1024**3
+    mem_reserved = torch.cuda.memory_reserved(0) / 1024**3
+    mem_free = (torch.cuda.get_device_properties(0).total_memory / 1024**3) - mem_allocated
+    print(f"GPU Memory After Cleanup:")
+    print(f"  Allocated: {mem_allocated:.3f} GB")
+    print(f"  Reserved:  {mem_reserved:.3f} GB")
+    print(f"  Free:      {mem_free:.3f} GB")
     print(f"{'='*60}")
 else:
     print(f"{'='*60}")
@@ -54,6 +126,9 @@ os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
 # Global monitoring variables
 monitoring_active = False
 monitor_thread = None
+
+# Verbosity control - set to False to silence pipeline prints
+VERBOSE = False  # Set to False for silent mode
 
 def print_utilization():
     """Print current GPU and CPU utilization"""
@@ -120,16 +195,18 @@ def pre_generate_data(parameters, gamma, hyperparams):
         gamma: Gamma value for channel
         hyperparams: Dictionary of hyperparameters
     """
-    print("\n" + "="*70)
-    print("PRE-GENERATING DATA FOR ALL PARAMETER COMBINATIONS")
-    print("This will take a few minutes but will drastically reduce CPU usage later")
-    print("="*70 + "\n")
+    if VERBOSE:
+        print("\n" + "="*70)
+        print("PRE-GENERATING DATA FOR ALL PARAMETER COMBINATIONS")
+        print("This will take a few minutes but will drastically reduce CPU usage later")
+        print("="*70 + "\n")
     
     cache = ChannelDataCache()
     
     # Get cache stats before
     stats_before = cache.get_cache_stats()
-    print(f"📦 Cache before: {stats_before['num_files']} files, {stats_before['total_size_mb']:.2f} MB\n")
+    if VERBOSE:
+        print(f"📦 Cache before: {stats_before['num_files']} files, {stats_before['total_size_mb']:.2f} MB\n")
     
     # Import here to avoid circular dependency
     from Code.channel.channel_dataset import ChannelModelDataset
@@ -141,7 +218,8 @@ def pre_generate_data(parameters, gamma, hyperparams):
     for snr, val_block_length, pilot_length in parameters:
         for phase in ['train', 'val']:
             current_dataset += 1
-            print(f"\n[{current_dataset}/{total_datasets}] Generating data for SNR={snr}, block_length={val_block_length}, gamma={gamma}, phase={phase}...")
+            if VERBOSE:
+                print(f"\n[{current_dataset}/{total_datasets}] Generating data for SNR={snr}, block_length={val_block_length}, gamma={gamma}, phase={phase}...")
             start_time = time.time()
             
             # Calculate transmission_length (same as in trainer.py)
@@ -155,8 +233,8 @@ def pre_generate_data(parameters, gamma, hyperparams):
                 words=hyperparams['val_frames'] * hyperparams['subframes_in_frame'],
                 memory_length=2,  # Assuming this is fixed
                 channel_coefficients=hyperparams['channel_coefficients'],
-                random=RandomState(seed=42),
-                word_rand_gen=RandomState(seed=42),
+                random=RandomState(),
+                word_rand_gen=RandomState(),
                 noisy_est_var=hyperparams['noisy_est_var'],
                 fading_taps_type=hyperparams['fading_taps_type'],
                 use_ecc=True,
@@ -170,36 +248,40 @@ def pre_generate_data(parameters, gamma, hyperparams):
             _ = dataset.__getitem__([snr], gamma)
             
             elapsed = time.time() - start_time
-            print(f"   ✓ Completed in {elapsed:.2f}s")
+            if VERBOSE:
+                print(f"   ✓ Completed in {elapsed:.2f}s")
             
             del dataset
             gc.collect()
     
     # Get cache stats after
     stats_after = cache.get_cache_stats()
-    print(f"\n{'='*70}")
-    print(f"✅ PRE-GENERATION COMPLETE!")
-    print(f"📦 Cache after: {stats_after['num_files']} files, {stats_after['total_size_mb']:.2f} MB")
-    print(f"🆕 Generated {stats_after['num_files'] - stats_before['num_files']} new cache files")
-    print(f"{'='*70}\n")
-    
-    # Show cache efficiency message
-    if stats_after['num_files'] > stats_before['num_files']:
-        print("💡 Data cached successfully! Subsequent runs will be much faster.\n")
-    else:
-        print("💡 All data already cached! No generation needed.\n")
+    if VERBOSE:
+        print(f"\n{'='*70}")
+        print(f"✅ PRE-GENERATION COMPLETE!")
+        print(f"📦 Cache after: {stats_after['num_files']} files, {stats_after['total_size_mb']:.2f} MB")
+        print(f"🆕 Generated {stats_after['num_files'] - stats_before['num_files']} new cache files")
+        print(f"{'='*70}\n")
+        
+        # Show cache efficiency message
+        if stats_after['num_files'] > stats_before['num_files']:
+            print("💡 Data cached successfully! Subsequent runs will be much faster.\n")
+        else:
+            print("💡 All data already cached! No generation needed.\n")
 
 def execute_and_plot(model_name, detector_method, self_supervised, all_curves, current_params, run_over, num_rep, perf_tracker):
     method_name = model_name + "_" + detector_method
     
-    print(f"\n{'─'*70}")
-    print(f"🚀 Starting model: {model_name}")
-    print(f"   Method: {detector_method}, Reps: {num_rep}")
-    print(f"{'─'*70}")
+    if VERBOSE:
+        print(f"\n{'─'*70}")
+        print(f"🚀 Starting model: {model_name}")
+        print(f"   Method: {detector_method}, Reps: {num_rep}")
+        print(f"{'─'*70}")
     
     # Start timing the model execution
     perf_tracker.start_timing(model_name)
-    
+    if 'trainer' in locals() or 'trainer' in globals():
+      del trainer
     trainer = Trainer(
                     model_name=model_name,
                     detector_method=detector_method,
@@ -213,9 +295,11 @@ def execute_and_plot(model_name, detector_method, self_supervised, all_curves, c
     if hasattr(trainer.detector, "model"):
         try:
             trainer.detector.model.to(device)
-            print(f"✓ Model '{model_name}' loaded on {device}")
+            if VERBOSE:
+                print(f"✓ Model '{model_name}' loaded on {device}")
         except Exception as e:
-            print(f"✗ Warning: Could not move model to {device}: {e}")
+            if VERBOSE:
+                print(f"✗ Warning: Could not move model to {device}: {e}")
         model_parameters = filter(lambda p: p.requires_grad, trainer.detector.model.parameters())
         model_size = sum([torch.numel(p) for p in model_parameters])
     
@@ -252,10 +336,18 @@ def execute_and_plot(model_name, detector_method, self_supervised, all_curves, c
     # Calculate final SER (mean of the SER values)
     final_ser = np.mean(ser)
     
-    print(f"\n📊 Results for {model_name}:")
-    print(f"   Final SER: {final_ser:.6f}")
-    print(f"   Model Size: {model_size:,} parameters")
-    print(f"   Run Time: {run_time:.2f}s")
+    # Get bit statistics from trainer
+    total_bits = getattr(trainer, 'last_eval_total_bits', 0)
+    error_bits = getattr(trainer, 'last_eval_error_bits', 0)
+    
+    if VERBOSE:
+        print(f"\n📊 Results for {model_name}:")
+        print(f"   Final SER: {final_ser:.6f}")
+        print(f"   Total Bits Sent: {total_bits:,}")
+        print(f"   Error Bits: {error_bits:,}")
+        print(f"   Correct Bits: {total_bits - error_bits:,}")
+        print(f"   Model Size: {model_size:,} parameters")
+        print(f"   Run Time: {run_time:.2f}s")
     
     # Record metrics
     perf_tracker.record_metrics(
@@ -267,11 +359,13 @@ def execute_and_plot(model_name, detector_method, self_supervised, all_curves, c
     )
     
     # Print utilization after model completes
-    print(f"\n📊 Utilization after {model_name} completed:")
-    print_utilization()
+    if VERBOSE:
+        print(f"\n📊 Utilization after {model_name} completed:")
+        print_utilization()
     
     all_curves.append((ser, model_name, HYPERPARAMS_DICT['val_block_length'], HYPERPARAMS_DICT['n_symbols']))
-    print(f"✅ {model_name} completed!\n")
+    if VERBOSE:
+        print(f"✅ {model_name} completed!\n")
 
 
 HYPERPARAMS_DICT = {
@@ -295,30 +389,30 @@ if __name__ == '__main__':
   perf_tracker = ModelPerformanceTracker()
   
   # Print initial system state
-  print_utilization()
+#   print_utilization()
   
   # Start background monitoring (every 30 seconds)
-  start_monitoring(interval=30)
+#   start_monitoring(interval=300)
   
   # Parameters for data generation
-  # parameters = [(0, 120,25),
-  #               (1, 120,25),
-  #               (2, 120,25),
-  #               (3, 120,25),
-  #               (4, 120,25),
-  #               (5, 120,25),
-  #               (6, 120,25),
-  #               (7, 120,25),
-  #               (8, 120,25),
-  #               (9, 120,25),
-  #               (10, 120,25),
-  #               (11, 120,25),
-  #               (12, 120*2,25*2),
-  #               (13,120*2,25*2),
-  #               (14,120*3,25*3),  
-  parameters = [(15,120*6,25*6),
-                (16,120*7,25*7),  
-                (17,120*8,25*8)]  
+#   parameters = [(0, 120,25),
+#                 (1, 120,25),
+#                 (2, 120,25),
+#                 (3, 120,25),
+#                 (4, 120,25),
+#                 (5, 120,25),
+#                 (6, 120,25),
+#                 (7, 120,25),
+#                 (8, 120,25),
+#                 (9, 120,25),
+#                 (10,120,25),
+#                 (11,120,25),
+#                 (12,120*5,25*5),
+#                 (13,120*5,25*5),
+#                 (14,120*9,25*9),  
+  parameters = [(15,120*9,25*9),
+                (16,120*9,25*9),  
+                (17,120*9,25*9)]  
 
   
   # Pre-generate and cache all data BEFORE training to minimize CPU usage
@@ -346,8 +440,8 @@ if __name__ == '__main__':
     gc.collect()
     if device.type == "cuda":
         torch.cuda.empty_cache()
-    
-    num_of_reps = [6,7,8]
+    #num_of_rep  = [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17]
+    num_of_reps = [9,9,9]
     # main flags
     if (mc<1):
       run_over = 2 # 0 - load plots from previous runs if exists / 1 - load trained weights and start online evaluation / 2 - clear all and start training  from scratch
@@ -357,7 +451,7 @@ if __name__ == '__main__':
     block_length = 120  # determine the transmission length
     channel_coefficients = 'cost2100'  # 'time_decay' / 'cost2100'
     n_symbol = 2
-    snr_start , snr_end = 17,17
+    snr_start , snr_end =15,17
     # deep learning models list 'ADNN', 'Sionna', 'SionnaPlus', 'Transformer', 'LSTM', 'ViterbiNet'
     #models_list = ['ADNN', 'Sionna', 'SionnaPlus', 'Transformer', 'LSTM', 'ViterbiNet', 'ClassicViterbi']
     # models_list = ['Sionna','SionnaPlus','Transformer','ViterbiNet', 'ClassicViterbi']    # Gil Zukerman : Jun/03/2023

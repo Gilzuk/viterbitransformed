@@ -1,0 +1,5 @@
+model,snr,final-ser,model-size,model-run-time
+Transformer,15,0.0,6960,83.97144985198975
+ViterbiNet,15,0.0,7002,88.21506929397583
+Transformer,16,0.0,6960,116.52089047431946
+ViterbiNet,16,0.0,7002,120.20876383781433

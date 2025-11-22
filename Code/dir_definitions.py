@@ -1,7 +1,12 @@
 import os
 import sys
 # main folders
-ROOT_DIR = os.path.dirname(os.path.abspath(__file__))  # This is your Project Root
+import os
+
+ROOT_DIR = os.path.dirname(os.path.abspath(__file__))
+
+# Global verbosity control - imported by other modules
+VERBOSE = True  # Set to False for silent mode
 CODE_DIR = os.path.join(ROOT_DIR, '')
 RESOURCES_DIR = os.path.join(ROOT_DIR, '../Resources')
 RESULTS_DIR = os.path.join(ROOT_DIR, '../Results')
