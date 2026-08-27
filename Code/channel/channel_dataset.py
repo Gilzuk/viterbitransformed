@@ -108,25 +108,25 @@ class ChannelModelDataset(Dataset):
         # Check if we can use cache for all SNRs
         if self.use_cache and len(snr_list) == 1:
             snr = snr_list[0]
-            cache_filename = _data_cache.get_cache_filename(
-                snr=snr, gamma=gamma, 
-                block_length=self.block_length,
-                transmission_length=self.transmission_length,
-                words=self.words,
-                channel_coefficients=self.channel_coefficients,
-                phase=self.phase
-            )
-            
-            # Validate cache exists and matches parameters
-            cache_valid = _data_cache.validate_cache(
-                cache_filename,
+            # The fading flag actually used by get_snr_data depends on the phase
+            fading = self.fading_in_channel if self.phase == 'val' else self.fading_in_decoder
+            cache_params = dict(
                 snr=snr, gamma=gamma,
                 block_length=self.block_length,
                 transmission_length=self.transmission_length,
                 words=self.words,
                 channel_coefficients=self.channel_coefficients,
-                phase=self.phase
+                phase=self.phase,
+                memory_length=self.memory_length,
+                noisy_est_var=self.noisy_est_var,
+                fading_taps_type=self.fading_taps_type,
+                n_symbols=self.n_symbols,
+                fading=fading
             )
+            cache_filename = _data_cache.get_cache_filename(**cache_params)
+
+            # Validate cache exists and matches parameters
+            cache_valid = _data_cache.validate_cache(cache_filename, **cache_params)
             
             # Load from cache if valid
             if cache_valid:
@@ -140,15 +140,7 @@ class ChannelModelDataset(Dataset):
                 b, y = (np.concatenate(arrays) for arrays in zip(*database))
                 
                 # Save to cache with metadata
-                _data_cache.save_to_cache(
-                    cache_filename, b, y,
-                    snr=snr, gamma=gamma,
-                    block_length=self.block_length,
-                    transmission_length=self.transmission_length,
-                    words=self.words,
-                    channel_coefficients=self.channel_coefficients,
-                    phase=self.phase
-                )
+                _data_cache.save_to_cache(cache_filename, b, y, **cache_params)
                 
                 # Convert to GPU tensors
                 b, y = torch.Tensor(b).to(device=device), torch.Tensor(y).to(device=device)

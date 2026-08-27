@@ -224,14 +224,18 @@ def pre_generate_data(parameters, gamma, hyperparams):
             
             # Calculate transmission_length (same as in trainer.py)
             transmission_length = val_block_length + 8 * hyperparams['n_symbols']
-            
+
+            # Must match the per-phase settings used by Trainer.initialize_channel_data,
+            # otherwise the pre-generated cache entries never get reused.
+            frames = hyperparams['train_frames'] if phase == 'train' else hyperparams['val_frames']
+
             # Create temporary dataset to trigger cache generation
             dataset = ChannelModelDataset(
                 channel_type=hyperparams['channel_type'],
                 block_length=val_block_length,
                 transmission_length=transmission_length,
-                words=hyperparams['val_frames'] * hyperparams['subframes_in_frame'],
-                memory_length=2,  # Assuming this is fixed
+                words=frames * hyperparams['subframes_in_frame'],
+                memory_length=hyperparams['memory_length'],
                 channel_coefficients=hyperparams['channel_coefficients'],
                 random=RandomState(),
                 word_rand_gen=RandomState(),
@@ -369,7 +373,8 @@ def execute_and_plot(model_name, detector_method, self_supervised, all_curves, c
 
 
 HYPERPARAMS_DICT = {
-                    'noisy_est_var': 0,
+                    'noisy_est_var': 0,  # >0 injects CSI uncertainty into taps 2..L
+                    'memory_length': 4,  # channel memory (number of taps); n_states = 2**memory_length
                     'fading_taps_type': 1,  # 1 / 2  for time decay only
                     'fading_in_channel': True,
                     'fading_in_decoder': True,
@@ -420,6 +425,8 @@ if __name__ == '__main__':
   # Set initial values needed for pre-generation
   HYPERPARAMS_DICT['n_symbols'] = 2  # Default value from main loop
   HYPERPARAMS_DICT['channel_coefficients'] = 'cost2100'  # Default value from main loop
+  # Match the value the main loop derives, so pre-generated entries are actually reused
+  HYPERPARAMS_DICT['fading_in_channel'] = True if HYPERPARAMS_DICT['channel_coefficients'] == 'time_decay' else False
   
   # Pre-generate data for all parameter combinations
   pre_generate_data(parameters, HYPERPARAMS_DICT['gamma'], HYPERPARAMS_DICT)
@@ -456,7 +463,9 @@ if __name__ == '__main__':
     #models_list = ['ADNN', 'Sionna', 'SionnaPlus', 'Transformer', 'LSTM', 'ViterbiNet', 'ClassicViterbi']
     # models_list = ['Sionna','SionnaPlus','Transformer','ViterbiNet', 'ClassicViterbi']    # Gil Zukerman : Jun/03/2023
     # models_list = ['Sionna','Transformer']
-    models_list = ['Transformer', 'ViterbiNet']
+    # 'Sionna' is the unmodified baseline; keep it in the sweep so SionnaPlus can be
+    # reported as a gain/loss against the original architecture.
+    models_list = ['Sionna', 'SionnaPlus', 'Transformer', 'ViterbiNet', 'ClassicViterbi']
     # models_list = ['Transformer']
     # models_list = ['Mamba','Transformer']
     # models_list = ['ViterbiNet']
