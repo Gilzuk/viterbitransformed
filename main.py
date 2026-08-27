@@ -2,6 +2,7 @@ from Code.dir_definitions import *
 from Code.plotter import get_ser_data, plot_ser_by_block_index, plot_ser_by_snr, plot_summary_table
 from Code.trainer import Trainer
 from Code.csv_reporter import ModelPerformanceTracker
+from Code.complexity import profile_model
 import torch
 import gc
 import numpy as np
@@ -307,6 +308,19 @@ def execute_and_plot(model_name, detector_method, self_supervised, all_curves, c
         model_parameters = filter(lambda p: p.requires_grad, trainer.detector.model.parameters())
         model_size = sum([torch.numel(p) for p in model_parameters])
     
+    # Profile computational complexity (MACs/bit, latency) for the complexity analysis
+    complexity = None
+    if hasattr(trainer.detector, "model"):
+        try:
+            complexity = profile_model(
+                trainer.detector.model,
+                transmission_length=HYPERPARAMS_DICT['val_block_length'] + 8 * HYPERPARAMS_DICT['n_symbols'],
+                memory_length=HYPERPARAMS_DICT['memory_length'],
+                device=device)
+        except Exception as e:
+            if VERBOSE:
+                print(f"✗ Warning: complexity profiling failed for {model_name}: {e}")
+
     # Free GPU memory before heavy operations
     gc.collect()
     if device.type == "cuda":
@@ -353,13 +367,29 @@ def execute_and_plot(model_name, detector_method, self_supervised, all_curves, c
         print(f"   Model Size: {model_size:,} parameters")
         print(f"   Run Time: {run_time:.2f}s")
     
-    # Record metrics
+    # Record metrics. ser is a per-block array, so it also yields a confidence
+    # interval - needed to tell whether model gaps are larger than the noise.
+    ser_reps = np.asarray(ser).reshape(-1).tolist()
+    train_samples = (HYPERPARAMS_DICT['train_frames']
+                     * HYPERPARAMS_DICT['subframes_in_frame']
+                     * HYPERPARAMS_DICT['train_minibatch_num'])
     perf_tracker.record_metrics(
         model_name=model_name,
         snr=HYPERPARAMS_DICT['curr_SNR'],
         final_ser=final_ser,
         model_size=model_size,
-        run_time=run_time
+        run_time=run_time,
+        config={
+            'memory_length': HYPERPARAMS_DICT['memory_length'],
+            'noisy_est_var': HYPERPARAMS_DICT['noisy_est_var'],
+            'train_samples': train_samples,
+            'channel_coefficients': HYPERPARAMS_DICT['channel_coefficients'],
+            'n_symbols': HYPERPARAMS_DICT['n_symbols'],
+            'val_block_length': HYPERPARAMS_DICT['val_block_length'],
+            'detector_method': detector_method,
+        },
+        complexity=complexity,
+        ser_reps=ser_reps
     )
     
     # Print utilization after model completes
@@ -389,6 +419,61 @@ HYPERPARAMS_DICT = {
                     }
 
 
+# ============================================================================
+# Experiment sweep configuration
+# ============================================================================
+# Each sweep produces one of the studies requested in review. A sweep is a list
+# of override dicts applied on top of HYPERPARAMS_DICT; every run records its
+# own configuration into the results CSV, so rows remain distinguishable.
+#
+# IMPORTANT: memory_length and noisy_est_var are part of the data-cache key, so
+# changing them correctly triggers regeneration rather than silently reusing
+# data generated under a different channel.
+
+# Full SNR ladder: (snr, val_block_length, pilot_length).
+# Block length is scaled up at high SNR so enough errors are observed to make
+# the BER estimate meaningful.
+FULL_SNR_PARAMETERS = [(snr, 120, 25) for snr in range(7, 12)] + \
+                      [(12, 120 * 5, 25 * 5),
+                       (13, 120 * 5, 25 * 5),
+                       (14, 120 * 9, 25 * 9),
+                       (15, 120 * 9, 25 * 9),
+                       (16, 120 * 9, 25 * 9),
+                       (17, 120 * 9, 25 * 9)]
+
+# Reduced ladder for quick runs
+SHORT_SNR_PARAMETERS = [(15, 120 * 9, 25 * 9),
+                        (16, 120 * 9, 25 * 9),
+                        (17, 120 * 9, 25 * 9)]
+
+
+def build_sweep(sweep_name: str):
+    """Return a list of (label, overrides) pairs for the requested study."""
+    if sweep_name == 'baseline':
+        # Single configuration - the standard 4-tap, perfect-CSI setting
+        return [('baseline', {})]
+
+    if sweep_name == 'memory':
+        # Reviewer question: is the architecture hard-wired to 4-tap memory?
+        # Note the trellis grows as 2**memory_length, so large L is expensive.
+        return [(f'memory_L{L}', {'memory_length': L}) for L in (2, 3, 4, 5, 6)]
+
+    if sweep_name == 'imperfect_csi':
+        # Reviewer question: how do the detectors behave under CSI uncertainty?
+        return [(f'csi_var{v}', {'noisy_est_var': v})
+                for v in (0.0, 0.01, 0.05, 0.1, 0.5)]
+
+    if sweep_name == 'training_size':
+        # Reviewer question: was the ViterbiNet baseline under-trained? Sweep the
+        # training volume until BER saturates. Effective number of training words
+        # is train_frames * subframes_in_frame * train_minibatch_num.
+        return [(f'train_mb{n}', {'train_minibatch_num': n})
+                for n in (25, 50, 100, 200, 400, 800)]
+
+    raise ValueError(f"Unknown sweep '{sweep_name}'. Valid: baseline, memory, "
+                     f"imperfect_csi, training_size")
+
+
 if __name__ == '__main__':
   # Initialize the performance tracker
   perf_tracker = ModelPerformanceTracker()
@@ -399,131 +484,134 @@ if __name__ == '__main__':
   # Start background monitoring (every 30 seconds)
 #   start_monitoring(interval=300)
   
-  # Parameters for data generation
-#   parameters = [(0, 120,25),
-#                 (1, 120,25),
-#                 (2, 120,25),
-#                 (3, 120,25),
-#                 (4, 120,25),
-#                 (5, 120,25),
-#                 (6, 120,25),
-#                 (7, 120,25),
-#                 (8, 120,25),
-#                 (9, 120,25),
-#                 (10,120,25),
-#                 (11,120,25),
-#                 (12,120*5,25*5),
-#                 (13,120*5,25*5),
-#                 (14,120*9,25*9),  
-  parameters = [(15,120*9,25*9),
-                (16,120*9,25*9),  
-                (17,120*9,25*9)]  
+  # ==========================================================================
+  # Experiment selection
+  # ==========================================================================
+  # SWEEP: 'baseline' | 'memory' | 'imperfect_csi' | 'training_size'
+  SWEEP = 'baseline'
+  # Use FULL_SNR_PARAMETERS to reproduce the 7-17 dB benchmark ladder, or
+  # SHORT_SNR_PARAMETERS for a quick check.
+  parameters = FULL_SNR_PARAMETERS
+  NUM_OF_REPS = 9          # evaluation repetitions per configuration
+  MC_ITERATIONS = 1        # independent Monte-Carlo restarts
 
-  
-  # Pre-generate and cache all data BEFORE training to minimize CPU usage
-  # This happens once - subsequent runs will load from cache
-  # Set initial values needed for pre-generation
-  HYPERPARAMS_DICT['n_symbols'] = 2  # Default value from main loop
-  HYPERPARAMS_DICT['channel_coefficients'] = 'cost2100'  # Default value from main loop
+  sweep_configs = build_sweep(SWEEP)
+
+  # Baseline settings shared by every sweep entry
+  HYPERPARAMS_DICT['n_symbols'] = 2
+  HYPERPARAMS_DICT['channel_coefficients'] = 'cost2100'
   # Match the value the main loop derives, so pre-generated entries are actually reused
   HYPERPARAMS_DICT['fading_in_channel'] = True if HYPERPARAMS_DICT['channel_coefficients'] == 'time_decay' else False
-  
-  # Pre-generate data for all parameter combinations
-  pre_generate_data(parameters, HYPERPARAMS_DICT['gamma'], HYPERPARAMS_DICT)
-  
+
+  # Preserve the pristine defaults so each sweep entry starts from a clean slate
+  BASE_HYPERPARAMS = dict(HYPERPARAMS_DICT)
+
+  print(f"\n{'='*70}")
+  print(f"SWEEP: {SWEEP}  ({len(sweep_configs)} configuration(s))")
+  print(f"SNR points: {[p[0] for p in parameters]}")
+  print(f"{'='*70}\n")
+
   # Enable CUDA matmul optimizations if using GPU
   if device.type == "cuda":
       torch.backends.cuda.matmul.allow_bf16_reduced_precision_reduction = True
       torch.backends.cuda.matmul.allow_fp16_accumulation = True
 
+  for sweep_label, overrides in sweep_configs:
+    print(f"\n{'#'*70}")
+    print(f"# CONFIGURATION: {sweep_label}  {overrides if overrides else '(defaults)'}")
+    print(f"{'#'*70}\n")
 
-  for mc in range(100):
-    print(f"\n{'🔄 '*35}")
-    print(f"{'='*70}")
-    print(f"ITERATION {mc + 1}/100")
-    print(f"{'='*70}")
-    
-    # Reduce CPU/GPU pressure between top-level iterations
-    gc.collect()
-    if device.type == "cuda":
-        torch.cuda.empty_cache()
-    #num_of_rep  = [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17]
-    num_of_reps = [9,9,9]
-    # main flags
-    if (mc<1):
+    # Reset to defaults, then apply this configuration's overrides
+    HYPERPARAMS_DICT.clear()
+    HYPERPARAMS_DICT.update(BASE_HYPERPARAMS)
+    HYPERPARAMS_DICT.update(overrides)
+
+    # Pre-generate data for this configuration. Because memory_length and
+    # noisy_est_var are part of the cache key, each configuration gets its own
+    # cache entries instead of silently reusing another configuration's data.
+    pre_generate_data(parameters, HYPERPARAMS_DICT['gamma'], HYPERPARAMS_DICT)
+
+    for mc in range(MC_ITERATIONS):
+      print(f"\n{'🔄 '*35}")
+      print(f"{'='*70}")
+      print(f"ITERATION {mc + 1}/{MC_ITERATIONS}  [{sweep_label}]")
+      print(f"{'='*70}")
+
+      # Reduce CPU/GPU pressure between top-level iterations
+      gc.collect()
+      if device.type == "cuda":
+          torch.cuda.empty_cache()
+
+      # main flags
       run_over = 2 # 0 - load plots from previous runs if exists / 1 - load trained weights and start online evaluation / 2 - clear all and start training  from scratch
-    else:
-      run_over = 2
-    plot_by_block = False  # False / True either plot by SNR or by block index
-    block_length = 120  # determine the transmission length
-    channel_coefficients = 'cost2100'  # 'time_decay' / 'cost2100'
-    n_symbol = 2
-    snr_start , snr_end =15,17
-    # deep learning models list 'ADNN', 'Sionna', 'SionnaPlus', 'Transformer', 'LSTM', 'ViterbiNet'
-    #models_list = ['ADNN', 'Sionna', 'SionnaPlus', 'Transformer', 'LSTM', 'ViterbiNet', 'ClassicViterbi']
-    # models_list = ['Sionna','SionnaPlus','Transformer','ViterbiNet', 'ClassicViterbi']    # Gil Zukerman : Jun/03/2023
-    # models_list = ['Sionna','Transformer']
-    # 'Sionna' is the unmodified baseline; keep it in the sweep so SionnaPlus can be
-    # reported as a gain/loss against the original architecture.
-    models_list = ['Sionna', 'SionnaPlus', 'Transformer', 'ViterbiNet', 'ClassicViterbi']
-    # models_list = ['Transformer']
-    # models_list = ['Mamba','Transformer']
-    # models_list = ['ViterbiNet']
-    # models_list = ['SionnaPlus']
-    # models_list = ['Mamba']
-    detector_method = 'ModelBased'  # ModelBased / EndToEnd / Statistical
-    self_supervised = False  # True / False for online evaluation enablement
-    all_curves = []
-    snr_values = []
-    # for snr in range(snr_start, snr_end+1):
-    total_params = len(parameters)
-    for idx, (snr, val_block_length, pilot_length) in enumerate(parameters, 1):
-      print(f'\n{"─"*70}')
-      print(f'📍 Parameter Set [{idx}/{total_params}]:')
-      print(f'   SNR={snr}, val_block_length={val_block_length}, pilots_length={pilot_length}, n_symbols={n_symbol}')
-      print(f'   Iteration: {mc}, block-length={block_length}')
-      print(f'{"─"*70}')
-      
-      HYPERPARAMS_DICT['n_symbols'] = n_symbol
-      HYPERPARAMS_DICT['curr_SNR'] = snr
-      HYPERPARAMS_DICT['val_block_length'] = val_block_length
-      HYPERPARAMS_DICT['train_block_length'] = val_block_length
-      HYPERPARAMS_DICT['fading_in_channel'] = True if channel_coefficients == 'time_decay' else False
-      HYPERPARAMS_DICT['pilots_num'] = pilot_length 
-      HYPERPARAMS_DICT['channel_coefficients'] = channel_coefficients
-      current_params = HYPERPARAMS_DICT['channel_coefficients'] + '_' + str(HYPERPARAMS_DICT['curr_SNR']) + '_' + \
-                      str(HYPERPARAMS_DICT['val_block_length']) + '_' + str(HYPERPARAMS_DICT['n_symbols'])
-      
-      print(f"\n🤖 Running {len(models_list)} models: {', '.join(models_list)}\n")
-      
-      for model_idx, model in enumerate(models_list, 1):
-          print(f"   [{model_idx}/{len(models_list)}] Processing model: {model}")
-          if model == 'ClassicViterbi':
-              execute_and_plot(model, 'Statistical', False, all_curves, current_params, run_over, num_of_reps[snr-snr_start], perf_tracker)  # Classic Viterbi Alg with Perfect-CSI
-          else:
-              execute_and_plot(model, detector_method, self_supervised, all_curves, current_params, run_over, num_of_reps[snr-snr_start], perf_tracker)
-      
-      # Save metrics after each SNR level
+      plot_by_block = False  # False / True either plot by SNR or by block index
+      block_length = 120  # determine the transmission length
+      channel_coefficients = HYPERPARAMS_DICT['channel_coefficients']  # 'time_decay' / 'cost2100'
+      n_symbol = HYPERPARAMS_DICT['n_symbols']
+      # deep learning models list 'ADNN', 'Sionna', 'SionnaPlus', 'Transformer', 'LSTM', 'ViterbiNet'
+      # 'Sionna' is the unmodified baseline; keep it in the sweep so SionnaPlus can be
+      # reported as a gain/loss against the original architecture.
+      # 'SionnaAdd' / 'SionnaSkip' are fusion-variant ablations of SionnaPlus.
+      models_list = ['Sionna', 'SionnaPlus', 'Transformer', 'ViterbiNet', 'ClassicViterbi']
+      # Ablation study (justifies the fusion design):
+      # models_list = ['Sionna', 'ViterbiNet', 'SionnaPlus', 'SionnaAdd', 'SionnaSkip']
+      detector_method = 'ModelBased'  # ModelBased / EndToEnd / Statistical
+      self_supervised = False  # True / False for online evaluation enablement
+      all_curves = []
+      snr_values = []
+      total_params = len(parameters)
+      for idx, (snr, val_block_length, pilot_length) in enumerate(parameters, 1):
+        print(f'\n{"─"*70}')
+        print(f'📍 Parameter Set [{idx}/{total_params}]  [{sweep_label}]:')
+        print(f'   SNR={snr}, val_block_length={val_block_length}, pilots_length={pilot_length}, n_symbols={n_symbol}')
+        print(f'   memory_length={HYPERPARAMS_DICT["memory_length"]}, noisy_est_var={HYPERPARAMS_DICT["noisy_est_var"]}')
+        print(f'   Iteration: {mc}, block-length={block_length}')
+        print(f'{"─"*70}')
+
+        HYPERPARAMS_DICT['curr_SNR'] = snr
+        HYPERPARAMS_DICT['val_block_length'] = val_block_length
+        HYPERPARAMS_DICT['train_block_length'] = val_block_length
+        HYPERPARAMS_DICT['pilots_num'] = pilot_length
+        current_params = HYPERPARAMS_DICT['channel_coefficients'] + '_' + str(HYPERPARAMS_DICT['curr_SNR']) + '_' + \
+                        str(HYPERPARAMS_DICT['val_block_length']) + '_' + str(HYPERPARAMS_DICT['n_symbols'])
+        # Keep weights from different sweep configurations separate
+        if sweep_label != 'baseline':
+          current_params += '_' + sweep_label
+
+        print(f"\n🤖 Running {len(models_list)} models: {', '.join(models_list)}\n")
+
+        for model_idx, model in enumerate(models_list, 1):
+            print(f"   [{model_idx}/{len(models_list)}] Processing model: {model}")
+            if model == 'ClassicViterbi':
+                execute_and_plot(model, 'Statistical', False, all_curves, current_params, run_over, NUM_OF_REPS, perf_tracker)  # Classic Viterbi Alg with Perfect-CSI
+            else:
+                execute_and_plot(model, detector_method, self_supervised, all_curves, current_params, run_over, NUM_OF_REPS, perf_tracker)
+
+        # Save metrics after each SNR level
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        csv_filename = f"model_performance_{sweep_label}_snr_{snr}_{timestamp}.csv"
+        perf_tracker.save_to_csv(csv_filename)
+        print(f"\n💾 Metrics saved to: {csv_filename}\n")
+
+      # if not plot_by_block:
+      #     plot_ser_by_snr(all_curves, snr_values)
+      # else:
+      #     plot_ser_by_block_index(all_curves, block_length, n_symbol, snr)
+
+      # plot_summary_table(all_curves, models_list, snr_values)
+
+      # Save final metrics after all iterations
       timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-      csv_filename = f"model_performance_snr_{snr}_{timestamp}.csv"
-      perf_tracker.save_to_csv(csv_filename)
-      print(f"\n💾 Metrics saved to: {csv_filename}\n")
+      final_csv = f"model_performance_final_{sweep_label}_mc_{mc}_{timestamp}.csv"
+      perf_tracker.save_to_csv(final_csv)
+      print(f"\n{'='*70}")
+      print(f"💾 Final metrics for iteration {mc+1} saved to: {final_csv}")
+      print(f"{'='*70}\n")
 
-    # if not plot_by_block:
-    #     plot_ser_by_snr(all_curves, snr_values)
-    # else:
-    #     plot_ser_by_block_index(all_curves, block_length, n_symbol, snr)
+  # Export the reviewer-facing summary tables across every configuration
+  perf_tracker.save_ber_vs_snr_table()
+  perf_tracker.save_complexity_table()
 
-    # plot_summary_table(all_curves, models_list, snr_values)
-    
-    # Save final metrics after all iterations
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    final_csv = f"model_performance_final_mc_{mc}_{timestamp}.csv"
-    perf_tracker.save_to_csv(final_csv)
-    print(f"\n{'='*70}")
-    print(f"💾 Final metrics for iteration {mc+1} saved to: {final_csv}")
-    print(f"{'='*70}\n")
-  
   # Stop monitoring and print final stats
   stop_monitoring()
   print("\n" + "🎉"*35)
