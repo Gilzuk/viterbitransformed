@@ -137,7 +137,14 @@ class ModelPerformanceTracker:
             return df
 
         value_col = 'ser-mean' if 'ser-mean' in df.columns else 'final-ser'
-        table = df.pivot_table(index='snr', columns='model',
+        config_cols = [
+            column for column in (
+                'memory_length', 'noisy_est_var', 'train_samples',
+                'channel_coefficients', 'n_symbols', 'val_block_length',
+                'pilots_num', 'detector_method'
+            ) if column in df.columns
+        ]
+        table = df.pivot_table(index=['snr'] + config_cols, columns='model',
                                values=value_col, aggfunc='mean')
 
         if filename is None:
@@ -161,10 +168,17 @@ class ModelPerformanceTracker:
             return pd.DataFrame()
 
         value_col = 'ser-mean' if 'ser-mean' in df.columns else 'final-ser'
-        agg = {c: 'first' for c in cols}
+        config_cols = [
+            column for column in (
+                'snr', 'memory_length', 'noisy_est_var', 'train_samples',
+                'channel_coefficients', 'n_symbols', 'val_block_length',
+                'pilots_num', 'detector_method'
+            ) if column in df.columns
+        ]
+        agg = {c: 'mean' for c in cols}
         agg[value_col] = 'mean'
         agg['model-size'] = 'first'
-        summary = df.groupby('model').agg(agg).reset_index()
+        summary = df.groupby(['model'] + config_cols, dropna=False).agg(agg).reset_index()
 
         if filename is None:
             filename = f"complexity_{time.strftime('%Y%m%d_%H%M%S')}.csv"

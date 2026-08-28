@@ -386,6 +386,7 @@ def execute_and_plot(model_name, detector_method, self_supervised, all_curves, c
             'channel_coefficients': HYPERPARAMS_DICT['channel_coefficients'],
             'n_symbols': HYPERPARAMS_DICT['n_symbols'],
             'val_block_length': HYPERPARAMS_DICT['val_block_length'],
+            'pilots_num': HYPERPARAMS_DICT['pilots_num'],
             'detector_method': detector_method,
         },
         complexity=complexity,
@@ -620,5 +621,4 @@ if __name__ == '__main__':
   print("="*70)
   print("\n📊 FINAL SYSTEM STATE:")
   print_utilization()
-
 

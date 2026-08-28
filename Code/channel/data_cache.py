@@ -6,6 +6,7 @@ import numpy as np
 import torch
 import os
 import pickle
+import math
 from typing import Tuple, Dict
 from pathlib import Path
 
@@ -107,7 +108,15 @@ class ChannelDataCache:
                 print(f"[DataCache] Cache file missing keys {missing}, will regenerate: {Path(filename).name}")
                 return False
 
-            mismatched = {k: (v, metadata[k]) for k, v in expected.items() if metadata[k] != v}
+            float_keys = {'snr', 'gamma', 'noisy_est_var'}
+            mismatched = {
+                k: (v, metadata[k]) for k, v in expected.items()
+                if (
+                    not math.isclose(float(metadata[k]), float(v), rel_tol=1e-9, abs_tol=1e-12)
+                    if k in float_keys
+                    else metadata[k] != v
+                )
+            }
             if mismatched:
                 print(f"[DataCache] Parameter mismatch, will regenerate: {Path(filename).name}")
                 for key, (want, got) in mismatched.items():
