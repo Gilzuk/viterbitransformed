@@ -55,7 +55,12 @@ def execute_and_plot(model_name, detector_method, self_supervised, all_curves, c
         snr=HYPERPARAMS_DICT['curr_SNR'],
         final_ser=final_ser,
         model_size=model_size,
-        run_time=run_time
+        run_time=run_time,
+        config={
+            'val_block_length': HYPERPARAMS_DICT['val_block_length'],
+            'pilots_num': HYPERPARAMS_DICT.get('pilots_num'),
+        },
+        ser_reps=np.asarray(ser).reshape(-1).tolist()
     )
     all_curves.append((ser, model_name, HYPERPARAMS_DICT['val_block_length'], HYPERPARAMS_DICT['n_symbols']))
 
@@ -147,5 +152,4 @@ if __name__ == '__main__':
   # plot_summary_table(all_curves, models_list, snr_values)
   # Save final metrics after all iterations
   perf_tracker.save_to_csv(f"model_performance_final_mc_{mc}_parallel.csv")
-
 

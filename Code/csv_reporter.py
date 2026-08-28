@@ -2,9 +2,8 @@ import os
 import csv
 import time
 import math
-import pandas as pd
 import torch
-from typing import Dict, List, Tuple
+from typing import Dict, List
 
 class ModelPerformanceTracker:
     """
@@ -106,70 +105,117 @@ class ModelPerformanceTracker:
             
         if filename is None:
             filename = f"model_performance_{time.strftime('%Y%m%d_%H%M%S')}.csv"
-            
-        file_path = os.path.join(self.output_path, filename)
         
-        df = pd.DataFrame(self.metrics)
-        df.to_csv(file_path, index=False)
+        file_path = os.path.join(self.output_path, filename)
+        self._write_rows(file_path, self.metrics)
         print(f"Metrics saved to {file_path}")
         
         # Also print a summary
         print("\nModel Performance Summary:")
         print("="*60)
-        print(df)
+        self._print_table(self.metrics)
         print("="*60)
         
-    def get_summary_dataframe(self) -> pd.DataFrame:
-        """Return metrics as a DataFrame"""
-        if not self.metrics:
-            return pd.DataFrame()
-        return pd.DataFrame(self.metrics)
+    @staticmethod
+    def _write_rows(file_path: str, rows: List[Dict]):
+        fieldnames = list(dict.fromkeys(key for row in rows for key in row))
+        with open(file_path, 'w', newline='') as output:
+            writer = csv.DictWriter(output, fieldnames=fieldnames)
+            writer.writeheader()
+            writer.writerows(rows)
 
-    def save_ber_vs_snr_table(self, filename: str = None) -> pd.DataFrame:
+    @staticmethod
+    def _print_table(rows: List[Dict]):
+        if not rows:
+            return
+        columns = list(dict.fromkeys(key for row in rows for key in row))
+        print('\t'.join(columns))
+        for row in rows:
+            print('\t'.join(str(row.get(column, '')) for column in columns))
+
+    def get_summary_dataframe(self) -> List[Dict]:
+        """Return recorded metrics as a list of table rows."""
+        return list(self.metrics)
+
+    def save_ber_vs_snr_table(self, filename: str = None) -> List[Dict]:
         """Pivot results into the model-vs-SNR table used in the paper.
 
         Rows are SNR, columns are models, values are mean SER - matching the
         benchmark table layout in the README.
         """
-        df = self.get_summary_dataframe()
-        if df.empty:
+        rows = self.get_summary_dataframe()
+        if not rows:
             print("No metrics to pivot")
-            return df
+            return rows
 
-        value_col = 'ser-mean' if 'ser-mean' in df.columns else 'final-ser'
-        table = df.pivot_table(index='snr', columns='model',
-                               values=value_col, aggfunc='mean')
+        value_col = 'ser-mean' if any('ser-mean' in row for row in rows) else 'final-ser'
+        config_cols = [
+            column for column in (
+                'memory_length', 'noisy_est_var', 'train_samples',
+                'channel_coefficients', 'n_symbols', 'val_block_length',
+                'pilots_num', 'detector_method'
+            ) if any(column in row for row in rows)
+        ]
+        grouped = {}
+        for row in rows:
+            key = tuple(row.get(column) for column in ['snr'] + config_cols)
+            model = row['model']
+            grouped.setdefault((key, model), []).append(row.get(value_col, 0))
+        models = sorted({row['model'] for row in rows})
+        table = []
+        for key in sorted({key for key, _ in grouped}, key=lambda value: tuple(str(v) for v in value)):
+            output = dict(zip(['snr'] + config_cols, key))
+            for model in models:
+                values = grouped.get((key, model), [])
+                if values:
+                    output[model] = sum(values) / len(values)
+            table.append(output)
 
         if filename is None:
             filename = f"ber_vs_snr_{time.strftime('%Y%m%d_%H%M%S')}.csv"
         file_path = os.path.join(self.output_path, filename)
-        table.to_csv(file_path)
+        self._write_rows(file_path, table)
         print(f"BER-vs-SNR table saved to {file_path}")
-        print(table)
+        self._print_table(table)
         return table
 
-    def save_complexity_table(self, filename: str = None) -> pd.DataFrame:
+    def save_complexity_table(self, filename: str = None) -> List[Dict]:
         """Export the BER-gain-vs-complexity comparison the reviewers requested."""
-        df = self.get_summary_dataframe()
-        if df.empty:
+        rows = self.get_summary_dataframe()
+        if not rows:
             print("No metrics to summarise")
-            return df
+            return rows
 
-        cols = [c for c in df.columns if c.startswith('complexity-')]
+        cols = sorted({c for row in rows for c in row if c.startswith('complexity-')})
         if not cols:
             print("No complexity metrics recorded")
-            return pd.DataFrame()
+            return []
 
-        value_col = 'ser-mean' if 'ser-mean' in df.columns else 'final-ser'
-        agg = {c: 'first' for c in cols}
-        agg[value_col] = 'mean'
-        agg['model-size'] = 'first'
-        summary = df.groupby('model').agg(agg).reset_index()
+        value_col = 'ser-mean' if any('ser-mean' in row for row in rows) else 'final-ser'
+        config_cols = [
+            column for column in (
+                'snr', 'memory_length', 'noisy_est_var', 'train_samples',
+                'channel_coefficients', 'n_symbols', 'val_block_length',
+                'pilots_num', 'detector_method'
+            ) if any(column in row for row in rows)
+        ]
+        groups = {}
+        for row in rows:
+            key = tuple(row.get(column) for column in ['model'] + config_cols)
+            groups.setdefault(key, []).append(row)
+        summary = []
+        for key, group in sorted(groups.items(), key=lambda item: tuple(str(v) for v in item[0])):
+            output = dict(zip(['model'] + config_cols, key))
+            for column in cols:
+                output[column] = sum(row.get(column, 0) for row in group) / len(group)
+            output[value_col] = sum(row.get(value_col, 0) for row in group) / len(group)
+            output['model-size'] = group[0].get('model-size')
+            summary.append(output)
 
         if filename is None:
             filename = f"complexity_{time.strftime('%Y%m%d_%H%M%S')}.csv"
         file_path = os.path.join(self.output_path, filename)
-        summary.to_csv(file_path, index=False)
+        self._write_rows(file_path, summary)
         print(f"Complexity table saved to {file_path}")
-        print(summary)
+        self._print_table(summary)
         return summary
