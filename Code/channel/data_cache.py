@@ -18,11 +18,20 @@ class ChannelDataCache:
         self.cache_dir.mkdir(exist_ok=True)
         print(f"[DataCache] Cache directory: {self.cache_dir.absolute()}")
     
-    def get_cache_filename(self, snr: float, gamma: float, block_length: int, 
-                          transmission_length: int, words: int, 
-                          channel_coefficients: str, phase: str) -> str:
-        """Generate unique cache filename based on parameters"""
-        filename = f"data_snr{snr}_gamma{gamma}_bl{block_length}_tl{transmission_length}_w{words}_ch{channel_coefficients}_{phase}.pkl"
+    def get_cache_filename(self, snr: float, gamma: float, block_length: int,
+                          transmission_length: int, words: int,
+                          channel_coefficients: str, phase: str,
+                          memory_length: int, noisy_est_var: float,
+                          fading_taps_type: int, n_symbols: int,
+                          fading: bool) -> str:
+        """Generate unique cache filename based on parameters.
+
+        Every parameter that changes the generated data must appear here, otherwise
+        data generated under one setting would be silently reused under another.
+        """
+        filename = (f"data_snr{snr}_gamma{gamma}_bl{block_length}_tl{transmission_length}"
+                    f"_w{words}_ch{channel_coefficients}_ml{memory_length}_nev{noisy_est_var}"
+                    f"_ftt{fading_taps_type}_ns{n_symbols}_fad{int(fading)}_{phase}.pkl")
         return str(self.cache_dir / filename)
     
     def cache_exists(self, filename: str) -> bool:
@@ -32,7 +41,9 @@ class ChannelDataCache:
     def save_to_cache(self, filename: str, b: np.ndarray, y: np.ndarray, 
                      snr: float, gamma: float, block_length: int, 
                      transmission_length: int, words: int, 
-                     channel_coefficients: str, phase: str):
+                     channel_coefficients: str, phase: str,
+                     memory_length: int, noisy_est_var: float,
+                     fading_taps_type: int, n_symbols: int, fading: bool):
         """Save generated data to cache file with metadata for validation"""
         print(f"[DataCache] Saving to cache: {Path(filename).name}")
         metadata = {
@@ -42,7 +53,12 @@ class ChannelDataCache:
             'transmission_length': transmission_length,
             'words': words,
             'channel_coefficients': channel_coefficients,
-            'phase': phase
+            'phase': phase,
+            'memory_length': memory_length,
+            'noisy_est_var': noisy_est_var,
+            'fading_taps_type': fading_taps_type,
+            'n_symbols': n_symbols,
+            'fading': fading
         }
         with open(filename, 'wb') as f:
             pickle.dump({'b': b, 'y': y, 'metadata': metadata}, f, protocol=pickle.HIGHEST_PROTOCOL)
@@ -51,7 +67,10 @@ class ChannelDataCache:
     
     def validate_cache(self, filename: str, snr: float, gamma: float, 
                       block_length: int, transmission_length: int, 
-                      words: int, channel_coefficients: str, phase: str) -> bool:
+                      words: int, channel_coefficients: str, phase: str,
+                      memory_length: int, noisy_est_var: float,
+                      fading_taps_type: int, n_symbols: int,
+                      fading: bool) -> bool:
         """Check if cached file matches expected parameters"""
         if not os.path.exists(filename):
             return False
@@ -66,18 +85,33 @@ class ChannelDataCache:
                 return False
             
             metadata = data['metadata']
-            
-            # Validate all parameters match
-            if (metadata['snr'] != snr or 
-                metadata['gamma'] != gamma or
-                metadata['block_length'] != block_length or
-                metadata['transmission_length'] != transmission_length or
-                metadata['words'] != words or
-                metadata['channel_coefficients'] != channel_coefficients or
-                metadata['phase'] != phase):
+
+            expected = {
+                'snr': snr,
+                'gamma': gamma,
+                'block_length': block_length,
+                'transmission_length': transmission_length,
+                'words': words,
+                'channel_coefficients': channel_coefficients,
+                'phase': phase,
+                'memory_length': memory_length,
+                'noisy_est_var': noisy_est_var,
+                'fading_taps_type': fading_taps_type,
+                'n_symbols': n_symbols,
+                'fading': fading
+            }
+
+            # Cache files written before these keys existed cannot be trusted
+            missing = [k for k in expected if k not in metadata]
+            if missing:
+                print(f"[DataCache] Cache file missing keys {missing}, will regenerate: {Path(filename).name}")
+                return False
+
+            mismatched = {k: (v, metadata[k]) for k, v in expected.items() if metadata[k] != v}
+            if mismatched:
                 print(f"[DataCache] Parameter mismatch, will regenerate: {Path(filename).name}")
-                print(f"  Expected: SNR={snr}, gamma={gamma}, bl={block_length}, tl={transmission_length}, w={words}")
-                print(f"  Found:    SNR={metadata['snr']}, gamma={metadata['gamma']}, bl={metadata['block_length']}, tl={metadata['transmission_length']}, w={metadata['words']}")
+                for key, (want, got) in mismatched.items():
+                    print(f"  {key}: expected={want}, found={got}")
                 return False
             
             return True
