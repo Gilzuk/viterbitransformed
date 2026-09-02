@@ -97,6 +97,19 @@ class ModelPerformanceTracker:
         half_width = confidence_z * std / math.sqrt(n)
         return {'ser-mean': mean, 'ser-std': std, 'ser-ci95': half_width, 'ser-reps': n}
     
+    def save_session_summary(self, session_info: Dict, filename: str = None) -> str:
+        """Persist overall Colab session runtime/tier info alongside the metrics.
+
+        Lets a paid-runtime session's wall-clock cost be correlated against
+        the experiments actually completed in it.
+        """
+        if filename is None:
+            filename = f"session_summary_{time.strftime('%Y%m%d_%H%M%S')}.csv"
+        file_path = os.path.join(self.output_path, filename)
+        self._write_rows(file_path, [session_info])
+        print(f"Session summary saved to {file_path}")
+        return file_path
+
     def save_to_csv(self, filename: str = None):
         """Save recorded metrics to CSV"""
         if not self.metrics:
