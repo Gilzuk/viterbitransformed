@@ -67,15 +67,28 @@ class ColabRuntimeMonitor:
         return bool(self.backup_dir) and (time.time() - self._last_backup) >= self.backup_interval_seconds
 
     def backup_results(self, source_dirs: Iterable[str]):
-        """Copy source_dirs into self.backup_dir, if one was configured."""
+        """Copy source_dirs into self.backup_dir, if one was configured.
+
+        Copies each directory into a staging path first and swaps it into
+        place afterwards, rather than copying straight into the previous
+        backup with dirs_exist_ok=True. A disconnect mid-copy then leaves
+        the last known-good backup untouched instead of half-overwritten.
+        """
         if not self.backup_dir:
             return
         os.makedirs(self.backup_dir, exist_ok=True)
         for src in source_dirs:
             if not os.path.isdir(src):
                 continue
-            dest = os.path.join(self.backup_dir, os.path.basename(src))
-            shutil.copytree(src, dest, dirs_exist_ok=True)
+            name = os.path.basename(src)
+            dest = os.path.join(self.backup_dir, name)
+            staging = os.path.join(self.backup_dir, f'.{name}.staging')
+            if os.path.exists(staging):
+                shutil.rmtree(staging)
+            shutil.copytree(src, staging)
+            if os.path.exists(dest):
+                shutil.rmtree(dest)
+            os.rename(staging, dest)
         self._last_backup = time.time()
         print(f"[runtime {self.elapsed_str()}] backed up results to {self.backup_dir}")
 
