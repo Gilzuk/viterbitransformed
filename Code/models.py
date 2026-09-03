@@ -812,8 +812,7 @@ class ECC_Transformer(nn.Module):
 
     def generate_square_subsequent_mask(self, size: int):
         """Generates an upper-triangular matrix of -inf, with zeros on diag."""
-        return torch.ones(size, size).type(torch.bool).to(device)
-        # return torch.triu(torch.ones(size, size) * float('-inf'), diagonal=1).type(torch.bool).to(device)
+        return torch.triu(torch.ones(size, size) * float('-inf'), diagonal=1).type(torch.bool).to(device)
 
 
     def forward(self, input_):

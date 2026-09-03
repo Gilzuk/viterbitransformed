@@ -101,5 +101,18 @@ All results are based on  Model-Based `ViterbiNet` with using  `cost2100` channe
 5.2.   Coded Bit-Error-Rate Vs SNR Chart   
 ![image](https://user-images.githubusercontent.com/104585352/197407950-e7d44eb6-25bb-4dc8-9a9a-6fcaaab20a03.png)
 
+5.3.  Known issue: Transformer attention mask (fixed) <a name="mask-fix"></a>
+The `Transformer` (`ECC_Transformer`) architecture in `Code/models.py` regressed after the results above were captured: `generate_square_subsequent_mask` was changed to return an all-`True` mask, which zeros out every attention score before the softmax and makes self-attention degenerate to a uniform average over the whole block, regardless of content or position. The correct causal mask (`torch.triu(torch.ones(size, size) * float('-inf'), diagonal=1)`) has been restored.
+
+Validation (CPU, `ModelBased`/self-supervised config matching `main_mp.py`, SNR ∈ {4, 12, 16}, n=3 reps/point, `Transformer` only — see `Results/metrics` history for the pre-fix `ViterbiNet` baseline used for comparison):
+
+|SNR|Transformer (pre-fix bug)|ViterbiNet baseline|Transformer (mask restored)|
+|:--|:--:|:--:|:--:|
+|4|0.09966|0.08690|0.10393|
+|12|0.00219|0.00216|0.00113|
+|16|0.00007|0.00005|0.00000|
+
+At SNR 12 the fix roughly halves the Transformer's SER and pulls it back below the ViterbiNet baseline, consistent with the moderate/high-SNR crossover this project's paper claims. SNR 4 is essentially unchanged, consistent with the paper's own explanation that the low-SNR gap comes from sparse self-supervised training signal (few blocks pass `ser_thresh`), not attention. This was a reduced sanity check (3 SNR points, n=3, CPU-only), not a full re-run of the table in 5.1 — that re-run is still outstanding.
+
 Enjoy!
 
