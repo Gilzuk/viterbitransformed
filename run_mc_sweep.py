@@ -67,15 +67,22 @@ TARGET_ERRORS = 100
 #                 this is what stops it running away when they never are.
 #   step       -- minimum rep increment while extending
 #
-# Sizing max_bits: accumulating ~100 errors needs ~100/SER bits, so an error
-# floor near 5e-7 needs ~2e8 bits. That is only affordable since caching the
-# COST2100 tap load made ClassicViterbi ~200x faster (0ad20cd); before that
-# it was ~6.5 s/rep and 2e8 bits would have taken over a week for one point.
-# The Transformer gets a far smaller budget: its cost is per-word backprop
-# during online adaptation, which that speedup does not touch.
+# Sizing max_bits, from MEASURED throughput on this box (2000 bits/rep):
+#   ClassicViterbi  1.15 s/rep = ~1760 bits/s  -> 2e7 bits = 3.2 h/point
+#   Transformer     ~210 s/rep = ~9.5 bits/s   -> 1e5 bits = 2.9 h/point
+# (ClassicViterbi was 6.5 s/rep before the COST2100 tap-load cache in
+# 0ad20cd; that is a 5.7x end-to-end speedup, not the 224x that applies to
+# estimate_channel alone.)
+#
+# What this does and does not buy: ~100 errors needs ~100/SER bits, so
+# SNR<=13 (SER >= 5.5e-6) now reaches a full 100 errors. The error floor at
+# SNR>=14 (SER < 5e-7) would need ~2e8 bits = 31.5 h for ONE point, so those
+# stay censored -- but at 2e7 bits their upper bound tightens 10x, to
+# ~1.5e-7. Brute force cannot reach the floor here; that needs importance
+# sampling, or a much faster detector implementation.
 MODELS = [
-    ('ClassicViterbi', 'Statistical', 100, 500, 500_000_000, 100),
-    ('Transformer', 'ModelBased', 20, 30, 4_000_000, 5),
+    ('ClassicViterbi', 'Statistical', 100, 500, 20_000_000, 100),
+    ('Transformer', 'ModelBased', 20, 30, 100_000, 5),
 ]
 BRANCH = 'claude/transformer-sionna-mlp-comparison-wc67zp'
 
