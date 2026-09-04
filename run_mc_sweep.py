@@ -6,10 +6,12 @@ rep count that silently floors to a meaningless "0" once the true SER drops
 below what that many bits can resolve.
 
 Sizing method (per point):
-  1. Predict the SER at this SNR using the closed-form BPSK/AWGN error
-     probability Q(sqrt(2*snr_linear)). This is only a heuristic -- the
-     real channel has ISI and fading on top of AWGN -- but it is a
-     reasonable prior for how many bits are needed.
+  1. Predict the SER at this SNR with Q(sqrt(2*snr_eff_linear)), where
+     snr_eff = snr - ISI_PENALTY_DB. The ideal single-tap AWGN expression
+     (penalty 0) is badly miscalibrated for this 4-tap ISI channel --
+     under-predicting by 2.2x at 0 dB and 258x at 10 dB against our own
+     measurements -- but the gap is a near-constant effective-SNR shift,
+     so applying that shift makes it a usable prior. See ISI_PENALTY_DB.
   2. Target ~100 expected errors (the standard rule of thumb for a stable
      Monte-Carlo BER/SER estimate): required_bits = 100 / predicted_ser.
   3. Convert to repetitions via the trainer's actual words/rep and bits/word,
@@ -69,13 +71,40 @@ MODELS = [
 BRANCH = 'claude/transformer-sionna-mlp-comparison-wc67zp'
 
 
-def expected_ser_awgn(snr_db):
-    """Closed-form BPSK/AWGN bit-error probability Q(sqrt(2*snr_linear)).
+# Effective-SNR penalty of the ISI channel relative to ideal single-tap AWGN.
+#
+# The plain AWGN expression Q(sqrt(2*snr_linear)) is badly miscalibrated here
+# because the channel has 4-tap ISI (mean COST2100 taps [0.944, 0.430, 0.172,
+# 0.079]) and the measured quantity is post-FEC SER, not raw channel BER:
+# against our own ClassicViterbi (perfect-CSI) measurements it under-predicts
+# by 2.2x at 0 dB, growing to 258x at 10 dB.
+#
+# What it under-predicts by is, however, an almost constant shift in effective
+# SNR. Solving Q(sqrt(2*snr_eff)) = measured for each of SNR 0..10 dB gives an
+# implied penalty of +3.66, +3.83, +3.96, +4.06, +4.02, +3.90, +3.77, +3.67,
+# +3.55, +3.30, +3.21 dB -- i.e. the ISI channel costs a stable ~3.2-4.1 dB.
+# (Note the pure MLSE minimum-distance bound does NOT explain this: for these
+# taps d_min^2 = 4*||h||^2 = 4.61 > 4, so minimum-distance theory predicts
+# slightly *better* than AWGN, while the real detector does worse. The loss is
+# dominated by fading across the trace and by post-FEC error behaviour, which
+# is why this is calibrated empirically rather than derived.)
+#
+# 3.0 dB is deliberately at the conservative end of the measured range: a
+# smaller penalty predicts a lower SER, which asks for MORE bits, which is the
+# safe direction for a sizing heuristic (over-running wastes time; under-running
+# silently produces an under-powered estimate).
+ISI_PENALTY_DB = 3.0
 
-    A sizing heuristic only -- this channel has ISI/fading on top of AWGN,
-    so actual SER differs. Used solely to decide how many bits to run.
+
+def expected_ser_isi(snr_db):
+    """Predicted SER for this ISI channel: Q(sqrt(2 * snr_eff_linear)).
+
+    snr_eff = snr - ISI_PENALTY_DB, i.e. the ideal single-tap AWGN expression
+    evaluated at the effective SNR the ISI channel actually delivers. A sizing
+    heuristic only -- used solely to decide how many bits a point should run.
     """
-    snr_linear = 10 ** (snr_db / 10)
+    snr_eff_db = snr_db - ISI_PENALTY_DB
+    snr_linear = 10 ** (snr_eff_db / 10)
     x = math.sqrt(2 * snr_linear)
     return 0.5 * math.erfc(x / math.sqrt(2))
 
@@ -207,7 +236,7 @@ def run_point(model_name, detector_method, snr, min_reps, max_reps, extend_max_r
     words_per_rep = trainer.val_frames * trainer.subframes_in_frame
     bits_per_word = trainer.n_symbols * 8
 
-    predicted_ser = max(expected_ser_awgn(snr), 1e-300)
+    predicted_ser = max(expected_ser_isi(snr), 1e-300)
     required_bits = TARGET_ERRORS / predicted_ser
     required_reps = math.ceil(required_bits / (words_per_rep * bits_per_word))
     planned_reps = int(min(max(required_reps, min_reps), max_reps))
