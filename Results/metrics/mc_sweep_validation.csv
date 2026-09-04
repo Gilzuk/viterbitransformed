@@ -1,1 +1,2 @@
 model,snr,ser_mean,ser_std,ser_ci95,n_reps,model_size,run_time_sec
+ClassicViterbi,0,0.17793333721160895,5.579080615598709e-17,1.0934998006573469e-17,100,0,626.5481479167938
