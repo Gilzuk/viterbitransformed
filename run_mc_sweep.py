@@ -15,18 +15,22 @@ Sizing method (per point):
   2. Target ~100 expected errors (the standard rule of thumb for a stable
      Monte-Carlo BER/SER estimate): required_bits = 100 / predicted_ser.
   3. Convert to repetitions via the trainer's actual words/rep and bits/word,
-     clipped to a per-model [MIN_REPS, MAX_REPS] so runtime stays bounded
-     even where the AWGN prediction badly underestimates the requirement
-     (which happens routinely at high SNR, since Q(.) collapses to numbers
-     like 1e-24 that would imply an infeasible bit count).
-  4. Run that many reps. If literally zero errors were observed (the
-     prediction undershot, or the detector is genuinely error-free in this
-     regime), keep extending in fixed increments -- "run until first error"
-     -- up to a separate, higher EXTEND_MAX_REPS safety cap.
-  5. If the safety cap is hit with still zero errors, the point is recorded
-     as CENSORED: ser_mean is reported as 0.0, but `censored=1` and
-     `bits_run` are also recorded, so downstream analysis can report it
-     honestly as an upper bound (< 1/bits_run) instead of a converged zero.
+     clipped to a per-model [MIN_REPS, MAX_REPS]. This only sizes the opening
+     move -- the observed error count, not the prediction, decides when to
+     stop.
+  4. Keep running until TARGET_ERRORS errors have actually been OBSERVED:
+       - zero errors so far: nothing to estimate a rate from, so double the
+         bits and look again ("run until the first error").
+       - errors seen at N bits: SER ~ errors/N, so ~TARGET_ERRORS errors
+         needs TARGET_ERRORS/SER bits. At exactly one error that is the
+         100x-the-bits-to-first-error rule; more errors sharpen the estimate.
+     Bounded by the per-model max_bits so a point cannot run away.
+  5. If max_bits is spent with still zero errors, the point is recorded as
+     CENSORED: ser_mean is 0.0, but `censored=1` and `bits_run` are recorded
+     so it reads as an honest upper bound rather than a converged zero. (For
+     zero errors in N bits the correct 95% bound is the rule of three, 3/N.)
+     If it is spent with some errors but fewer than TARGET_ERRORS, the point
+     is kept and flagged `[thin]` in the log -- its CI is real but wide.
 
 Commits and pushes Results/metrics/mc_sweep_validation.csv after every
 completed (model, snr) point, so a container reset loses at most one point.
@@ -55,18 +59,23 @@ FIELDNAMES = ['model', 'snr', 'ser_mean', 'ser_std', 'ser_ci95', 'n_reps',
 SNR_VALUES = list(range(0, 18))
 TARGET_ERRORS = 100
 
-# (model_name, detector_method, min_reps, max_reps, extend_max_reps, step)
-#   min_reps        -- floor, matches the previous fixed-n baseline
-#   max_reps         -- cap on the AWGN-formula-driven primary run
-#   extend_max_reps  -- higher safety cap for the "run until first error"
-#                       fallback when the primary run sees zero errors
-#   step             -- rep increment used while extending
-# ClassicViterbi is ~6s/rep (no training, no online adaptation) so it can
-# afford a much higher cap than the Transformer, whose self-supervised
-# online training fires on almost every word each rep (~3.5 min/rep on CPU).
+# (model_name, detector_method, min_reps, max_reps, max_bits, step)
+#   min_reps   -- floor
+#   max_reps   -- cap on the predictor-sized opening run
+#   max_bits   -- total bit budget for the point. The run keeps going past
+#                 max_reps until TARGET_ERRORS errors are actually observed;
+#                 this is what stops it running away when they never are.
+#   step       -- minimum rep increment while extending
+#
+# Sizing max_bits: accumulating ~100 errors needs ~100/SER bits, so an error
+# floor near 5e-7 needs ~2e8 bits. That is only affordable since caching the
+# COST2100 tap load made ClassicViterbi ~200x faster (0ad20cd); before that
+# it was ~6.5 s/rep and 2e8 bits would have taken over a week for one point.
+# The Transformer gets a far smaller budget: its cost is per-word backprop
+# during online adaptation, which that speedup does not touch.
 MODELS = [
-    ('ClassicViterbi', 'Statistical', 100, 500, 1000, 100),
-    ('Transformer', 'ModelBased', 20, 30, 45, 5),
+    ('ClassicViterbi', 'Statistical', 100, 500, 500_000_000, 100),
+    ('Transformer', 'ModelBased', 20, 30, 4_000_000, 5),
 ]
 BRANCH = 'claude/transformer-sionna-mlp-comparison-wc67zp'
 
@@ -211,7 +220,7 @@ def commit_and_push(model, snr):
         f'locally but not on the remote yet).')
 
 
-def run_point(model_name, detector_method, snr, min_reps, max_reps, extend_max_reps, step):
+def run_point(model_name, detector_method, snr, min_reps, max_reps, max_bits, step):
     method_name = f'{model_name}_{detector_method}'
     weights_dir = os.path.join(
         WEIGHTS_DIR,
@@ -252,31 +261,62 @@ def run_point(model_name, detector_method, snr, min_reps, max_reps, extend_max_r
     print(f'[plan] {model_name} snr={snr}: predicted_ser={predicted_ser:.3e}, '
           f'planned_reps={planned_reps} (min={min_reps}, max={max_reps})', flush=True)
 
+    bits_per_rep = words_per_rep * bits_per_word
+
     ser_batches = []
     reps_done = 0
-    while reps_done < planned_reps:
-        batch = min(step, planned_reps - reps_done)
-        ser_batches.append(np.asarray(trainer.online_evaluation(num_of_rep=batch)).reshape(-1))
-        reps_done += batch
 
     def total_errors(batches):
         return sum(float(b.sum()) * bits_per_word for b in batches)
 
-    censored = False
-    # Safety net: if the primary (formula-sized) run saw literally zero
-    # errors, keep extending until the first error appears or we hit the
-    # higher extend cap.
-    while total_errors(ser_batches) == 0 and reps_done < extend_max_reps:
-        batch = min(step, extend_max_reps - reps_done)
-        print(f'[extend] {model_name} snr={snr}: 0 errors after {reps_done} reps, '
-              f'running {batch} more (cap {extend_max_reps})', flush=True)
-        ser_batches.append(np.asarray(trainer.online_evaluation(num_of_rep=batch)).reshape(-1))
-        reps_done += batch
+    def run_batch(n):
+        nonlocal reps_done
+        ser_batches.append(np.asarray(trainer.online_evaluation(num_of_rep=n)).reshape(-1))
+        reps_done += n
 
-    if total_errors(ser_batches) == 0:
-        censored = True
+    while reps_done < planned_reps:
+        run_batch(min(step, planned_reps - reps_done))
+
+    # Keep going until TARGET_ERRORS errors have actually been observed, not
+    # merely until the predictor's bit budget is spent. The predictor only
+    # sizes the opening move; the observed error rate is the real authority.
+    #
+    #   - zero errors so far: nothing to estimate a rate from, so double the
+    #     bits and look again (this is the "run until the first error" phase).
+    #   - at least one error at N bits: the rate implies SER ~ errors/N, so
+    #     ~TARGET_ERRORS errors needs TARGET_ERRORS/SER bits. With a single
+    #     error that is exactly the 100x-the-bits-to-first-error rule; with
+    #     more errors the estimate simply gets better.
+    #
+    # Bounded by max_bits so a point cannot run away; a point that exhausts it
+    # without any error is recorded as censored (an honest upper bound).
+    while total_errors(ser_batches) < TARGET_ERRORS and reps_done * bits_per_rep < max_bits:
+        errs = total_errors(ser_batches)
+        bits_so_far = reps_done * bits_per_rep
+        if errs == 0:
+            target_reps = reps_done * 2
+            why = f'0 errors in {bits_so_far:,} bits -- doubling'
+        else:
+            observed_ser = errs / bits_so_far
+            target_reps = math.ceil((TARGET_ERRORS / observed_ser) / bits_per_rep)
+            why = (f'{errs:.0f} errors in {bits_so_far:,} bits '
+                   f'(ser~{observed_ser:.2e}) -- need ~{target_reps} reps for {TARGET_ERRORS}')
+        # cap the target by the bit budget, and always make forward progress
+        target_reps = min(target_reps, max_bits // bits_per_rep)
+        batch = max(step, min(target_reps - reps_done, reps_done))  # grow at most 2x per round
+        if batch <= 0:
+            break
+        print(f'[extend] {model_name} snr={snr}: {why}; running {batch} more', flush=True)
+        run_batch(batch)
+
+    censored = total_errors(ser_batches) == 0
+    if censored:
         print(f'[censored] {model_name} snr={snr}: 0 errors in {reps_done} reps '
-              f'({reps_done * words_per_rep * bits_per_word} bits) -- reporting as upper bound',
+              f'({reps_done * bits_per_rep:,} bits) -- reporting as upper bound',
+              flush=True)
+    elif total_errors(ser_batches) < TARGET_ERRORS:
+        print(f'[thin] {model_name} snr={snr}: only {total_errors(ser_batches):.0f} errors in '
+              f'{reps_done * bits_per_rep:,} bits (max_bits budget spent) -- CI will be wide',
               flush=True)
 
     run_time = time.time() - t0
@@ -317,7 +357,7 @@ def main():
     done = already_done()
     print(f'Already completed points: {sorted(done)}', flush=True)
 
-    for model_name, detector_method, min_reps, max_reps, extend_max_reps, step in MODELS:
+    for model_name, detector_method, min_reps, max_reps, max_bits, step in MODELS:
         for snr in SNR_VALUES:
             key = (model_name, snr)
             if key in done:
@@ -327,7 +367,7 @@ def main():
             print(f'\n{"="*70}\n[run] {model_name} snr={snr}\n{"="*70}', flush=True)
             try:
                 row = run_point(model_name, detector_method, snr,
-                                 min_reps, max_reps, extend_max_reps, step)
+                                 min_reps, max_reps, max_bits, step)
             except Exception as e:
                 print(f'[ERROR] {model_name} snr={snr} failed: {e}', flush=True)
                 import traceback
