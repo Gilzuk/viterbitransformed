@@ -479,8 +479,15 @@ class Trainer(object):
         from tqdm import tqdm
         
         if self.self_supervised:
-            self.config_optimizer()
-            self.config_criterion()
+            # Idempotent: a caller running online_evaluation in several
+            # smaller batches on the same trainer (e.g. an adaptive
+            # run-until-enough-errors loop) keeps one optimizer/criterion
+            # across all of them, instead of losing Adam's momentum state
+            # to a fresh optimizer at the start of every batch.
+            if getattr(self, 'optimizer', None) is None:
+                self.config_optimizer()
+            if getattr(self, 'criterion', None) is None:
+                self.config_criterion()
         total_ser = 0
         first_run = True
         
