@@ -1,10 +1,22 @@
 """
-MC=100 validation sweep: Viterbi-Transformer and ClassicViterbi over SNR 0-17,
-using num_of_rep=100 evaluation repetitions per (model, SNR) point (train once,
-evaluate 100 times), matching Code/configuration.yaml defaults.
+Higher-MC validation sweep: ClassicViterbi and Viterbi-Transformer over SNR
+0-17, evaluating each with more Monte-Carlo repetitions than the earlier n=3
+sweep (Results/metrics/transformer_mask_fix_validation.csv), to tighten the
+confidence interval on the paper's central result.
 
-Commits and pushes Results/metrics/transformer_mc100_validation.csv after every
+Each (model, snr) point trains once (Transformer only; ClassicViterbi has no
+training) and then evaluates num_of_rep times (train once, evaluate N times),
+using Code/configuration.yaml defaults otherwise. Rep counts differ by model
+because of measured cost: ClassicViterbi is ~6s/rep (no training, no online
+adaptation), while the Transformer's self-supervised online training fires on
+almost every word during each eval rep (avg SER is usually well under the
+0.02 gating threshold), making each Transformer rep ~3.5 min.
+  - ClassicViterbi: num_of_rep=100 (~3 hours total across 18 SNR points)
+  - Transformer:    num_of_rep=20  (~21 hours total across 18 SNR points)
+
+Commits and pushes Results/metrics/mc_sweep_validation.csv after every
 completed (model, snr) point, so a container reset loses at most one point.
+ClassicViterbi runs first so the cheap, fast-feedback half lands first.
 
 Run standalone: python run_mc100_sweep.py
 """
@@ -12,7 +24,6 @@ import csv
 import math
 import os
 import subprocess
-import sys
 import time
 
 import numpy as np
@@ -21,14 +32,16 @@ import torch
 from Code.dir_definitions import RESULTS_DIR, WEIGHTS_DIR
 from Code.trainer import Trainer
 
-CSV_PATH = os.path.join(RESULTS_DIR, 'metrics', 'transformer_mc100_validation.csv')
+CSV_PATH = os.path.join(RESULTS_DIR, 'metrics', 'mc_sweep_validation.csv')
 FIELDNAMES = ['model', 'snr', 'ser_mean', 'ser_std', 'ser_ci95', 'n_reps',
               'model_size', 'run_time_sec']
-NUM_OF_REP = 100
 SNR_VALUES = list(range(0, 18))
-MODELS = [('Transformer', 'ModelBased'), ('ClassicViterbi', 'Statistical')]
-
-WORDS_PER_REP = None  # inferred from returned ser array length
+# (model_name, detector_method, num_of_rep) -- ClassicViterbi first (cheap).
+MODELS = [
+    ('ClassicViterbi', 'Statistical', 100),
+    ('Transformer', 'ModelBased', 20),
+]
+BRANCH = 'claude/transformer-sionna-mlp-comparison-wc67zp'
 
 
 def already_done():
@@ -52,32 +65,35 @@ def append_row(row):
         csv.DictWriter(f, fieldnames=FIELDNAMES).writerow(row)
 
 
-def run_git(*args):
-    subprocess.run(['git'] + list(args), check=True, cwd=os.path.dirname(os.path.abspath(__file__)))
+def repo_dir():
+    return os.path.dirname(os.path.abspath(__file__))
 
 
 def commit_and_push(model, snr):
     try:
-        run_git('add', 'Results/metrics/transformer_mc100_validation.csv')
-        run_git('commit', '-q', '-m',
-                f'Add MC=100 validation point: {model} snr={snr}')
-        for attempt, delay in enumerate([0, 2, 4, 8, 16]):
-            if delay:
-                time.sleep(delay)
-            r = subprocess.run(['git', 'push', '-q', 'origin',
-                                 'claude/transformer-sionna-mlp-comparison-wc67zp'],
-                                cwd=os.path.dirname(os.path.abspath(__file__)))
-            if r.returncode == 0:
-                break
+        subprocess.run(['git', 'add', 'Results/metrics/mc_sweep_validation.csv'],
+                        check=True, cwd=repo_dir())
+        subprocess.run(['git', 'commit', '-q', '-m',
+                         f'Add MC-sweep validation point: {model} snr={snr}'],
+                        check=True, cwd=repo_dir())
     except subprocess.CalledProcessError as e:
-        print(f'[git] nothing to commit or push failed for {model} snr={snr}: {e}')
+        print(f'[git] nothing to commit for {model} snr={snr}: {e}', flush=True)
+        return
+
+    for delay in (0, 2, 4, 8, 16):
+        if delay:
+            time.sleep(delay)
+        r = subprocess.run(['git', 'push', '-q', 'origin', BRANCH], cwd=repo_dir())
+        if r.returncode == 0:
+            return
+    print(f'[git] push FAILED after retries for {model} snr={snr}', flush=True)
 
 
-def run_point(model_name, detector_method, snr):
+def run_point(model_name, detector_method, snr, num_of_rep):
     method_name = f'{model_name}_{detector_method}'
     weights_dir = os.path.join(
         WEIGHTS_DIR,
-        f'{method_name}_training_120_2_channel1_cost2100_mc100')
+        f'{method_name}_training_120_2_channel1_cost2100_mcsweep')
 
     t0 = time.time()
     trainer = Trainer(
@@ -95,17 +111,17 @@ def run_point(model_name, detector_method, snr):
         params = filter(lambda p: p.requires_grad, trainer.detector.model.parameters())
         model_size = sum(torch.numel(p) for p in params)
 
-    ser = trainer.run(run_over=2, num_of_rep=NUM_OF_REP)
+    ser = trainer.run(run_over=2, num_of_rep=num_of_rep)
     run_time = time.time() - t0
 
     ser = np.asarray(ser).reshape(-1)
-    words_per_rep = ser.shape[0] // NUM_OF_REP
-    per_rep_means = ser.reshape(NUM_OF_REP, words_per_rep).mean(axis=1)
+    words_per_rep = ser.shape[0] // num_of_rep
+    per_rep_means = ser.reshape(num_of_rep, words_per_rep).mean(axis=1)
 
     ser_mean = float(per_rep_means.mean())
-    if NUM_OF_REP > 1:
+    if num_of_rep > 1:
         ser_std = float(per_rep_means.std(ddof=1))
-        ser_ci95 = 1.96 * ser_std / math.sqrt(NUM_OF_REP)
+        ser_ci95 = 1.96 * ser_std / math.sqrt(num_of_rep)
     else:
         ser_std = 0.0
         ser_ci95 = 0.0
@@ -116,7 +132,7 @@ def run_point(model_name, detector_method, snr):
         'ser_mean': ser_mean,
         'ser_std': ser_std,
         'ser_ci95': ser_ci95,
-        'n_reps': NUM_OF_REP,
+        'n_reps': num_of_rep,
         'model_size': int(model_size),
         'run_time_sec': run_time,
     }
@@ -127,16 +143,17 @@ def main():
     done = already_done()
     print(f'Already completed points: {sorted(done)}', flush=True)
 
-    for model_name, detector_method in MODELS:
+    for model_name, detector_method, num_of_rep in MODELS:
         for snr in SNR_VALUES:
             key = (model_name, snr)
             if key in done:
                 print(f'[skip] {model_name} snr={snr} already in CSV', flush=True)
                 continue
 
-            print(f'\n{"="*70}\n[run] {model_name} snr={snr} (num_of_rep={NUM_OF_REP})\n{"="*70}', flush=True)
+            print(f'\n{"="*70}\n[run] {model_name} snr={snr} (num_of_rep={num_of_rep})\n{"="*70}',
+                  flush=True)
             try:
-                row = run_point(model_name, detector_method, snr)
+                row = run_point(model_name, detector_method, snr, num_of_rep)
             except Exception as e:
                 print(f'[ERROR] {model_name} snr={snr} failed: {e}', flush=True)
                 import traceback
