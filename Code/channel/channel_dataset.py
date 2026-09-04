@@ -102,9 +102,19 @@ class ChannelModelDataset(Dataset):
             raise Exception('No such channel defined!!!')
         return y
 
-    def __getitem__(self, snr_list: List[float], gamma: float) -> Tuple[torch.Tensor, torch.Tensor]:
-        """Get data for given SNRs and gamma. Uses cache if available."""
-        
+    def __getitem__(self, snr_list: List[float], gamma: float, rep: int = None) -> Tuple[torch.Tensor, torch.Tensor]:
+        """Get data for given SNRs and gamma. Uses cache if available.
+
+        `rep`, when given, distinguishes independent repeated draws under
+        otherwise-identical parameters -- e.g. Monte-Carlo evaluation
+        repetitions, which are supposed to be independent trials. Without it,
+        every call with the same (snr, gamma, phase, ...) hits the same cache
+        entry and gets back byte-identical data every time, silently
+        collapsing "N repetitions" into one repetition measured N times.
+        Callers that want the old "one fixed draw, reused" behavior (e.g. a
+        training set reused across minibatches) simply omit it.
+        """
+
         # Check if we can use cache for all SNRs
         if self.use_cache and len(snr_list) == 1:
             snr = snr_list[0]
@@ -121,7 +131,8 @@ class ChannelModelDataset(Dataset):
                 noisy_est_var=self.noisy_est_var,
                 fading_taps_type=self.fading_taps_type,
                 n_symbols=self.n_symbols,
-                fading=fading
+                fading=fading,
+                rep=rep
             )
             cache_filename = _data_cache.get_cache_filename(**cache_params)
 

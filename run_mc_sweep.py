@@ -132,15 +132,26 @@ def repo_dir():
 
 
 def commit_and_push(model, snr):
-    try:
-        subprocess.run(['git', 'add', 'Results/metrics/mc_sweep_validation.csv'],
-                        check=True, cwd=repo_dir())
-        subprocess.run(['git', 'commit', '-q', '-m',
-                         f'Add MC-sweep validation point: {model} snr={snr}'],
-                        check=True, cwd=repo_dir())
-    except subprocess.CalledProcessError as e:
-        print(f'[git] nothing to commit for {model} snr={snr}: {e}', flush=True)
-        return
+    subprocess.run(['git', 'add', 'Results/metrics/mc_sweep_validation.csv'],
+                    check=True, cwd=repo_dir())
+    commit = subprocess.run(
+        ['git', 'commit', '-q', '-m', f'Add MC-sweep validation point: {model} snr={snr}'],
+        cwd=repo_dir(), capture_output=True, text=True)
+    if commit.returncode != 0:
+        # The only expected/benign failure is "nothing to commit" (append_row
+        # already wrote a fresh row before this is called, so that should
+        # never actually happen -- but check for it specifically rather than
+        # swallowing every commit failure, since a real failure here (e.g.
+        # git identity not configured: "Please tell me who you are") would
+        # otherwise be silently mislabeled as "nothing to commit" and the
+        # point would never reach the remote.
+        combined = (commit.stdout or '') + (commit.stderr or '')
+        if 'nothing to commit' in combined.lower():
+            print(f'[git] nothing to commit for {model} snr={snr}', flush=True)
+            return
+        raise RuntimeError(
+            f'git commit failed for {model} snr={snr} (not a "nothing to commit" '
+            f'case): {combined.strip()}')
 
     # A point that is committed locally but never reaches the remote is a
     # point that can still be lost (container reclaim, disconnect, etc).
