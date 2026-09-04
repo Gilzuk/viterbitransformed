@@ -6,6 +6,41 @@ in parallel with the CPU sweep already running elsewhere against
 separate CSV on a separate branch so the two runs cannot collide, and get
 merged back afterward.
 
+**If you pulled this branch before this section existed**, stop and re-pull:
+an earlier version had a real bug where every repetition at a given SNR
+evaluated byte-identical data (see "The data-cache bug" below) -- any
+results already collected under it are not valid and should be discarded
+(the CSV `already_done()` skip logic won't protect you here, since it only
+skips based on what's in the CSV, and stale local results might not be
+pushed anywhere yet).
+
+## The data-cache bug (fixed here, but know what it was)
+
+The channel-data cache (`Code/channel/data_cache.py`) keys cached
+(bits, noise) draws by `(snr, gamma, phase, block/word config, ...)` --
+*not* by which repetition this is. `online_evaluation` calls
+`ChannelModelDataset.__getitem__` once per repetition, intending each call
+to be an independent Monte-Carlo trial ("draw words of given gamma for all
+SNRs"). Before this fix, every call after the first with the same
+parameters just replayed the exact cached data from the first call --
+so "n repetitions" was really 1 sample measured n times: an exact repeat,
+not n independent trials. This is why an earlier run of this script would
+report the same SER, run after run, with the reported std/CI across "reps"
+reflecting only floating-point noise. It's a pre-existing bug in the
+repository's caching layer, not something specific to this sweep script.
+
+Fixed by threading a persistent, ever-incrementing repetition counter into
+the cache key (see `Code/trainer.py`'s `online_evaluation` and
+`Code/channel/channel_dataset.py`'s `__getitem__`), so each repetition
+gets an independently-generated (and independently cached) draw. Verified:
+5 reps at SNR=6 now give per-rep SER
+`[0.0338, 0.038, 0.0372, 0.0386, 0.0349]` instead of five identical values.
+
+Note: the same underlying bug also affects `train()`'s per-minibatch data
+draws (each minibatch iteration is supposed to be a fresh draw too) -- not
+touched by this fix, since changing training dynamics is a separate,
+bigger decision than fixing evaluation variance.
+
 ## Why bother with Colab
 
 `run_mc_sweep.py` evaluates ClassicViterbi and the Viterbi-Transformer over

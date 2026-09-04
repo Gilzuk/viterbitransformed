@@ -507,8 +507,18 @@ class Trainer(object):
             if hasattr(self.detector, 'model') and hasattr(self.detector.model, 'count'):
                 self.detector.model.count = 0
 
+            # A persistent, ever-increasing counter (not the `rep` loop
+            # variable, which restarts at 0 on every call to this method) so
+            # each repetition gets an independently-generated draw instead of
+            # every call with the same (snr, gamma, phase, ...) hitting the
+            # same cache entry and replaying byte-identical data -- which
+            # silently collapses "N repetitions" into one repetition
+            # measured N times, with zero actual Monte-Carlo variance.
+            self._eval_rep_counter = getattr(self, '_eval_rep_counter', 0)
             # draw words of given gamma for all SNRs
-            transmitted_words, received_words = self.channel_dataset['val'].__getitem__(snr_list=[self.curr_SNR], gamma=self.gamma)
+            transmitted_words, received_words = self.channel_dataset['val'].__getitem__(
+                snr_list=[self.curr_SNR], gamma=self.gamma, rep=self._eval_rep_counter)
+            self._eval_rep_counter += 1
 
             # Ensure data is on the correct device
             transmitted_words = transmitted_words.to(device)
