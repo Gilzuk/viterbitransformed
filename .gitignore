@@ -5,3 +5,6 @@ Data_Cache/
 __pycache__/
 *.pyc
 logs/
+
+# Scratch weight checkpoints from ad-hoc timing calibration runs, not real results
+Results/weights/calib_test_*/
