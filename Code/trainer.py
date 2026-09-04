@@ -493,9 +493,16 @@ class Trainer(object):
                        bar_format='{l_bar}{bar}| {n_fmt}/{total_fmt} [{elapsed}<{remaining}, {postfix}]')
         
         for rep in rep_pbar:
+            # Some detectors (e.g. ClassicViterbi) track a per-word index into
+            # this rep's channel estimate array internally; it must be reset
+            # at the start of every repetition or it runs past the array
+            # bounds from num_of_rep=2 onward.
+            if hasattr(self.detector, 'model') and hasattr(self.detector.model, 'count'):
+                self.detector.model.count = 0
+
             # draw words of given gamma for all SNRs
             transmitted_words, received_words = self.channel_dataset['val'].__getitem__(snr_list=[self.curr_SNR], gamma=self.gamma)
-            
+
             # Ensure data is on the correct device
             transmitted_words = transmitted_words.to(device)
             received_words = received_words.to(device)
