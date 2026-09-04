@@ -143,11 +143,19 @@ def already_done():
     if os.path.isfile(CSV_PATH):
         with open(CSV_PATH) as f:
             for row in csv.DictReader(f):
-                # A row measuring exactly zero errors is the floor artifact
-                # this adaptive scheme fixes -- treat it as not-done so it
-                # gets re-run, instead of trusting it as converged. (Also
-                # covers rows written by an older, non-adaptive version of
-                # this script, which lack the newer columns entirely.)
+                # censored=1 means this point ran all the way to its extend
+                # cap and honestly observed zero errors -- a legitimate upper
+                # bound, already as good as it is going to get. It must count
+                # as DONE, or every restart re-runs it forever and the sweep
+                # can never advance past the first censored point.
+                if row.get('censored') == '1':
+                    done.add((row['model'], int(row['snr'])))
+                    continue
+
+                # An un-censored zero, by contrast, can only come from the old
+                # fixed-rep methodology (post-fix, zero errors always sets
+                # censored=1) -- that is the floor artifact this rewrite
+                # replaces, so re-run it rather than trusting it.
                 try:
                     is_zero = float(row['ser_mean']) == 0.0
                 except (KeyError, ValueError):
