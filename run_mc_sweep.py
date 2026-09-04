@@ -1,24 +1,28 @@
 """
-Higher-MC validation sweep: ClassicViterbi and Viterbi-Transformer over SNR
-0-17, evaluating each with more Monte-Carlo repetitions than the earlier n=3
-sweep (Results/metrics/transformer_mask_fix_validation.csv), to tighten the
+Higher-MC validation sweep (Colab/GPU configuration): ClassicViterbi and
+Viterbi-Transformer over SNR 0-17, evaluating each with more Monte-Carlo
+repetitions than the earlier n=3 sweep
+(Results/metrics/transformer_mask_fix_validation.csv), to tighten the
 confidence interval on the paper's central result.
 
 Each (model, snr) point trains once (Transformer only; ClassicViterbi has no
 training) and then evaluates num_of_rep times (train once, evaluate N times),
-using Code/configuration.yaml defaults otherwise. Rep counts differ by model
-because of measured cost: ClassicViterbi is ~6s/rep (no training, no online
-adaptation), while the Transformer's self-supervised online training fires on
-almost every word during each eval rep (avg SER is usually well under the
-0.02 gating threshold), making each Transformer rep ~3.5 min.
-  - ClassicViterbi: num_of_rep=100 (~3 hours total across 18 SNR points)
-  - Transformer:    num_of_rep=20  (~21 hours total across 18 SNR points)
+using Code/configuration.yaml defaults otherwise. On CPU, ClassicViterbi is
+~6s/rep (no training, no online adaptation), while the Transformer's
+self-supervised online training fires on almost every word during each eval
+rep (avg SER is usually well under the 0.02 gating threshold), making each
+Transformer rep ~3.5 min there -- see COLAB_MC_SWEEP.md for why this copy of
+the script targets a GPU runtime instead: both models run at num_of_rep=100
+here, which is only tractable with GPU-accelerated backprop for the
+Transformer's per-word online updates.
 
-Commits and pushes Results/metrics/mc_sweep_validation.csv after every
-completed (model, snr) point, so a container reset loses at most one point.
-ClassicViterbi runs first so the cheap, fast-feedback half lands first.
+Commits and pushes Results/metrics/mc_sweep_validation_colab.csv (a separate
+file from the CPU run's mc_sweep_validation.csv) to the mc-sweep-colab-gpu
+branch (separate from the CPU run's branch) after every completed
+(model, snr) point, so a Colab disconnect loses at most one point. See
+COLAB_MC_SWEEP.md for setup and how the two runs' results get merged back.
 
-Run standalone: python run_mc100_sweep.py
+Run standalone: python run_mc_sweep.py
 """
 import csv
 import math
@@ -32,16 +36,18 @@ import torch
 from Code.dir_definitions import RESULTS_DIR, WEIGHTS_DIR
 from Code.trainer import Trainer
 
-CSV_PATH = os.path.join(RESULTS_DIR, 'metrics', 'mc_sweep_validation.csv')
+CSV_PATH = os.path.join(RESULTS_DIR, 'metrics', 'mc_sweep_validation_colab.csv')
 FIELDNAMES = ['model', 'snr', 'ser_mean', 'ser_std', 'ser_ci95', 'n_reps',
               'model_size', 'run_time_sec']
 SNR_VALUES = list(range(0, 18))
 # (model_name, detector_method, num_of_rep) -- ClassicViterbi first (cheap).
+# GPU run: both at n=100 (CPU run elsewhere caps the Transformer at n=20
+# because of per-rep online-training cost -- see COLAB_MC_SWEEP.md).
 MODELS = [
     ('ClassicViterbi', 'Statistical', 100),
-    ('Transformer', 'ModelBased', 20),
+    ('Transformer', 'ModelBased', 100),
 ]
-BRANCH = 'claude/transformer-sionna-mlp-comparison-wc67zp'
+BRANCH = 'mc-sweep-colab-gpu'
 
 
 def already_done():
@@ -71,7 +77,7 @@ def repo_dir():
 
 def commit_and_push(model, snr):
     try:
-        subprocess.run(['git', 'add', 'Results/metrics/mc_sweep_validation.csv'],
+        subprocess.run(['git', 'add', 'Results/metrics/mc_sweep_validation_colab.csv'],
                         check=True, cwd=repo_dir())
         subprocess.run(['git', 'commit', '-q', '-m',
                          f'Add MC-sweep validation point: {model} snr={snr}'],
