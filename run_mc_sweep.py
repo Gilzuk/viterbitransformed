@@ -73,16 +73,29 @@ TARGET_ERRORS = 100
 
 # (model_name, detector_method, min_reps, max_reps, extend_max_reps, step)
 #   min_reps        -- floor
-#   max_reps         -- cap on the AWGN-formula-driven primary run
+#   max_reps         -- cap on the predictor-driven primary run
 #   extend_max_reps  -- higher safety cap for the "run until first error"
 #                       fallback when the primary run sees zero errors
 #   step             -- rep increment used while extending
-# GPU run: higher caps than the CPU run (see COLAB_MC_SWEEP.md), since a
-# real GPU should make the Transformer's per-word online-training updates
-# cheap enough to afford them.
+#
+# Fixed at 25 reps per point (min == max, so the ISI predictor cannot push a
+# point above 25): measured GPU throughput made 100 reps per point too slow to
+# get through the SNR ladder in reasonable time. n=25 still yields a real
+# confidence interval -- unlike the pre-fix runs, these are 25 genuinely
+# independent draws (see 2ee4ba9).
+#
+# extend_max_reps stays above 25 so a point that sees ZERO errors can still
+# extend past the cap rather than reporting a meaningless converged 0.0. That
+# path only fires at high SNR where errors are rare, and ClassicViterbi gets
+# the most headroom there since it is by far the cheapest to run.
+#
+# ViterbiNet is included because the cache bug invalidated its old n=84
+# baseline (Results/metrics/model_performance_final_mc_83.csv) too -- the
+# paper's three-way comparison needs all three detectors measured under the fix.
 MODELS = [
-    ('ClassicViterbi', 'Statistical', 100, 1000, 3000, 200),
-    ('Transformer', 'ModelBased', 20, 100, 150, 20),
+    ('ClassicViterbi', 'Statistical', 25, 25, 100, 25),
+    ('ViterbiNet', 'ModelBased', 25, 25, 50, 25),
+    ('Transformer', 'ModelBased', 25, 25, 50, 25),
 ]
 BRANCH = 'mc-sweep-colab-gpu'
 

@@ -41,39 +41,43 @@ draws (each minibatch iteration is supposed to be a fresh draw too) -- not
 touched by this fix, since changing training dynamics is a separate,
 bigger decision than fixing evaluation variance.
 
-## Why bother with Colab
+## What this runs
 
-`run_mc_sweep.py` evaluates ClassicViterbi and the Viterbi-Transformer over
-SNR 0-17, sizing the number of repetitions per SNR point adaptively (see
-"How many reps run" below) instead of a fixed rep count, so high-SNR points
-actually observe real errors instead of silently floors at a meaningless
-"0". The Transformer side is slow on CPU because its self-supervised online
-training does a backprop step on almost every word during evaluation --
-measured at ~3.5 min/rep on a CPU-only sandbox. A real GPU should cut that
-per-rep cost substantially, making the higher rep caps this branch uses
-tractable in a few hours instead of the better part of a day.
+Three detectors over SNR 0-17: **ClassicViterbi** (perfect-CSI reference),
+**ViterbiNet**, and the **Viterbi-Transformer**. ViterbiNet is in the sweep
+because the cache bug above invalidated its old n=84 baseline
+(`Results/metrics/model_performance_final_mc_83.csv`) as well -- the paper's
+three-way comparison needs all three measured under the fix.
+
+**25 repetitions per point.** 100 was too slow on GPU to get through the
+ladder in reasonable time. n=25 still gives a real confidence interval,
+because (post-fix) these are 25 genuinely independent draws rather than one
+draw counted 25 times.
 
 ## How many reps run per point
 
-Fixed rep counts have a real problem: at high SNR the true SER can be far
-below what a small, fixed number of bits can resolve, and a naive average
-then reports an exact "0" that looks converged but is really just "we didn't
-run enough bits to see an error." `run_mc_sweep.py` instead:
+Fixed rep counts have a real problem at high SNR: the true SER can be far
+below what a given number of bits can resolve, and a naive average then
+reports an exact "0" that looks converged but really just means "we didn't
+run enough bits to see an error." `run_mc_sweep.py` handles that:
 
-1. Predicts the SER at each SNR from the closed-form BPSK/AWGN error
-   probability Q(sqrt(2*snr_linear)) -- a heuristic only (this channel has
-   ISI/fading on top of AWGN), used just to size the run.
-2. Targets ~100 expected errors (the standard rule of thumb for a stable
+1. Predicts the SER at each SNR as `Q(sqrt(2*snr_eff_linear))` with
+   `snr_eff = snr - ISI_PENALTY_DB`. The ideal single-tap AWGN form
+   (penalty 0) is badly miscalibrated for this 4-tap ISI channel --
+   it under-predicts by 2.2x at 0 dB rising to 258x at 10 dB against our
+   own ClassicViterbi measurements -- but the gap is a near-constant
+   effective-SNR shift (+3.2 to +4.1 dB), so applying that shift makes it
+   a usable prior. See `ISI_PENALTY_DB` in the script.
+2. Targets ~100 expected errors (standard rule of thumb for a stable
    Monte-Carlo estimate): `required_bits = 100 / predicted_ser`.
-3. Converts that to repetitions, clipped to a per-model `[min_reps,
-   max_reps]` (see `MODELS` near the top of the script) so runtime stays
-   bounded even where the formula's prediction is unreasonably large.
-4. If the point still saw zero errors after that, keeps extending in fixed
-   steps -- "run until first error" -- up to a higher `extend_max_reps`
-   safety cap.
-5. If it's still zero at that cap, the row is recorded as `censored=1` with
-   `bits_run` also recorded, so it can be read as an honest upper bound
-   (`< 1/bits_run`) rather than a converged zero.
+3. Converts that to repetitions, clipped to the per-model `[min_reps,
+   max_reps]` in `MODELS`. Here both are 25, so the predictor cannot push
+   a point above 25 -- it only matters for step 4.
+4. If a point still saw zero errors, it keeps extending in fixed steps --
+   "run until first error" -- up to the higher `extend_max_reps`.
+5. If it is still zero at that cap, the row is recorded with `censored=1`
+   plus `bits_run`, so it reads as an honest upper bound (`< 1/bits_run`)
+   rather than a converged zero.
 
 ## Setup
 
