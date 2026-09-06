@@ -272,9 +272,23 @@ def repo_dir():
     return os.path.dirname(os.path.abspath(__file__))
 
 
-def commit_and_push(model, snr):
-    subprocess.run(['git', 'add', 'Results/metrics/mc_sweep_validation_colab.csv'],
-                    check=True, cwd=repo_dir())
+def weights_dir_for(model_name, detector_method):
+    method_name = f'{model_name}_{detector_method}'
+    return os.path.join(
+        WEIGHTS_DIR,
+        f'{method_name}_training_120_2_channel1_cost2100_mcsweep_colab')
+
+
+def commit_and_push(model, detector_method, snr):
+    # Other models' weight checkpoints are already tracked in this repo (see
+    # Results/weights/*), so this sweep's are too -- add them alongside the
+    # CSV row so each point's commit is atomic and a training run this sweep
+    # produced isn't left as an untracked, unpushed pile on disk.
+    weights_dir = weights_dir_for(model, detector_method)
+    add_paths = ['Results/metrics/mc_sweep_validation_colab.csv']
+    if os.path.isdir(weights_dir):
+        add_paths.append(os.path.relpath(weights_dir, repo_dir()))
+    subprocess.run(['git', 'add'] + add_paths, check=True, cwd=repo_dir())
     commit = subprocess.run(
         ['git', 'commit', '-q', '-m', f'Add MC-sweep validation point: {model} snr={snr}'],
         cwd=repo_dir(), capture_output=True, text=True)
@@ -316,10 +330,7 @@ def commit_and_push(model, snr):
 
 
 def run_point(model_name, detector_method, snr, min_reps, max_reps, max_bits, step):
-    method_name = f'{model_name}_{detector_method}'
-    weights_dir = os.path.join(
-        WEIGHTS_DIR,
-        f'{method_name}_training_120_2_channel1_cost2100_mcsweep_colab')
+    weights_dir = weights_dir_for(model_name, detector_method)
 
     t0 = time.time()
     trainer = Trainer(
@@ -502,7 +513,7 @@ def main():
             drop_existing_row(model_name, snr)
             append_row(row)
             print(f'[done] {row}', flush=True)
-            commit_and_push(model_name, snr)
+            commit_and_push(model_name, detector_method, snr)
             clear_checkpoint(model_name, snr)
             done.add(key)
 
