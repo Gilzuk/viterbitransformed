@@ -98,8 +98,8 @@ THIN_ERROR_THRESHOLD = 10
 # ~1.5e-7. Brute force cannot reach the floor here; that needs importance
 # sampling, or a much faster detector implementation.
 MODELS = [
-    ('ClassicViterbi', 'Statistical', 100, 500, 20_000_000, 100),
     ('Transformer', 'ModelBased', 20, 30, 100_000, 5),
+    ('ClassicViterbi', 'Statistical', 100, 500, 20_000_000, 100),
 ]
 BRANCH = 'claude/transformer-sionna-mlp-comparison-wc67zp'
 
