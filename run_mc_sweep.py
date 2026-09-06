@@ -359,7 +359,23 @@ def run_point(model_name, detector_method, snr, min_reps, max_reps, max_bits, st
     # (a restart, not a clean finish -- a finished point is a committed CSV
     # row and has no checkpoint). per_rep_means is the only state needed to
     # reconstruct every final statistic exactly; see save_checkpoint().
+    #
+    # This is only valid for methods with no training step (Statistical):
+    # load_train_weights(run_over=2) above ALWAYS retrains from scratch for
+    # model-based methods, so a restarted run_point trains a genuinely
+    # different model than whatever produced an existing checkpoint's eval
+    # reps. Resuming that checkpoint would silently blend SER measurements
+    # from two different trained models into one point's statistics -- an
+    # invalid Monte-Carlo estimate. Discard it and start eval fresh; only
+    # the (usually short) training step is repeated, not the whole point.
     checkpoint = load_checkpoint(model_name, snr)
+    if checkpoint and detector_method != 'Statistical':
+        print(f'[resume] {model_name} snr={snr}: discarding stale eval checkpoint with '
+              f'{len(checkpoint["per_rep_means"])} reps -- training just ran fresh (not '
+              f'itself resumable), so those reps were computed against a different '
+              f'trained model and cannot be mixed with this one\'s', flush=True)
+        clear_checkpoint(model_name, snr)
+        checkpoint = None
     per_rep_means = list(checkpoint['per_rep_means']) if checkpoint else []
     reps_done = len(per_rep_means)
     if reps_done:
