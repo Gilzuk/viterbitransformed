@@ -24,25 +24,35 @@ PRO_TIER_MAX_HOURS = 24
 
 
 class ColabRuntimeMonitor:
-    def __init__(self, backup_dir: Optional[str] = None, backup_interval_seconds: float = 1800):
+    def __init__(
+        self,
+        backup_dir: Optional[str] = None,
+        backup_interval_seconds: float = 1800,
+        gpu_name: Optional[str] = None,
+    ):
+        """
+        :param gpu_name: pass torch.cuda.get_device_name(0) when the caller
+            already has torch loaded (as the notebook does), so this module
+            doesn't need its own nvidia-smi detection. Falls back to
+            nvidia-smi only when not given, so this stays usable standalone.
+        """
         self.session_start = time.time()
         self.backup_dir = backup_dir
         self.backup_interval_seconds = backup_interval_seconds
         self._last_backup = self.session_start
-        self.gpu_name, self.is_paid_tier = self._detect_runtime_tier()
+        self.gpu_name = gpu_name if gpu_name is not None else self._detect_gpu_name()
+        self.is_paid_tier = bool(self.gpu_name) and any(tag in self.gpu_name for tag in PAID_GPU_NAMES)
 
     @staticmethod
-    def _detect_runtime_tier():
+    def _detect_gpu_name():
         try:
             output = subprocess.check_output(
                 ['nvidia-smi', '--query-gpu=name', '--format=csv,noheader'],
                 stderr=subprocess.DEVNULL, text=True, timeout=5,
             )
-            gpu_name = output.strip().splitlines()[0] if output.strip() else None
+            return output.strip().splitlines()[0] if output.strip() else None
         except Exception:
-            gpu_name = None
-        is_paid_tier = bool(gpu_name) and any(tag in gpu_name for tag in PAID_GPU_NAMES)
-        return gpu_name, is_paid_tier
+            return None
 
     def elapsed_seconds(self) -> float:
         return time.time() - self.session_start
@@ -73,24 +83,33 @@ class ColabRuntimeMonitor:
         place afterwards, rather than copying straight into the previous
         backup with dirs_exist_ok=True. A disconnect mid-copy then leaves
         the last known-good backup untouched instead of half-overwritten.
+
+        A failed backup (e.g. a transient Drive I/O error) is reported and
+        skipped rather than raised - this call sits inside the training
+        loop it is meant to protect, and must not be able to abort a run
+        that is otherwise fine.
         """
         if not self.backup_dir:
             return
-        os.makedirs(self.backup_dir, exist_ok=True)
-        for src in source_dirs:
-            if not os.path.isdir(src):
-                continue
-            name = os.path.basename(src)
-            dest = os.path.join(self.backup_dir, name)
-            staging = os.path.join(self.backup_dir, f'.{name}.staging')
-            if os.path.exists(staging):
-                shutil.rmtree(staging)
-            shutil.copytree(src, staging)
-            if os.path.exists(dest):
-                shutil.rmtree(dest)
-            os.rename(staging, dest)
-        self._last_backup = time.time()
-        print(f"[runtime {self.elapsed_str()}] backed up results to {self.backup_dir}")
+        try:
+            os.makedirs(self.backup_dir, exist_ok=True)
+            for src in source_dirs:
+                if not os.path.isdir(src):
+                    continue
+                name = os.path.basename(src)
+                dest = os.path.join(self.backup_dir, name)
+                staging = os.path.join(self.backup_dir, f'.{name}.staging')
+                if os.path.exists(staging):
+                    shutil.rmtree(staging)
+                shutil.copytree(src, staging)
+                if os.path.exists(dest):
+                    shutil.rmtree(dest)
+                os.rename(staging, dest)
+            self._last_backup = time.time()
+            print(f"[runtime {self.elapsed_str()}] backed up results to {self.backup_dir}")
+        except OSError as e:
+            # Retry on the next checkpoint rather than blocking on this one.
+            print(f"[runtime {self.elapsed_str()}] backup skipped due to error: {e}")
 
     def summary(self) -> Dict:
         return {
