@@ -245,11 +245,57 @@ def weights_dir_for(model_name, detector_method):
         f'{method_name}_training_120_2_channel1_cost2100_mcsweep')
 
 
+def push_with_retry(context):
+    # A commit that never reaches the remote is a commit that can still be
+    # lost (container reclaim, disconnect, etc). Retry with capped backoff
+    # for several minutes; if it still can't push, stop the whole sweep
+    # loudly instead of silently moving on and leaving this stranded local-only.
+    delays = (0, 2, 4, 8, 16, 30, 60, 60, 60, 60)
+    for attempt, delay in enumerate(delays, 1):
+        if delay:
+            time.sleep(delay)
+        r = subprocess.run(['git', 'push', '-q', 'origin', BRANCH], cwd=repo_dir())
+        if r.returncode == 0:
+            return
+        print(f'[git] push attempt {attempt}/{len(delays)} failed for {context}', flush=True)
+
+    raise RuntimeError(
+        f'git push failed after {len(delays)} attempts for {context} -- '
+        f'stopping the sweep so this is not silently lost (it is committed '
+        f'locally but not on the remote yet).')
+
+
+def commit_weights_snapshot(model_name, detector_method, snr):
+    """Commit+push a point's just-trained weights right after training
+    finishes, before the (often much longer) eval-rep phase runs. Without
+    this, a freshly-written weights file sits untracked on disk for the
+    whole point's runtime, not just the training step's -- narrowing that
+    window means training output is never far from being pushed."""
+    weights_dir = weights_dir_for(model_name, detector_method)
+    if not os.path.isdir(weights_dir):
+        return
+    subprocess.run(['git', 'add', os.path.relpath(weights_dir, repo_dir())],
+                    check=True, cwd=repo_dir())
+    commit = subprocess.run(
+        ['git', 'commit', '-q', '-m', f'Train MC-sweep weights: {model_name} snr={snr}'],
+        cwd=repo_dir(), capture_output=True, text=True)
+    if commit.returncode != 0:
+        combined = (commit.stdout or '') + (commit.stderr or '')
+        if 'nothing to commit' in combined.lower():
+            return
+        raise RuntimeError(
+            f'git commit failed for {model_name} snr={snr} weights snapshot '
+            f'(not a "nothing to commit" case): {combined.strip()}')
+    push_with_retry(f'{model_name} snr={snr} weights snapshot')
+
+
 def commit_and_push(model, detector_method, snr):
     # Other models' weight checkpoints are already tracked in this repo (see
     # Results/weights/*), so this sweep's are too -- add them alongside the
     # CSV row so each point's commit is atomic and a training run this sweep
-    # produced isn't left as an untracked, unpushed pile on disk.
+    # produced isn't left as an untracked, unpushed pile on disk. (Usually a
+    # no-op here: commit_weights_snapshot already committed them right after
+    # training, before the eval-rep phase ran.)
     weights_dir = weights_dir_for(model, detector_method)
     add_paths = ['Results/metrics/mc_sweep_validation.csv']
     if os.path.isdir(weights_dir):
@@ -274,25 +320,7 @@ def commit_and_push(model, detector_method, snr):
             f'git commit failed for {model} snr={snr} (not a "nothing to commit" '
             f'case): {combined.strip()}')
 
-    # A point that is committed locally but never reaches the remote is a
-    # point that can still be lost (container reclaim, disconnect, etc).
-    # Retry with capped backoff for several minutes; if it still can't push,
-    # stop the whole sweep loudly instead of silently moving on to the next
-    # point and leaving this one stranded local-only.
-    delays = (0, 2, 4, 8, 16, 30, 60, 60, 60, 60)
-    for attempt, delay in enumerate(delays, 1):
-        if delay:
-            time.sleep(delay)
-        r = subprocess.run(['git', 'push', '-q', 'origin', BRANCH], cwd=repo_dir())
-        if r.returncode == 0:
-            return
-        print(f'[git] push attempt {attempt}/{len(delays)} failed for {model} snr={snr}',
-              flush=True)
-
-    raise RuntimeError(
-        f'git push failed after {len(delays)} attempts for {model} snr={snr} -- '
-        f'stopping the sweep so this point is not silently lost (it is committed '
-        f'locally but not on the remote yet).')
+    push_with_retry(f'{model} snr={snr}')
 
 
 def run_point(model_name, detector_method, snr, min_reps, max_reps, max_bits, step):
@@ -316,6 +344,7 @@ def run_point(model_name, detector_method, snr, min_reps, max_reps, max_bits, st
 
     # Train once (no-op for ClassicViterbi/Statistical).
     trainer.load_train_weights(run_over=2)
+    commit_weights_snapshot(model_name, detector_method, snr)
 
     # Total words drawn per online_evaluation repetition (matches
     # transmitted_words.shape[0] inside trainer.online_evaluation, i.e. all
