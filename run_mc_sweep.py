@@ -13,24 +13,30 @@ Sizing method (per point):
      measurements -- but the gap is a near-constant effective-SNR shift,
      so applying that shift makes it a usable prior. See ISI_PENALTY_DB.
   2. Target ~100 expected errors (the standard rule of thumb for a stable
-     Monte-Carlo BER/SER estimate): required_bits = 100 / predicted_ser.
+     Monte-Carlo BER/SER estimate) purely to size the OPENING run:
+     required_bits = 100 / predicted_ser. This is only a prior -- the
+     observed error count, not the prediction, decides what happens next.
   3. Convert to repetitions via the trainer's actual words/rep and bits/word,
-     clipped to a per-model [MIN_REPS, MAX_REPS]. This only sizes the opening
-     move -- the observed error count, not the prediction, decides when to
-     stop.
-  4. Keep running until TARGET_ERRORS errors have actually been OBSERVED:
-       - zero errors so far: nothing to estimate a rate from, so double the
-         bits and look again ("run until the first error").
-       - errors seen at N bits: SER ~ errors/N, so ~TARGET_ERRORS errors
-         needs TARGET_ERRORS/SER bits. At exactly one error that is the
-         100x-the-bits-to-first-error rule; more errors sharpen the estimate.
-     Bounded by the per-model max_bits so a point cannot run away.
-  5. If max_bits is spent with still zero errors, the point is recorded as
+     clipped to a per-model [MIN_REPS, MAX_REPS].
+  4. If the opening run sees zero errors, double the bits and look again
+     ("run until the first error") -- there is nothing to estimate a rate
+     from yet.
+  5. Once the first error is observed, at bits_to_first_error, run to a
+     FIXED cap of FIRST_ERROR_BITS_MULTIPLIER (100) times that bit count and
+     stop -- e.g. first error at 1e6 bits means run to 1e8 bits, then stop,
+     however many errors that ends up with. This is deliberately NOT
+     re-estimated from the running SER as more errors come in: re-targeting
+     off a noisy observed rate can keep chasing a moving goalpost and never
+     converge, whereas the first-error bit count is measured once and the
+     cap it sets is fixed. Bounded by the per-model max_bits so a point
+     cannot run away.
+  6. If max_bits is spent with still zero errors, the point is recorded as
      CENSORED: ser_mean is 0.0, but `censored=1` and `bits_run` are recorded
      so it reads as an honest upper bound rather than a converged zero. (For
      zero errors in N bits the correct 95% bound is the rule of three, 3/N.)
-     If it is spent with some errors but fewer than TARGET_ERRORS, the point
-     is kept and flagged `[thin]` in the log -- its CI is real but wide.
+     If the 100x-first-error cap is reached with very few errors (bursty
+     luck), the point is kept and flagged `[thin]` in the log -- its CI is
+     real but wide.
 
 Commits and pushes Results/metrics/mc_sweep_validation.csv after every
 completed (model, snr) point, so a container reset loses at most one point.
@@ -58,14 +64,24 @@ FIELDNAMES = ['model', 'snr', 'ser_mean', 'ser_std', 'ser_ci95', 'n_reps',
               'words_run', 'bits_run', 'errors_observed', 'censored',
               'model_size', 'run_time_sec']
 SNR_VALUES = list(range(0, 18))
-TARGET_ERRORS = 100
+# Used only to size the opening run (see docstring step 2) -- NOT the
+# stopping condition. The actual stopping rule is FIRST_ERROR_BITS_MULTIPLIER.
+INITIAL_SIZING_TARGET_ERRORS = 100
+# Once the first error is observed at N bits, run to a fixed cap of this many
+# times N and stop, rather than re-targeting an error count from the
+# (noisy) observed rate as more errors accumulate. See docstring step 5.
+FIRST_ERROR_BITS_MULTIPLIER = 100
+# Below this many observed errors at the cap, flag the point [thin] -- the
+# result is still a valid unbiased estimate, just with a wide CI.
+THIN_ERROR_THRESHOLD = 10
 
 # (model_name, detector_method, min_reps, max_reps, max_bits, step)
 #   min_reps   -- floor
 #   max_reps   -- cap on the predictor-sized opening run
 #   max_bits   -- total bit budget for the point. The run keeps going past
-#                 max_reps until TARGET_ERRORS errors are actually observed;
-#                 this is what stops it running away when they never are.
+#                 max_reps until the FIRST_ERROR_BITS_MULTIPLIER cap is
+#                 reached (see docstring); this is what stops it running
+#                 away when the first error never comes.
 #   step       -- minimum rep increment while extending
 #
 # Sizing max_bits, from MEASURED throughput on this box (2000 bits/rep):
@@ -319,6 +335,18 @@ def run_point(model_name, detector_method, snr, min_reps, max_reps, max_bits, st
     def total_errors():
         return sum(m * bits_per_rep for m in per_rep_means)
 
+    def bits_at_first_error():
+        """Total bits run through the first rep at which the cumulative
+        error count first became nonzero, or None if no error has been
+        observed yet. Reconstructed from per_rep_means so it is correct
+        across a checkpoint resume, not just within one process's run."""
+        cum = 0.0
+        for i, m in enumerate(per_rep_means):
+            cum += m * bits_per_rep
+            if cum > 0:
+                return (i + 1) * bits_per_rep
+        return None
+
     def run_batch(n):
         nonlocal reps_done
         # Chunk into at most `step` reps per trainer call and checkpoint
@@ -337,7 +365,7 @@ def run_point(model_name, detector_method, snr, min_reps, max_reps, max_bits, st
             save_checkpoint(model_name, snr, per_rep_means)
 
     predicted_ser = max(expected_ser_isi(snr), 1e-300)
-    required_bits = TARGET_ERRORS / predicted_ser
+    required_bits = INITIAL_SIZING_TARGET_ERRORS / predicted_ser
     required_reps = math.ceil(required_bits / bits_per_rep)
     planned_reps = int(min(max(required_reps, min_reps), max_reps))
 
@@ -347,47 +375,42 @@ def run_point(model_name, detector_method, snr, min_reps, max_reps, max_bits, st
     if reps_done < planned_reps:
         run_batch(planned_reps - reps_done)
 
-    # Keep going until TARGET_ERRORS errors have actually been observed, not
-    # merely until the predictor's bit budget is spent. The predictor only
-    # sizes the opening move; the observed error rate is the real authority.
-    #
-    #   - zero errors so far: nothing to estimate a rate from, so double the
-    #     bits and look again (this is the "run until the first error" phase).
-    #   - at least one error at N bits: the rate implies SER ~ errors/N, so
-    #     ~TARGET_ERRORS errors needs TARGET_ERRORS/SER bits. With a single
-    #     error that is exactly the 100x-the-bits-to-first-error rule; with
-    #     more errors the estimate simply gets better.
-    #
-    # Bounded by max_bits so a point cannot run away; a point that exhausts it
-    # without any error is recorded as censored (an honest upper bound).
-    while total_errors() < TARGET_ERRORS and reps_done * bits_per_rep < max_bits:
-        errs = total_errors()
+    # Phase 1: run until the first error is actually observed. The predictor
+    # only sizes the opening move -- if it undershoots, there is nothing to
+    # estimate a rate from yet, so double the bits and look again.
+    while total_errors() == 0 and reps_done * bits_per_rep < max_bits:
         bits_so_far = reps_done * bits_per_rep
-        if errs == 0:
-            target_reps = reps_done * 2
-            why = f'0 errors in {bits_so_far:,} bits -- doubling'
-        else:
-            observed_ser = errs / bits_so_far
-            target_reps = math.ceil((TARGET_ERRORS / observed_ser) / bits_per_rep)
-            why = (f'{errs:.0f} errors in {bits_so_far:,} bits '
-                   f'(ser~{observed_ser:.2e}) -- need ~{target_reps} reps for {TARGET_ERRORS}')
-        # cap the target by the bit budget, and always make forward progress
-        target_reps = min(target_reps, max_bits // bits_per_rep)
-        batch = max(step, min(target_reps - reps_done, reps_done))  # grow at most 2x per round
+        target_reps = min(reps_done * 2, max_bits // bits_per_rep)
+        batch = max(step, target_reps - reps_done)
         if batch <= 0:
             break
-        print(f'[extend] {model_name} snr={snr}: {why}; running {batch} more', flush=True)
+        print(f'[extend] {model_name} snr={snr}: 0 errors in {bits_so_far:,} bits -- '
+              f'doubling toward first error; running {batch} more', flush=True)
         run_batch(batch)
+
+    # Phase 2: once the first error is observed at N bits, run to a FIXED cap
+    # of FIRST_ERROR_BITS_MULTIPLIER x N bits and stop -- not re-targeted off
+    # the observed rate as more errors come in, since that can chase a moving
+    # goalpost and never converge. Bounded by max_bits as always.
+    first_bits = bits_at_first_error()
+    if first_bits is not None:
+        cap_bits = min(FIRST_ERROR_BITS_MULTIPLIER * first_bits, max_bits)
+        cap_reps = int(cap_bits // bits_per_rep)
+        if reps_done < cap_reps:
+            print(f'[extend] {model_name} snr={snr}: first error at {first_bits:,} bits -- '
+                  f'running to {FIRST_ERROR_BITS_MULTIPLIER}x cap = {cap_bits:,.0f} bits '
+                  f'({cap_reps} reps)', flush=True)
+            run_batch(cap_reps - reps_done)
 
     censored = total_errors() == 0
     if censored:
         print(f'[censored] {model_name} snr={snr}: 0 errors in {reps_done} reps '
               f'({reps_done * bits_per_rep:,} bits) -- reporting as upper bound',
               flush=True)
-    elif total_errors() < TARGET_ERRORS:
+    elif total_errors() < THIN_ERROR_THRESHOLD:
         print(f'[thin] {model_name} snr={snr}: only {total_errors():.0f} errors in '
-              f'{reps_done * bits_per_rep:,} bits (max_bits budget spent) -- CI will be wide',
-              flush=True)
+              f'{reps_done * bits_per_rep:,} bits (100x-first-error cap reached) -- '
+              f'CI will be wide', flush=True)
 
     run_time = time.time() - t0
 
