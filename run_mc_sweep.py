@@ -41,6 +41,7 @@ fixes) -- everything else already in the CSV is left alone.
 Run standalone: python run_mc_sweep.py
 """
 import csv
+import json
 import math
 import os
 import subprocess
@@ -180,6 +181,43 @@ def append_row(row):
         csv.DictWriter(f, fieldnames=FIELDNAMES).writerow(row)
 
 
+# In-progress-point resume state. A point can take hours (an extend batch is a
+# single trainer.online_evaluation() call that does not return until it
+# finishes), and until now a mid-point restart lost all of it -- observed
+# twice on SNR=13, each costing several hours of real compute. Checkpointing
+# only the per-rep SER means (not the raw per-word arrays) is enough to
+# reconstruct ser_mean/ser_std/ci95/errors_observed exactly on resume, and
+# keeps each checkpoint write small.
+CHECKPOINT_DIR = os.path.join(RESULTS_DIR, 'metrics', '.mc_sweep_checkpoints')
+
+
+def checkpoint_path(model, snr):
+    return os.path.join(CHECKPOINT_DIR, f'{model}_snr{snr}.json')
+
+
+def load_checkpoint(model, snr):
+    path = checkpoint_path(model, snr)
+    if not os.path.isfile(path):
+        return None
+    with open(path) as f:
+        return json.load(f)
+
+
+def save_checkpoint(model, snr, per_rep_means):
+    os.makedirs(CHECKPOINT_DIR, exist_ok=True)
+    path = checkpoint_path(model, snr)
+    tmp = path + '.tmp'
+    with open(tmp, 'w') as f:
+        json.dump({'per_rep_means': per_rep_means}, f)
+    os.replace(tmp, path)  # atomic: a restart mid-write never leaves a corrupt checkpoint
+
+
+def clear_checkpoint(model, snr):
+    path = checkpoint_path(model, snr)
+    if os.path.isfile(path):
+        os.remove(path)
+
+
 def repo_dir():
     return os.path.dirname(os.path.abspath(__file__))
 
@@ -259,30 +297,55 @@ def run_point(model_name, detector_method, snr, min_reps, max_reps, max_bits, st
     # actually comes back in).
     words_per_rep = trainer.val_frames * trainer.subframes_in_frame
     bits_per_word = trainer.n_symbols * 8
+    bits_per_rep = words_per_rep * bits_per_word
+
+    # Resume from a checkpoint left by a run that was interrupted mid-point
+    # (a restart, not a clean finish -- a finished point is a committed CSV
+    # row and has no checkpoint). per_rep_means is the only state needed to
+    # reconstruct every final statistic exactly; see save_checkpoint().
+    checkpoint = load_checkpoint(model_name, snr)
+    per_rep_means = list(checkpoint['per_rep_means']) if checkpoint else []
+    reps_done = len(per_rep_means)
+    if reps_done:
+        print(f'[resume] {model_name} snr={snr}: found checkpoint with {reps_done} reps '
+              f'already done, continuing from there', flush=True)
+    # The rep-index cache-key fix (see Code/trainer.py online_evaluation) keys
+    # each draw by a per-trainer counter starting at 0. A fresh trainer after
+    # a restart would replay reps_done..0's cache entries from the START,
+    # which are exactly the ones the abandoned run already consumed --
+    # pre-seed the counter so resumed reps get genuinely new indices instead.
+    trainer._eval_rep_counter = reps_done
+
+    def total_errors():
+        return sum(m * bits_per_rep for m in per_rep_means)
+
+    def run_batch(n):
+        nonlocal reps_done
+        # Chunk into at most `step` reps per trainer call and checkpoint
+        # after every chunk. Without this, a single extend round can be
+        # thousands of reps in one online_evaluation() call that does not
+        # return for hours -- a restart mid-call loses all of it, which is
+        # exactly what happened twice on SNR=13 before this existed.
+        remaining = n
+        while remaining > 0:
+            chunk = min(step, remaining)
+            ser = np.asarray(trainer.online_evaluation(num_of_rep=chunk)).reshape(-1)
+            chunk_means = ser.reshape(chunk, words_per_rep).mean(axis=1)
+            per_rep_means.extend(float(m) for m in chunk_means)
+            reps_done += chunk
+            remaining -= chunk
+            save_checkpoint(model_name, snr, per_rep_means)
 
     predicted_ser = max(expected_ser_isi(snr), 1e-300)
     required_bits = TARGET_ERRORS / predicted_ser
-    required_reps = math.ceil(required_bits / (words_per_rep * bits_per_word))
+    required_reps = math.ceil(required_bits / bits_per_rep)
     planned_reps = int(min(max(required_reps, min_reps), max_reps))
 
     print(f'[plan] {model_name} snr={snr}: predicted_ser={predicted_ser:.3e}, '
           f'planned_reps={planned_reps} (min={min_reps}, max={max_reps})', flush=True)
 
-    bits_per_rep = words_per_rep * bits_per_word
-
-    ser_batches = []
-    reps_done = 0
-
-    def total_errors(batches):
-        return sum(float(b.sum()) * bits_per_word for b in batches)
-
-    def run_batch(n):
-        nonlocal reps_done
-        ser_batches.append(np.asarray(trainer.online_evaluation(num_of_rep=n)).reshape(-1))
-        reps_done += n
-
-    while reps_done < planned_reps:
-        run_batch(min(step, planned_reps - reps_done))
+    if reps_done < planned_reps:
+        run_batch(planned_reps - reps_done)
 
     # Keep going until TARGET_ERRORS errors have actually been observed, not
     # merely until the predictor's bit budget is spent. The predictor only
@@ -297,8 +360,8 @@ def run_point(model_name, detector_method, snr, min_reps, max_reps, max_bits, st
     #
     # Bounded by max_bits so a point cannot run away; a point that exhausts it
     # without any error is recorded as censored (an honest upper bound).
-    while total_errors(ser_batches) < TARGET_ERRORS and reps_done * bits_per_rep < max_bits:
-        errs = total_errors(ser_batches)
+    while total_errors() < TARGET_ERRORS and reps_done * bits_per_rep < max_bits:
+        errs = total_errors()
         bits_so_far = reps_done * bits_per_rep
         if errs == 0:
             target_reps = reps_done * 2
@@ -316,24 +379,22 @@ def run_point(model_name, detector_method, snr, min_reps, max_reps, max_bits, st
         print(f'[extend] {model_name} snr={snr}: {why}; running {batch} more', flush=True)
         run_batch(batch)
 
-    censored = total_errors(ser_batches) == 0
+    censored = total_errors() == 0
     if censored:
         print(f'[censored] {model_name} snr={snr}: 0 errors in {reps_done} reps '
               f'({reps_done * bits_per_rep:,} bits) -- reporting as upper bound',
               flush=True)
-    elif total_errors(ser_batches) < TARGET_ERRORS:
-        print(f'[thin] {model_name} snr={snr}: only {total_errors(ser_batches):.0f} errors in '
+    elif total_errors() < TARGET_ERRORS:
+        print(f'[thin] {model_name} snr={snr}: only {total_errors():.0f} errors in '
               f'{reps_done * bits_per_rep:,} bits (max_bits budget spent) -- CI will be wide',
               flush=True)
 
     run_time = time.time() - t0
 
-    ser_all = np.concatenate(ser_batches)
-    per_rep_means = ser_all.reshape(reps_done, words_per_rep).mean(axis=1)
-
-    ser_mean = float(per_rep_means.mean())
+    per_rep_means_arr = np.array(per_rep_means)
+    ser_mean = float(per_rep_means_arr.mean())
     if reps_done > 1:
-        ser_std = float(per_rep_means.std(ddof=1))
+        ser_std = float(per_rep_means_arr.std(ddof=1))
         ser_ci95 = 1.96 * ser_std / math.sqrt(reps_done)
     else:
         ser_std = 0.0
@@ -341,7 +402,7 @@ def run_point(model_name, detector_method, snr, min_reps, max_reps, max_bits, st
 
     words_run = reps_done * words_per_rep
     bits_run = words_run * bits_per_word
-    errors_observed = total_errors(ser_batches)
+    errors_observed = total_errors()
 
     return {
         'model': model_name,
@@ -385,6 +446,7 @@ def main():
             append_row(row)
             print(f'[done] {row}', flush=True)
             commit_and_push(model_name, snr)
+            clear_checkpoint(model_name, snr)
             done.add(key)
 
     print('\nAll points complete.', flush=True)

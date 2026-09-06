@@ -8,3 +8,7 @@ logs/
 
 # Scratch weight checkpoints from ad-hoc timing calibration runs, not real results
 Results/weights/calib_test_*/
+
+# In-progress-point resume state for run_mc_sweep.py -- local resilience against
+# a mid-point restart, superseded by the committed CSV row once a point finishes.
+Results/metrics/.mc_sweep_checkpoints/
