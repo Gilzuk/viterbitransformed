@@ -93,16 +93,39 @@ The sweep pushes after every point, so this has to work *before* the long run
 starts -- the last cell here does a `--dry-run` push to prove it does, rather
 than discovering a credentials problem hours in.
 
-Use a fine-grained GitHub PAT with **Contents: read and write** on this repo.
-Note the token gets written into `.git/config` on this (ephemeral) runtime.
+This repo being public only means anyone can *read* it without credentials --
+GitHub still requires a credential to *push*, public or not. A fine-grained
+PAT with **Contents: read and write** on this repo is the credential; the
+only thing public-vs-private changes is that the PAT needs no other scope.
+
+**One-time setup** (persists across sessions, so you only do this once):
+1. Click the key icon (**Secrets**) in the left sidebar of Colab.
+2. Add a new secret named `GITHUB_TOKEN`, value = your fine-grained PAT.
+3. Toggle **Notebook access** on for it.
+
+If the secret isn't there, this cell falls back to pasting the token in by
+hand for this session only.
 """),
 code("""
-from getpass import getpass
-
 !git config user.email "gil.zukerman@gmail.com"
 !git config user.name "Gil Zukerman"
 
-token = getpass("GitHub token (fine-grained PAT, Contents: read+write): ")
+token = None
+try:
+    from google.colab import userdata
+    token = userdata.get("GITHUB_TOKEN")
+    print("Using GITHUB_TOKEN from Colab Secrets.")
+except Exception:
+    pass
+
+if not token:
+    from getpass import getpass
+    print("No GITHUB_TOKEN secret found -- see cell 4's setup steps to avoid")
+    print("pasting this in every session.")
+    token = getpass("GitHub token (fine-grained PAT, Contents: read+write): ")
+
+# Note this still writes the token into .git/config on this (ephemeral)
+# runtime, same as pasting it in -- Secrets only avoids retyping it.
 !git remote set-url origin https://{token}@github.com/Gilzuk/viterbitransformed.git
 
 # Prove push auth works now, before committing hours of compute to it.

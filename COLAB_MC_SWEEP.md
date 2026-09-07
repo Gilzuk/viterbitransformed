@@ -117,13 +117,25 @@ print(device, torch.cuda.get_device_name(0) if device.type == "cuda" else "NO GP
 ```
 
 **4. Git identity + push auth**
+
+This repo being public only means anyone can *read* it without credentials --
+GitHub still requires a credential to *push*, public or not. Store a
+fine-grained PAT with "Contents: read and write" on this repo as a Colab
+Secret once (key icon in the left sidebar > add `GITHUB_TOKEN` > enable
+notebook access) so you never have to paste it in again:
 ```python
 !git config user.email "gil.zukerman@gmail.com"
 !git config user.name "Gil Zukerman"
 
-# Fine-grained GitHub PAT with "Contents: read and write" on this repo:
-from getpass import getpass
-token = getpass("GitHub token: ")
+token = None
+try:
+    from google.colab import userdata
+    token = userdata.get("GITHUB_TOKEN")
+except Exception:
+    pass
+if not token:
+    from getpass import getpass
+    token = getpass("GitHub token (fine-grained PAT, Contents: read+write): ")
 !git remote set-url origin https://{token}@github.com/Gilzuk/viterbitransformed.git
 ```
 
