@@ -504,8 +504,13 @@ def main():
     done = already_done()
     print(f'Already completed points: {sorted(done)}', flush=True)
 
-    for model_name, detector_method, min_reps, max_reps, max_bits, step in MODELS:
-        for snr in SNR_VALUES:
+    # Per-SNR, per-model: at each SNR, try every model before moving to the
+    # next SNR, rather than exhausting one model's whole 0-17 range first.
+    # Keeps progress broad instead of narrow, so no single model's full
+    # sweep has to finish before the other model's points at the same SNR
+    # are even attempted.
+    for snr in SNR_VALUES:
+        for model_name, detector_method, min_reps, max_reps, max_bits, step in MODELS:
             key = (model_name, snr)
             if key in done:
                 print(f'[skip] {model_name} snr={snr} already in CSV', flush=True)
