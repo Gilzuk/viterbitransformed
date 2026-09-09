@@ -1,10 +1,10 @@
 """
-Higher-MC validation sweep (Colab/GPU configuration): ClassicViterbi and
-Viterbi-Transformer over SNR 0-17, evaluating each with an SNR-adaptive
-number of repetitions so every point actually observes a meaningful number
-of errors, rather than a fixed rep count that silently floors to a
-meaningless "0" once the true SER drops below what that many bits can
-resolve.
+Higher-MC validation sweep (Colab/GPU configuration): ClassicViterbi,
+ViterbiNet, and the Viterbi-Transformer over SNR 0-17, evaluating each with
+an SNR-adaptive number of repetitions so every point actually observes a
+meaningful number of errors, rather than a fixed rep count that silently
+floors to a meaningless "0" once the true SER drops below what that many
+bits can resolve.
 
 Sizing method (per point):
   1. Predict the SER at this SNR with Q(sqrt(2*snr_eff_linear)), where
@@ -40,16 +40,19 @@ Sizing method (per point):
      real but wide.
 
 On CPU, ClassicViterbi was ~6.5s/rep before the COST2100 tap-load cache fix
-(now ~0.02s/rep); the Transformer's self-supervised online training fires on
-almost every word during each eval rep, making each Transformer rep on the
-order of minutes there -- see COLAB_MC_SWEEP.md for why this copy of the
-script targets a GPU runtime instead.
+(now ~0.02s/rep); the Transformer's and ViterbiNet's self-supervised online
+training fires on almost every word during each eval rep, making each rep
+on the order of minutes there -- see COLAB_MC_SWEEP.md for why this copy of
+the script targets a GPU runtime instead.
 
 RESILIENCE (this matters a lot more here than on a persistent machine --
 a Colab runtime is ephemeral: on disconnect/restart, everything not already
 pushed to GitHub is gone, full stop):
   - Every completed (model, snr) point is committed AND pushed to the
-    mc-sweep-colab-gpu branch before moving to the next point.
+    mc-sweep-colab-gpu branch before moving to the next point. Training a
+    model-based method's weights are ALSO committed+pushed the moment
+    training finishes, before the (often much longer) eval-rep phase runs
+    -- see commit_weights_snapshot().
   - If push fails, it is retried with capped backoff for several minutes;
     if it still fails, the script stops immediately (raises) rather than
     silently continuing and leaving that point committed-but-unpushed
@@ -68,15 +71,32 @@ pushed to GitHub is gone, full stop):
     so a restart loses at most one chunk instead of the whole point. This
     checkpoint is local-only (not committed to git, see .gitignore) --
     it does not survive a full Colab disconnect, only a restart of this
-    process on the same runtime.
+    process on the same runtime. It is discarded (not resumed) for
+    model-based methods, because their training step always reruns from
+    scratch on a restart -- resuming eval reps computed against the
+    PREVIOUS training run's weights would silently blend two different
+    trained models into one point's statistics. Only the eval phase is
+    lost on such a restart, not the checkpoint's correctness.
 
-Run standalone: python run_mc_sweep.py
+PARALLEL RUNS: python run_mc_sweep.py <ModelName> restricts this process to
+one model, so three notebook cells (one per model, each in its own cloned
+copy of this branch) can run concurrently on the same GPU runtime instead of
+one process working through all three in sequence -- a single slow or
+restart-prone point in one model no longer blocks progress on the others.
+See the notebook's "Run in parallel" section. Point-level commit/push is
+safe under this: push_with_retry rebases onto the latest origin tip before
+retrying a failed push, and every commit here is a pure append (one new CSV
+row, one model's own weights file), so rebasing one clean append onto
+another's essentially never conflicts.
+
+Run standalone: python run_mc_sweep.py [ModelName]
 """
 import csv
 import json
 import math
 import os
 import subprocess
+import sys
 import time
 
 import numpy as np
@@ -208,7 +228,7 @@ def ensure_header():
 
 def drop_existing_row(model, snr):
     """Remove any prior row for (model, snr) before appending its replacement
-    (used for the zero-SER rows this scheme re-runs)."""
+    (used for the zero-SER rows this rewrite is re-running)."""
     if not os.path.isfile(CSV_PATH):
         return
     with open(CSV_PATH) as f:
@@ -226,18 +246,13 @@ def append_row(row):
         csv.DictWriter(f, fieldnames=FIELDNAMES).writerow(row)
 
 
-# Mid-point checkpoint: a restart during a multi-thousand-rep extend round
-# (which can be a single trainer.online_evaluation() call that does not
-# return until it finishes) previously lost all of it -- on the CPU branch
-# this happened twice on SNR=13, each costing several hours of real compute,
-# and it matters even more here since a Colab runtime disconnect wipes local
-# disk entirely. Checkpointing only the per-rep SER means (not the raw
-# per-word arrays) is enough to reconstruct ser_mean/ser_std/ci95/
-# errors_observed exactly on resume, and keeps each checkpoint write small.
-# This directory is NOT pushed to git (see .gitignore) -- it is local
-# resilience against a mid-point restart, superseded by the committed CSV
-# row once a point finishes; a full Colab disconnect (not just a restart of
-# this process) still loses whatever chunk was in flight, same as before.
+# In-progress-point resume state. A point can take hours (an extend batch is a
+# single trainer.online_evaluation() call that does not return until it
+# finishes), and until now a mid-point restart lost all of it -- observed
+# twice on SNR=13, each costing several hours of real compute. Checkpointing
+# only the per-rep SER means (not the raw per-word arrays) is enough to
+# reconstruct ser_mean/ser_std/ci95/errors_observed exactly on resume, and
+# keeps each checkpoint write small.
 CHECKPOINT_DIR = os.path.join(RESULTS_DIR, 'metrics', '.mc_sweep_checkpoints')
 
 
@@ -279,11 +294,80 @@ def weights_dir_for(model_name, detector_method):
         f'{method_name}_training_120_2_channel1_cost2100_mcsweep_colab')
 
 
+def push_with_retry(context):
+    # A commit that never reaches the remote is a commit that can still be
+    # lost (container reclaim, disconnect, etc). Retry with capped backoff
+    # for several minutes; if it still can't push, stop the whole sweep
+    # loudly instead of silently moving on and leaving this stranded local-only.
+    #
+    # Push HEAD explicitly (not the local branch name) so this works the same
+    # whether this process is the main worktree (local branch == BRANCH) or a
+    # sibling worktree running a different model concurrently, which is on
+    # its own local branch pointed at the same remote BRANCH -- see
+    # PARALLEL_MC_SWEEP notes.
+    delays = (0, 2, 4, 8, 16, 30, 60, 60, 60, 60)
+    for attempt, delay in enumerate(delays, 1):
+        if delay:
+            time.sleep(delay)
+        r = subprocess.run(['git', 'push', '-q', 'origin', f'HEAD:{BRANCH}'], cwd=repo_dir())
+        if r.returncode == 0:
+            return
+        print(f'[git] push attempt {attempt}/{len(delays)} failed for {context}', flush=True)
+
+        # The expected cause when multiple sweep processes push to the same
+        # branch concurrently: a sibling committed and pushed its own point
+        # first, making this push non-fast-forward. Every commit here is a
+        # pure append (one new CSV row, one model's own weights file), so
+        # rebasing onto the new tip essentially never conflicts -- do that
+        # and let the next loop iteration retry the push.
+        subprocess.run(['git', 'fetch', '-q', 'origin', BRANCH], cwd=repo_dir())
+        rebase = subprocess.run(['git', 'rebase', f'origin/{BRANCH}'],
+                                 cwd=repo_dir(), capture_output=True, text=True)
+        if rebase.returncode != 0:
+            subprocess.run(['git', 'rebase', '--abort'], cwd=repo_dir())
+            raise RuntimeError(
+                f'git rebase onto origin/{BRANCH} failed for {context} (not a '
+                f'plain non-fast-forward push failure) -- aborted the rebase '
+                f'rather than risk a broken tree; needs manual resolution. '
+                f'{rebase.stdout.strip()} {rebase.stderr.strip()}')
+
+    raise RuntimeError(
+        f'git push failed after {len(delays)} attempts for {context} -- '
+        f'stopping the sweep so this is not silently lost (it is committed '
+        f'locally but not on the remote yet).')
+
+
+def commit_weights_snapshot(model_name, detector_method, snr):
+    """Commit+push a point's just-trained weights right after training
+    finishes, before the (often much longer) eval-rep phase runs. Without
+    this, a freshly-written weights file sits untracked on disk for the
+    whole point's runtime, not just the training step's -- narrowing that
+    window means training output is never far from being pushed."""
+    weights_dir = weights_dir_for(model_name, detector_method)
+    if not os.path.isdir(weights_dir):
+        return
+    subprocess.run(['git', 'add', os.path.relpath(weights_dir, repo_dir())],
+                    check=True, cwd=repo_dir())
+    commit = subprocess.run(
+        ['git', 'commit', '-q', '-m', f'Train MC-sweep weights: {model_name} snr={snr}'],
+        cwd=repo_dir(), capture_output=True, text=True)
+    if commit.returncode != 0:
+        combined = (commit.stdout or '') + (commit.stderr or '')
+        if 'nothing to commit' in combined.lower():
+            return
+        raise RuntimeError(
+            f'git commit failed for {model_name} snr={snr} weights snapshot '
+            f'(not a "nothing to commit" case): {combined.strip()}')
+    push_with_retry(f'{model_name} snr={snr} weights snapshot')
+
+
 def commit_and_push(model, detector_method, snr):
     # Other models' weight checkpoints are already tracked in this repo (see
     # Results/weights/*), so this sweep's are too -- add them alongside the
     # CSV row so each point's commit is atomic and a training run this sweep
-    # produced isn't left as an untracked, unpushed pile on disk.
+    # produced isn't left as an untracked, unpushed pile on disk. (Usually a
+    # no-op here: commit_weights_snapshot already committed them right after
+    # training, before the eval-rep phase ran.)
     weights_dir = weights_dir_for(model, detector_method)
     add_paths = ['Results/metrics/mc_sweep_validation_colab.csv']
     if os.path.isdir(weights_dir):
@@ -308,25 +392,7 @@ def commit_and_push(model, detector_method, snr):
             f'git commit failed for {model} snr={snr} (not a "nothing to commit" '
             f'case): {combined.strip()}')
 
-    # On Colab specifically, a point that is committed locally but never
-    # reaches the remote WILL be lost -- the runtime is ephemeral and a
-    # disconnect wipes local disk entirely. Retry with capped backoff for
-    # several minutes; if it still can't push, stop the whole sweep loudly
-    # instead of silently moving on and stranding this point local-only.
-    delays = (0, 2, 4, 8, 16, 30, 60, 60, 60, 60)
-    for attempt, delay in enumerate(delays, 1):
-        if delay:
-            time.sleep(delay)
-        r = subprocess.run(['git', 'push', '-q', 'origin', BRANCH], cwd=repo_dir())
-        if r.returncode == 0:
-            return
-        print(f'[git] push attempt {attempt}/{len(delays)} failed for {model} snr={snr}',
-              flush=True)
-
-    raise RuntimeError(
-        f'git push failed after {len(delays)} attempts for {model} snr={snr} -- '
-        f'stopping the sweep so this point is not silently lost (committed '
-        f'locally but not pushed -- a Colab disconnect would drop it entirely).')
+    push_with_retry(f'{model} snr={snr}')
 
 
 def run_point(model_name, detector_method, snr, min_reps, max_reps, max_bits, step):
@@ -350,6 +416,7 @@ def run_point(model_name, detector_method, snr, min_reps, max_reps, max_bits, st
 
     # Train once (no-op for ClassicViterbi/Statistical).
     trainer.load_train_weights(run_over=2)
+    commit_weights_snapshot(model_name, detector_method, snr)
 
     # Total words drawn per online_evaluation repetition (matches
     # transmitted_words.shape[0] inside trainer.online_evaluation, i.e. all
@@ -364,7 +431,23 @@ def run_point(model_name, detector_method, snr, min_reps, max_reps, max_bits, st
     # (a restart, not a clean finish -- a finished point is a committed CSV
     # row and has no checkpoint). per_rep_means is the only state needed to
     # reconstruct every final statistic exactly; see save_checkpoint().
+    #
+    # This is only valid for methods with no training step (Statistical):
+    # load_train_weights(run_over=2) above ALWAYS retrains from scratch for
+    # model-based methods, so a restarted run_point trains a genuinely
+    # different model than whatever produced an existing checkpoint's eval
+    # reps. Resuming that checkpoint would silently blend SER measurements
+    # from two different trained models into one point's statistics -- an
+    # invalid Monte-Carlo estimate. Discard it and start eval fresh; only
+    # the (usually short) training step is repeated, not the whole point.
     checkpoint = load_checkpoint(model_name, snr)
+    if checkpoint and detector_method != 'Statistical':
+        print(f'[resume] {model_name} snr={snr}: discarding stale eval checkpoint with '
+              f'{len(checkpoint["per_rep_means"])} reps -- training just ran fresh (not '
+              f'itself resumable), so those reps were computed against a different '
+              f'trained model and cannot be mixed with this one\'s', flush=True)
+        clear_checkpoint(model_name, snr)
+        checkpoint = None
     per_rep_means = list(checkpoint['per_rep_means']) if checkpoint else []
     reps_done = len(per_rep_means)
     if reps_done:
@@ -397,8 +480,8 @@ def run_point(model_name, detector_method, snr, min_reps, max_reps, max_bits, st
         # Chunk into at most `step` reps per trainer call and checkpoint
         # after every chunk. Without this, a single extend round can be
         # thousands of reps in one online_evaluation() call that does not
-        # return for hours -- a restart mid-call loses all of it, and on a
-        # Colab runtime that is even more likely than on a persistent box.
+        # return for hours -- a restart mid-call loses all of it, which is
+        # exactly what happened twice on SNR=13 before this existed.
         remaining = n
         while remaining > 0:
             chunk = min(step, remaining)
@@ -489,12 +572,32 @@ def run_point(model_name, detector_method, snr, min_reps, max_reps, max_bits, st
 
 
 def main():
+    # Optional: python run_mc_sweep.py <ModelName> restricts this process to
+    # one model, so it can run concurrently with sibling processes (each in
+    # its own worktree -- see PARALLEL_MC_SWEEP notes) covering the other
+    # models, instead of this one process working through all of them in
+    # sequence. Point-level commit/push and checkpointing are unaffected;
+    # only which models this particular process considers is scoped.
+    models = MODELS
+    if len(sys.argv) > 1:
+        wanted = sys.argv[1]
+        models = [m for m in MODELS if m[0] == wanted]
+        if not models:
+            valid = ', '.join(m[0] for m in MODELS)
+            raise SystemExit(f'Unknown model {wanted!r} -- choose one of: {valid}')
+        print(f'[filter] restricting this process to model={wanted}', flush=True)
+
     ensure_header()
     done = already_done()
     print(f'Already completed points: {sorted(done)}', flush=True)
 
-    for model_name, detector_method, min_reps, max_reps, max_bits, step in MODELS:
-        for snr in SNR_VALUES:
+    # Per-SNR, per-model: at each SNR, try every model before moving to the
+    # next SNR, rather than exhausting one model's whole 0-17 range first.
+    # Keeps progress broad instead of narrow, so no single model's full
+    # sweep has to finish before the other model's points at the same SNR
+    # are even attempted.
+    for snr in SNR_VALUES:
+        for model_name, detector_method, min_reps, max_reps, max_bits, step in models:
             key = (model_name, snr)
             if key in done:
                 print(f'[skip] {model_name} snr={snr} already in CSV', flush=True)

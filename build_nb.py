@@ -170,6 +170,81 @@ print("\\n--- exit code %d ---" % proc.returncode)
 print("full log: %s" % LOG)
 """),
 
+md("""
+## 5b. Or: run all three models in parallel instead
+
+An alternative to cell 5, not an addition to it -- pick one. A single GPU
+runtime has one accelerator but plenty of spare RAM/disk, so `ClassicViterbi`,
+`ViterbiNet`, and `Transformer` can each run as their own process instead of
+one process working through all three in sequence, where a single slow or
+restart-prone point in one model (Transformer's online training is the
+slowest) blocks progress on the other two even though they have nothing to
+do with why that point is stuck.
+
+Each model gets its own full clone of this branch (simpler and safer in a
+notebook than a shared working directory three processes would all write
+CSV rows and weights files into at once) and its own log file. Commits from
+all three land on the same `mc-sweep-colab-gpu` branch -- `push_with_retry`
+in `run_mc_sweep.py` rebases onto the latest tip before retrying a failed
+push, and every commit here is a pure append (one new CSV row, one model's
+own weights file), so this doesn't collide in practice.
+"""),
+code("""
+import os, subprocess
+
+PARALLEL_MODELS = ["ClassicViterbi", "ViterbiNet", "Transformer"]
+base_dir = os.getcwd()
+parallel_dirs = {PARALLEL_MODELS[0]: base_dir}
+
+for model in PARALLEL_MODELS[1:]:
+    clone_dir = base_dir + "_" + model.lower()
+    if not os.path.exists(clone_dir):
+        subprocess.run(["git", "clone", "--branch", BRANCH,
+                        "https://{}@github.com/Gilzuk/viterbitransformed.git".format(token),
+                        clone_dir], check=True)
+    subprocess.run(["git", "-C", clone_dir, "config", "user.email", "gil.zukerman@gmail.com"], check=True)
+    subprocess.run(["git", "-C", clone_dir, "config", "user.name", "Gil Zukerman"], check=True)
+    parallel_dirs[model] = clone_dir
+
+parallel_procs = {}
+parallel_logs = {}
+for model, d in parallel_dirs.items():
+    log_path = "/content/mc_sweep_{}.log".format(model.lower())
+    logf = open(log_path, "w")
+    proc = subprocess.Popen(["python", "-u", "run_mc_sweep.py", model],
+                            cwd=d, stdout=logf, stderr=subprocess.STDOUT)
+    parallel_procs[model] = proc
+    parallel_logs[model] = (log_path, logf)
+    print("started {} (pid {}) in {} -- log: {}".format(model, proc.pid, d, log_path))
+"""),
+md("Watch progress across all three (interrupt any time -- the processes keep running; re-run this cell to keep watching):"),
+code("""
+import re, time
+
+KEEP = re.compile(r"\\[run\\]|\\[plan\\]|\\[resume\\]|\\[done\\]|\\[skip\\]|\\[extend\\]"
+                  r"|\\[censored\\]|\\[thin\\]|\\[git\\]|\\[ERROR\\]|All points complete"
+                  r"|Traceback|Error|Exception")
+positions = {model: 0 for model in parallel_procs}
+
+try:
+    while any(p.poll() is None for p in parallel_procs.values()):
+        for model, (log_path, _) in parallel_logs.items():
+            with open(log_path) as f:
+                f.seek(positions[model])
+                for line in f:
+                    tail = line.rsplit("\\r", 1)[-1]
+                    if KEEP.search(tail):
+                        print("[{}] {}".format(model, tail.rstrip()))
+                positions[model] = f.tell()
+        time.sleep(5)
+except KeyboardInterrupt:
+    print("Stopped watching -- the processes are still running in the background.")
+
+for model, p in parallel_procs.items():
+    code_ = p.poll()
+    print("{}: {}".format(model, "still running" if code_ is None else "exited " + str(code_)))
+"""),
+
 md("## 6. Progress so far"),
 code("""
 import os
