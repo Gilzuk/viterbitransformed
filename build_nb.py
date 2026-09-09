@@ -134,6 +134,77 @@ print("\\n--- verifying push access (dry run) ---")
 """),
 
 md("""
+## 4b. Sanity test: a real commit + push round-trip
+
+The dry run above only proves the *credential* works -- it does not commit
+or push anything. This cell does a real end-to-end round trip (write a tiny
+marker file, commit it, push it, confirm it actually landed on
+`mc-sweep-colab-gpu`, then remove it) so a problem the dry run can't see --
+a rejected commit, a protected branch, a token that can authenticate but
+not write -- shows up now, in 10 seconds, instead of after training has
+been running for an hour.
+"""),
+code("""
+import os, subprocess, time, uuid
+
+def run(cmd):
+    return subprocess.run(cmd, cwd=REPO_DIR, text=True, capture_output=True)
+
+MARKER_REL = "Results/metrics/.colab_push_sanity_check.txt"
+marker_path = os.path.join(REPO_DIR, MARKER_REL)
+stamp = uuid.uuid4().hex[:12]
+os.makedirs(os.path.dirname(marker_path), exist_ok=True)
+with open(marker_path, "w") as f:
+    f.write("colab push sanity check -- {} -- {}\\n".format(
+        time.strftime("%Y-%m-%d %H:%M:%S"), stamp))
+
+ok = True
+
+r = run(["git", "add", MARKER_REL])
+if r.returncode != 0:
+    ok = False
+    print("FAIL: git add failed:", r.stderr.strip())
+
+if ok:
+    r = run(["git", "commit", "-q", "-m", "[sanity-check] Colab push round-trip test ({})".format(stamp)])
+    if r.returncode != 0:
+        ok = False
+        print("FAIL: git commit failed:", (r.stdout + r.stderr).strip())
+
+if ok:
+    r = run(["git", "push", "-q", "origin", "HEAD:{}".format(BRANCH)])
+    if r.returncode != 0:
+        ok = False
+        print("FAIL: git push failed -- check the token has write access to this repo:")
+        print((r.stdout + r.stderr).strip())
+
+if ok:
+    run(["git", "fetch", "-q", "origin", BRANCH])
+    local_head = run(["git", "rev-parse", "HEAD"]).stdout.strip()
+    remote_head = run(["git", "rev-parse", "origin/{}".format(BRANCH)]).stdout.strip()
+    if local_head == remote_head:
+        print("Push confirmed: local HEAD matches origin/{} ({})".format(BRANCH, local_head[:8]))
+    else:
+        ok = False
+        print("FAIL: local HEAD {} != origin/{} {} after push+fetch -- something else "
+              "is pushing to this branch, or the push silently didn't take.".format(
+                  local_head[:8], BRANCH, remote_head[:8]))
+
+# Clean up the marker either way -- a failed test shouldn't leave a stray
+# local commit, and a passed one shouldn't leave permanent litter upstream.
+if os.path.exists(marker_path):
+    os.remove(marker_path)
+run(["git", "add", "-A", MARKER_REL])
+cleanup = run(["git", "commit", "-q", "-m", "[sanity-check] remove push round-trip test marker"])
+if cleanup.returncode == 0:
+    run(["git", "push", "-q", "origin", "HEAD:{}".format(BRANCH)])
+
+print("\\nSANITY CHECK: {}".format(
+    "PASS -- commit+push round-trip confirmed working" if ok
+    else "FAIL -- see errors above; fix before running cell 5 / 5b"))
+"""),
+
+md("""
 ## 5. Run the sweep
 
 Re-runnable and resumable: points already in the CSV are skipped.
