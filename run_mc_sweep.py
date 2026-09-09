@@ -52,6 +52,7 @@ import json
 import math
 import os
 import subprocess
+import sys
 import time
 
 import numpy as np
@@ -263,14 +264,37 @@ def push_with_retry(context):
     # lost (container reclaim, disconnect, etc). Retry with capped backoff
     # for several minutes; if it still can't push, stop the whole sweep
     # loudly instead of silently moving on and leaving this stranded local-only.
+    #
+    # Push HEAD explicitly (not the local branch name) so this works the same
+    # whether this process is the main worktree (local branch == BRANCH) or a
+    # sibling worktree running a different model concurrently, which is on
+    # its own local branch pointed at the same remote BRANCH -- see
+    # PARALLEL_MC_SWEEP notes.
     delays = (0, 2, 4, 8, 16, 30, 60, 60, 60, 60)
     for attempt, delay in enumerate(delays, 1):
         if delay:
             time.sleep(delay)
-        r = subprocess.run(['git', 'push', '-q', 'origin', BRANCH], cwd=repo_dir())
+        r = subprocess.run(['git', 'push', '-q', 'origin', f'HEAD:{BRANCH}'], cwd=repo_dir())
         if r.returncode == 0:
             return
         print(f'[git] push attempt {attempt}/{len(delays)} failed for {context}', flush=True)
+
+        # The expected cause when multiple sweep processes push to the same
+        # branch concurrently: a sibling committed and pushed its own point
+        # first, making this push non-fast-forward. Every commit here is a
+        # pure append (one new CSV row, one model's own weights file), so
+        # rebasing onto the new tip essentially never conflicts -- do that
+        # and let the next loop iteration retry the push.
+        subprocess.run(['git', 'fetch', '-q', 'origin', BRANCH], cwd=repo_dir())
+        rebase = subprocess.run(['git', 'rebase', f'origin/{BRANCH}'],
+                                 cwd=repo_dir(), capture_output=True, text=True)
+        if rebase.returncode != 0:
+            subprocess.run(['git', 'rebase', '--abort'], cwd=repo_dir())
+            raise RuntimeError(
+                f'git rebase onto origin/{BRANCH} failed for {context} (not a '
+                f'plain non-fast-forward push failure) -- aborted the rebase '
+                f'rather than risk a broken tree; needs manual resolution. '
+                f'{rebase.stdout.strip()} {rebase.stderr.strip()}')
 
     raise RuntimeError(
         f'git push failed after {len(delays)} attempts for {context} -- '
@@ -513,6 +537,21 @@ def run_point(model_name, detector_method, snr, min_reps, max_reps, max_bits, st
 
 
 def main():
+    # Optional: python run_mc_sweep.py <ModelName> restricts this process to
+    # one model, so it can run concurrently with sibling processes (each in
+    # its own worktree -- see PARALLEL_MC_SWEEP notes) covering the other
+    # models, instead of this one process working through all of them in
+    # sequence. Point-level commit/push and checkpointing are unaffected;
+    # only which models this particular process considers is scoped.
+    models = MODELS
+    if len(sys.argv) > 1:
+        wanted = sys.argv[1]
+        models = [m for m in MODELS if m[0] == wanted]
+        if not models:
+            valid = ', '.join(m[0] for m in MODELS)
+            raise SystemExit(f'Unknown model {wanted!r} -- choose one of: {valid}')
+        print(f'[filter] restricting this process to model={wanted}', flush=True)
+
     ensure_header()
     done = already_done()
     print(f'Already completed points: {sorted(done)}', flush=True)
@@ -523,7 +562,7 @@ def main():
     # sweep has to finish before the other model's points at the same SNR
     # are even attempted.
     for snr in SNR_VALUES:
-        for model_name, detector_method, min_reps, max_reps, max_bits, step in MODELS:
+        for model_name, detector_method, min_reps, max_reps, max_bits, step in models:
             key = (model_name, snr)
             if key in done:
                 print(f'[skip] {model_name} snr={snr} already in CSV', flush=True)
