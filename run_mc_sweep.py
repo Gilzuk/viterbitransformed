@@ -1,6 +1,7 @@
 """
-Higher-MC validation sweep: ClassicViterbi and Viterbi-Transformer over SNR
-0-17, evaluating each with an SNR-adaptive number of repetitions so every
+Higher-MC validation sweep: ClassicViterbi, ViterbiNet, and the
+Viterbi-Transformer over SNR 0-17, evaluating each with an SNR-adaptive
+number of repetitions so every
 point actually observes a meaningful number of errors, rather than a fixed
 rep count that silently floors to a meaningless "0" once the true SER drops
 below what that many bits can resolve.
@@ -91,6 +92,17 @@ THIN_ERROR_THRESHOLD = 10
 # 0ad20cd; that is a 5.7x end-to-end speedup, not the 224x that applies to
 # estimate_channel alone.)
 #
+# ViterbiNet's max_bits (100_000, matching Transformer) is an UNCALIBRATED
+# placeholder -- no run has completed on this branch yet. It is included
+# because the data-cache bug invalidated its old n=84 baseline
+# (Results/metrics/model_performance_final_mc_83.csv) too -- the paper's
+# three-way comparison needs all three detectors measured under the fix, and
+# it is already in the Colab branch's MODELS list for the same reason. Check
+# the first [done] log line's run_time_sec once this actually runs, recompute
+# bits/sec, and raise or lower max_bits to target a similar per-point budget
+# as the other two -- do not leave this unexamined after the first real
+# timing comes back.
+#
 # What this does and does not buy: ~100 errors needs ~100/SER bits, so
 # SNR<=13 (SER >= 5.5e-6) now reaches a full 100 errors. The error floor at
 # SNR>=14 (SER < 5e-7) would need ~2e8 bits = 31.5 h for ONE point, so those
@@ -99,6 +111,7 @@ THIN_ERROR_THRESHOLD = 10
 # sampling, or a much faster detector implementation.
 MODELS = [
     ('Transformer', 'ModelBased', 20, 30, 100_000, 5),
+    ('ViterbiNet', 'ModelBased', 20, 30, 100_000, 5),
     ('ClassicViterbi', 'Statistical', 100, 500, 20_000_000, 100),
 ]
 BRANCH = 'claude/transformer-sionna-mlp-comparison-wc67zp'
