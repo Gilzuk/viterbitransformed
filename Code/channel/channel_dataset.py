@@ -5,7 +5,7 @@ from Code.ecc.rs_main import encode
 from Code.channel.data_cache import ChannelDataCache
 from torch.utils.data import Dataset
 from numpy.random import mtrand
-from typing import Tuple, List
+from typing import Tuple, List, Optional
 import numpy as np
 import torch
 
@@ -17,16 +17,6 @@ print(device)
 
 # Global cache instance
 _data_cache = ChannelDataCache()
-
-# Only the first CACHE_MAX_REP repetitions of a point are persisted to disk.
-# Each cached draw is ~0.24 MB, so a high-SNR point running 100k repetitions
-# (needed to accumulate errors down at the error floor) would otherwise write
-# ~23 GB of cache files and fill the disk. Caching the opening repetitions
-# still gives the useful property -- different models evaluated at the same
-# rep index see the same channel draw, so comparisons stay paired -- while
-# the long tail is generated fresh and simply not persisted.
-CACHE_MAX_REP = 200
-
 
 class ChannelModelDataset(Dataset):
     """
@@ -47,7 +37,8 @@ class ChannelModelDataset(Dataset):
                  n_symbols: int,
                  fading_in_channel: bool,
                  fading_in_decoder: bool,
-                 phase: str):
+                 phase: str,
+                 cache_rep_limit_exclusive: Optional[int] = 200):
 
         self.block_length = block_length
         self.transmission_length = transmission_length
@@ -64,6 +55,7 @@ class ChannelModelDataset(Dataset):
         self.n_symbols = n_symbols
         self.phase = phase
         self.use_cache = True  # Enable caching by default
+        self.cache_rep_limit_exclusive = cache_rep_limit_exclusive
         if use_ecc:
             self.encoding = lambda b: encode(b, self.n_symbols)
         else:
@@ -124,8 +116,16 @@ class ChannelModelDataset(Dataset):
         training set reused across minibatches) simply omit it.
         """
 
-        # Check if we can use cache for all SNRs
-        if self.use_cache and len(snr_list) == 1 and (rep is None or rep < CACHE_MAX_REP):
+        # Check if we can use cache for all SNRs. Ordinary single-SNR calls
+        # with rep omitted keep the original cache behavior; only explicit
+        # repeated-evaluation reps are keyed and bounded by
+        # cache_rep_limit_exclusive (a zero-based exclusive upper bound).
+        can_cache = self.use_cache and len(snr_list) == 1
+        if rep is not None:
+            can_cache = (can_cache and
+                         (self.cache_rep_limit_exclusive is None or
+                          rep < self.cache_rep_limit_exclusive))
+        if can_cache:
             snr = snr_list[0]
             # The fading flag actually used by get_snr_data depends on the phase
             fading = self.fading_in_channel if self.phase == 'val' else self.fading_in_decoder
@@ -140,9 +140,10 @@ class ChannelModelDataset(Dataset):
                 noisy_est_var=self.noisy_est_var,
                 fading_taps_type=self.fading_taps_type,
                 n_symbols=self.n_symbols,
-                fading=fading,
-                rep=rep
+                fading=fading
             )
+            if rep is not None:
+                cache_params['rep'] = rep
             cache_filename = _data_cache.get_cache_filename(**cache_params)
 
             # Validate cache exists and matches parameters

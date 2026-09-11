@@ -1,10 +1,10 @@
 """
-Higher-MC validation sweep: ClassicViterbi, ViterbiNet, and the
-Viterbi-Transformer over SNR 0-17, evaluating each with an SNR-adaptive
-number of repetitions so every
-point actually observes a meaningful number of errors, rather than a fixed
-rep count that silently floors to a meaningless "0" once the true SER drops
-below what that many bits can resolve.
+Higher-MC validation sweep (Colab/GPU configuration): ClassicViterbi,
+ViterbiNet, and the Viterbi-Transformer over SNR 0-17, evaluating each with
+an SNR-adaptive number of repetitions so every point actually observes a
+meaningful number of errors, rather than a fixed rep count that silently
+floors to a meaningless "0" once the true SER drops below what that many
+bits can resolve.
 
 Sizing method (per point):
   1. Predict the SER at this SNR with Q(sqrt(2*snr_eff_linear)), where
@@ -39,13 +39,73 @@ Sizing method (per point):
      luck), the point is kept and flagged `[thin]` in the log -- its CI is
      real but wide.
 
-Commits and pushes Results/metrics/mc_sweep_validation.csv after every
-completed (model, snr) point, so a container reset loses at most one point.
-Any existing row with ser_mean==0.0 is treated as not-done and re-run under
-this adaptive scheme (that is exactly the floor artifact this rewrite
-fixes) -- everything else already in the CSV is left alone.
+On CPU, ClassicViterbi was ~6.5s/rep before the COST2100 tap-load cache fix
+(now ~0.02s/rep); the Transformer's and ViterbiNet's self-supervised online
+training fires on almost every word during each eval rep, making each rep
+on the order of minutes there -- see COLAB_MC_SWEEP.md for why this copy of
+the script targets a GPU runtime instead.
 
-Run standalone: python run_mc_sweep.py
+ClassicViterbi's max_bits (20M) is copied from the CPU branch's
+measured-throughput calibration: the COST2100 tap-load cache fix is CPU
+logic, not GPU-dependent, so the same throughput should transfer here.
+
+ViterbiNet and Transformer max_bits (2M) are an UNCALIBRATED placeholder --
+no run has completed on this branch yet, so GPU throughput for their
+per-word online-training backprop is unknown. Check the first [done] log
+lines' run_time_sec once this actually runs, recompute bits/sec, and raise
+or lower max_bits to target a similar few-hours-per-point budget as
+ClassicViterbi -- do not leave this unexamined after the first real timing
+comes back.
+
+ViterbiNet is included because the cache bug invalidated its old n=84
+baseline too, so the paper's three-way comparison still needs it under the
+fixed pipeline.
+
+RESILIENCE (this matters a lot more here than on a persistent machine --
+a Colab runtime is ephemeral: on disconnect/restart, everything not already
+pushed to GitHub is gone, full stop):
+  - Every completed (model, snr) point is committed AND pushed to the
+    mc-sweep-colab-gpu branch before moving to the next point. Training a
+    model-based method's weights are ALSO committed+pushed the moment
+    training finishes, before the (often much longer) eval-rep phase runs
+    -- see commit_weights_snapshot().
+  - If push fails, it is retried with capped backoff for several minutes;
+    if it still fails, the script stops immediately (raises) rather than
+    silently continuing and leaving that point committed-but-unpushed
+    (which a Colab restart would then drop entirely).
+  - On (re)start, already_done() reads the CSV already on disk (i.e. after
+    re-cloning the branch, which carries every point pushed so far) and
+    skips every point already present, so a rerun after a disconnect
+    resumes from the last pushed point instead of starting over from SNR=0.
+    Re-running this script (e.g. re-running the notebook cell after a
+    reconnect) is therefore always safe and always cheap for already-done
+    points.
+  - Within a point, an extend round can be thousands of reps in a single
+    trainer call that does not return for hours. run_point() also
+    checkpoints per-rep SER means to disk after every `step`-sized chunk
+    and resumes from that checkpoint if this process restarts mid-point,
+    so a restart loses at most one chunk instead of the whole point. This
+    checkpoint is local-only (not committed to git, see .gitignore) --
+    it does not survive a full Colab disconnect, only a restart of this
+    process on the same runtime. It is discarded (not resumed) for
+    model-based methods, because their training step always reruns from
+    scratch on a restart -- resuming eval reps computed against the
+    PREVIOUS training run's weights would silently blend two different
+    trained models into one point's statistics. Only the eval phase is
+    lost on such a restart, not the checkpoint's correctness.
+
+PARALLEL RUNS: python run_mc_sweep.py <ModelName> restricts this process to
+one model, so three notebook cells (one per model, each in its own cloned
+copy of this branch) can run concurrently on the same GPU runtime instead of
+one process working through all three in sequence -- a single slow or
+restart-prone point in one model no longer blocks progress on the others.
+See the notebook's "Run in parallel" section. Point-level commit/push is
+safe under this: push_with_retry rebases onto the latest origin tip before
+retrying a failed push, and every commit here is a pure append (one new CSV
+row, one model's own weights file), so rebasing one clean append onto
+another's essentially never conflicts.
+
+Run standalone: python run_mc_sweep.py [ModelName]
 """
 import csv
 import json
@@ -61,7 +121,7 @@ import torch
 from Code.dir_definitions import RESULTS_DIR, WEIGHTS_DIR
 from Code.trainer import Trainer
 
-CSV_PATH = os.path.join(RESULTS_DIR, 'metrics', 'mc_sweep_validation.csv')
+CSV_PATH = os.path.join(RESULTS_DIR, 'metrics', 'mc_sweep_validation_colab.csv')
 FIELDNAMES = ['model', 'snr', 'ser_mean', 'ser_std', 'ser_ci95', 'n_reps',
               'words_run', 'bits_run', 'errors_observed', 'censored',
               'model_size', 'run_time_sec']
@@ -86,36 +146,34 @@ THIN_ERROR_THRESHOLD = 10
 #                 away when the first error never comes.
 #   step       -- minimum rep increment while extending
 #
-# Sizing max_bits, from MEASURED throughput on this box (2000 bits/rep):
-#   ClassicViterbi  1.15 s/rep = ~1760 bits/s  -> 2e7 bits = 3.2 h/point
-#   Transformer     ~210 s/rep = ~9.5 bits/s   -> 1e5 bits = 2.9 h/point
-# (ClassicViterbi was 6.5 s/rep before the COST2100 tap-load cache in
-# 0ad20cd; that is a 5.7x end-to-end speedup, not the 224x that applies to
-# estimate_channel alone.)
+# ClassicViterbi's max_bits (20M) is copied from the CPU branch's
+# measured-throughput calibration: the COST2100 tap-load cache fix is CPU
+# logic, not GPU-dependent, so the same throughput should transfer here.
 #
-# ViterbiNet's max_bits (100_000, matching Transformer) is an UNCALIBRATED
-# placeholder -- no run has completed on this branch yet. It is included
-# because the data-cache bug invalidated its old n=84 baseline
-# (Results/metrics/model_performance_final_mc_83.csv) too -- the paper's
-# three-way comparison needs all three detectors measured under the fix, and
-# it is already in the Colab branch's MODELS list for the same reason. Check
-# the first [done] log line's run_time_sec once this actually runs, recompute
-# bits/sec, and raise or lower max_bits to target a similar per-point budget
-# as the other two -- do not leave this unexamined after the first real
-# timing comes back.
+# ViterbiNet and Transformer max_bits (2M) are an UNCALIBRATED placeholder --
+# no run has completed on this branch yet, so GPU throughput for their
+# per-word online-training backprop is unknown. Check the first [done] log
+# lines' run_time_sec once this actually runs, recompute bits/sec, and raise
+# or lower max_bits to target a similar few-hours-per-point budget as
+# ClassicViterbi -- do not leave this unexamined after the first real timing
+# comes back.
 #
-# What this does and does not buy: ~100 errors needs ~100/SER bits, so
-# SNR<=13 (SER >= 5.5e-6) now reaches a full 100 errors. The error floor at
-# SNR>=14 (SER < 5e-7) would need ~2e8 bits = 31.5 h for ONE point, so those
-# stay censored -- but at 2e7 bits their upper bound tightens 10x, to
-# ~1.5e-7. Brute force cannot reach the floor here; that needs importance
-# sampling, or a much faster detector implementation.
+# ViterbiNet is included because the cache bug invalidated its old n=84
+# baseline (Results/metrics/model_performance_final_mc_83.csv) too -- the
+# paper's three-way comparison needs all three detectors measured under the fix.
 MODELS = [
-    ('Transformer', 'ModelBased', 20, 30, 100_000, 5),
-    ('ViterbiNet', 'ModelBased', 20, 30, 100_000, 5),
     ('ClassicViterbi', 'Statistical', 100, 500, 20_000_000, 100),
+    ('ViterbiNet', 'ModelBased', 20, 30, 2_000_000, 5),
+    ('Transformer', 'ModelBased', 20, 30, 2_000_000, 5),
 ]
-BRANCH = 'claude/transformer-sionna-mlp-comparison-wc67zp'
+BRANCH = 'mc-sweep-colab-gpu'
+# Set MC_SWEEP_NO_GIT=1 to skip every git commit/push in this file entirely
+# and rely on RESULTS_DIR/WEIGHTS_DIR pointing at persistent storage instead
+# (e.g. a Google Drive mount symlinked over Results/ before this runs) --
+# for when GitHub push access isn't available. Results are then only as
+# durable as wherever those directories actually live; nothing here backs
+# them up a second way.
+NO_GIT = os.environ.get('MC_SWEEP_NO_GIT') == '1'
 
 
 # Effective-SNR penalty of the ISI channel relative to ideal single-tap AWGN.
@@ -256,7 +314,7 @@ def weights_dir_for(model_name, detector_method):
     method_name = f'{model_name}_{detector_method}'
     return os.path.join(
         WEIGHTS_DIR,
-        f'{method_name}_training_120_2_channel1_cost2100_mcsweep')
+        f'{method_name}_training_120_2_channel1_cost2100_mcsweep_colab')
 
 
 def push_with_retry(context):
@@ -308,6 +366,8 @@ def commit_weights_snapshot(model_name, detector_method, snr):
     this, a freshly-written weights file sits untracked on disk for the
     whole point's runtime, not just the training step's -- narrowing that
     window means training output is never far from being pushed."""
+    if NO_GIT:
+        return
     weights_dir = weights_dir_for(model_name, detector_method)
     if not os.path.isdir(weights_dir):
         return
@@ -327,6 +387,11 @@ def commit_weights_snapshot(model_name, detector_method, snr):
 
 
 def commit_and_push(model, detector_method, snr):
+    if NO_GIT:
+        print(f'[git] skipped (MC_SWEEP_NO_GIT=1) for {model} snr={snr} -- '
+              f'relying on RESULTS_DIR/WEIGHTS_DIR for persistence instead', flush=True)
+        return
+
     # Other models' weight checkpoints are already tracked in this repo (see
     # Results/weights/*), so this sweep's are too -- add them alongside the
     # CSV row so each point's commit is atomic and a training run this sweep
@@ -334,7 +399,7 @@ def commit_and_push(model, detector_method, snr):
     # no-op here: commit_weights_snapshot already committed them right after
     # training, before the eval-rep phase ran.)
     weights_dir = weights_dir_for(model, detector_method)
-    add_paths = ['Results/metrics/mc_sweep_validation.csv']
+    add_paths = ['Results/metrics/mc_sweep_validation_colab.csv']
     if os.path.isdir(weights_dir):
         add_paths.append(os.path.relpath(weights_dir, repo_dir()))
     subprocess.run(['git', 'add'] + add_paths, check=True, cwd=repo_dir())

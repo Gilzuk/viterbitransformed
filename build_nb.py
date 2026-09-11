@@ -1,0 +1,468 @@
+"""Generates run_mc_sweep_colab.ipynb. Kept in-tree so the notebook can be
+regenerated rather than hand-edited as JSON."""
+import json
+
+def _lines(src):
+    """ipynb `source` is a list of lines that each KEEP their trailing newline
+    (all but the last). Splitting without keepends silently concatenates every
+    line into one when the notebook is opened."""
+    lines = src.strip("\n").split("\n")
+    return [l + "\n" for l in lines[:-1]] + [lines[-1]]
+
+def md(src):
+    return {"cell_type": "markdown", "metadata": {}, "source": _lines(src)}
+
+def code(src):
+    return {"cell_type": "code", "execution_count": None, "metadata": {},
+            "outputs": [], "source": _lines(src)}
+
+cells = [
+md("""
+# MC-sweep validation on Colab (GPU)
+
+Runs `run_mc_sweep.py` over SNR 0-17 for three detectors -- **ClassicViterbi**
+(perfect-CSI reference), **ViterbiNet**, and the **Viterbi-Transformer** -- at
+25 independent Monte-Carlo repetitions per point.
+
+Results are appended to `Results/metrics/mc_sweep_validation_colab.csv` and
+**committed + pushed after every completed `(model, snr)` point**, on the
+`mc-sweep-colab-gpu` branch.
+
+### If Colab disconnects
+Nothing already pushed is lost, and a rerun does **not** start over. Just
+re-run cells 1-5: the clone pulls back every point pushed so far, and the
+script skips those and continues from the next one. At most the single
+in-progress point is lost.
+
+See `COLAB_MC_SWEEP.md` in this repo for the background (including the
+data-cache bug that made every repetition identical, and the ISI-aware
+sizing predictor).
+"""),
+
+md("## 1. Clone (or update) the branch"),
+code("""
+import os
+
+REPO_DIR = "/content/viterbitransformed"
+BRANCH   = "mc-sweep-colab-gpu"
+REPO_URL = "https://github.com/Gilzuk/viterbitransformed.git"
+
+if not os.path.exists(REPO_DIR):
+    !git clone --branch {BRANCH} {REPO_URL} {REPO_DIR}
+else:
+    # Already present (e.g. re-running after a reconnect): fast-forward so we
+    # pick up every point pushed before the disconnect.
+    !cd {REPO_DIR} && git fetch origin {BRANCH} && git checkout {BRANCH} && git pull --ff-only origin {BRANCH}
+
+%cd {REPO_DIR}
+!git log --oneline -1
+"""),
+
+md("## 2. Install dependencies"),
+code("""
+!pip install -q numpy scipy matplotlib pandas psutil tqdm
+# torch/torchvision are preinstalled on Colab GPU runtimes; only install if missing.
+import importlib
+if importlib.util.find_spec("torch") is None:
+    !pip install -q torch torchvision torchaudio
+import torch
+print("torch", torch.__version__)
+"""),
+
+md("""
+## 3. Verify GPU
+
+If this prints `NO GPU`, stop and set **Runtime > Change runtime type > GPU**,
+then re-run from cell 1. Running this on a Colab CPU is slower than useless --
+that is the whole reason for using Colab here.
+"""),
+code("""
+import torch
+if torch.cuda.is_available():
+    print("GPU:", torch.cuda.get_device_name(0))
+    print("CUDA:", torch.version.cuda)
+    print("Memory: %.1f GB" % (torch.cuda.get_device_properties(0).total_memory / 1024**3))
+else:
+    print("NO GPU -- set Runtime > Change runtime type > GPU and re-run from cell 1")
+"""),
+
+md("""
+## 4. Git identity + push credentials
+
+The sweep pushes after every point, so this has to work *before* the long run
+starts -- the last cell here does a `--dry-run` push to prove it does, rather
+than discovering a credentials problem hours in.
+
+This repo being public only means anyone can *read* it without credentials --
+GitHub still requires a credential to *push*, public or not. A fine-grained
+PAT with **Contents: read and write** on this repo is the credential; the
+only thing public-vs-private changes is that the PAT needs no other scope.
+
+**One-time setup** (persists across sessions, so you only do this once):
+1. Click the key icon (**Secrets**) in the left sidebar of Colab.
+2. Add a new secret named `GITHUB_TOKEN`, value = your fine-grained PAT.
+3. Toggle **Notebook access** on for it.
+
+If the secret isn't there, this cell falls back to pasting the token in by
+hand for this session only.
+"""),
+code("""
+!git config user.email "gil.zukerman@gmail.com"
+!git config user.name "Gil Zukerman"
+
+token = None
+try:
+    from google.colab import userdata
+    token = userdata.get("GITHUB_TOKEN")
+    print("Using GITHUB_TOKEN from Colab Secrets.")
+except Exception:
+    pass
+
+if not token:
+    from getpass import getpass
+    print("No GITHUB_TOKEN secret found -- see cell 4's setup steps to avoid")
+    print("pasting this in every session.")
+    token = getpass("GitHub token (fine-grained PAT, Contents: read+write): ")
+
+# Note this still writes the token into .git/config on this (ephemeral)
+# runtime, same as pasting it in -- Secrets only avoids retyping it.
+!git remote set-url origin https://{token}@github.com/Gilzuk/viterbitransformed.git
+
+# Prove push auth works now, before committing hours of compute to it.
+print("\\n--- verifying push access (dry run) ---")
+!git push --dry-run origin {BRANCH} && echo "PUSH OK -- credentials work" || echo "PUSH FAILED -- fix the token before running cell 5"
+"""),
+
+md("""
+## 4b. Sanity test: a real commit + push round-trip
+
+The dry run above only proves the *credential* works -- it does not commit
+or push anything. This cell does a real end-to-end round trip (write a tiny
+marker file, commit it, push it, confirm it actually landed on
+`mc-sweep-colab-gpu`, then remove it) so a problem the dry run can't see --
+a rejected commit, a protected branch, a token that can authenticate but
+not write -- shows up now, in 10 seconds, instead of after training has
+been running for an hour.
+"""),
+code("""
+import os, subprocess, time, uuid
+
+def run(cmd):
+    return subprocess.run(cmd, cwd=REPO_DIR, text=True, capture_output=True)
+
+MARKER_REL = "Results/metrics/.colab_push_sanity_check.txt"
+marker_path = os.path.join(REPO_DIR, MARKER_REL)
+stamp = uuid.uuid4().hex[:12]
+os.makedirs(os.path.dirname(marker_path), exist_ok=True)
+with open(marker_path, "w") as f:
+    f.write("colab push sanity check -- {} -- {}\\n".format(
+        time.strftime("%Y-%m-%d %H:%M:%S"), stamp))
+
+ok = True
+
+r = run(["git", "add", MARKER_REL])
+if r.returncode != 0:
+    ok = False
+    print("FAIL: git add failed:", r.stderr.strip())
+
+if ok:
+    r = run(["git", "commit", "-q", "-m", "[sanity-check] Colab push round-trip test ({})".format(stamp)])
+    if r.returncode != 0:
+        ok = False
+        print("FAIL: git commit failed:", (r.stdout + r.stderr).strip())
+
+if ok:
+    r = run(["git", "push", "-q", "origin", "HEAD:{}".format(BRANCH)])
+    if r.returncode != 0:
+        ok = False
+        print("FAIL: git push failed -- check the token has write access to this repo:")
+        print((r.stdout + r.stderr).strip())
+
+if ok:
+    run(["git", "fetch", "-q", "origin", BRANCH])
+    local_head = run(["git", "rev-parse", "HEAD"]).stdout.strip()
+    remote_head = run(["git", "rev-parse", "origin/{}".format(BRANCH)]).stdout.strip()
+    if local_head == remote_head:
+        print("Push confirmed: local HEAD matches origin/{} ({})".format(BRANCH, local_head[:8]))
+    else:
+        ok = False
+        print("FAIL: local HEAD {} != origin/{} {} after push+fetch -- something else "
+              "is pushing to this branch, or the push silently didn't take.".format(
+                  local_head[:8], BRANCH, remote_head[:8]))
+
+# Clean up the marker either way -- a failed test shouldn't leave a stray
+# local commit, and a passed one shouldn't leave permanent litter upstream.
+if os.path.exists(marker_path):
+    os.remove(marker_path)
+run(["git", "add", "-A", MARKER_REL])
+cleanup = run(["git", "commit", "-q", "-m", "[sanity-check] remove push round-trip test marker"])
+if cleanup.returncode == 0:
+    run(["git", "push", "-q", "origin", "HEAD:{}".format(BRANCH)])
+
+print("\\nSANITY CHECK: {}".format(
+    "PASS -- commit+push round-trip confirmed working" if ok
+    else "FAIL -- see errors above; fix before running cell 5 / 5b"))
+"""),
+
+md("""
+## 4c. No GitHub access? Save to Google Drive instead
+
+An alternative to cells 4/4b, for when push access to this repo isn't
+available at all (wrong token scope, no write access, etc.) -- skip them
+and run this instead. Cell 1's clone still works either way (reading a
+public repo needs no credential); this cell only replaces how *results*
+persist.
+
+`Results/` (where the CSV, per-model weights, and mid-point checkpoints all
+live) becomes a symlink into your Google Drive, and `MC_SWEEP_NO_GIT=1`
+tells `run_mc_sweep.py` to skip every commit/push and rely on that instead.
+Every point still lands on disk the moment it finishes -- just in your
+Drive instead of on GitHub -- so a disconnect still only costs the one
+point in flight. The trade-off: results sit only in your Drive, not shared
+via the repo, until you upload `mc_sweep_validation_colab.csv` yourself.
+"""),
+code("""
+from google.colab import drive
+drive.mount("/content/drive")
+
+import os, shutil
+
+DRIVE_RESULTS = "/content/drive/MyDrive/viterbitransformed_mc_sweep_results"
+os.makedirs(DRIVE_RESULTS, exist_ok=True)
+
+if os.path.islink("Results"):
+    print("Results/ is already a symlink -- nothing to do.")
+else:
+    if os.path.exists("Results"):
+        # Keep whatever the clone already pulled in (earlier committed points,
+        # if any) by moving it into the Drive folder rather than discarding it.
+        for item in os.listdir("Results"):
+            src, dst = os.path.join("Results", item), os.path.join(DRIVE_RESULTS, item)
+            if not os.path.exists(dst):
+                shutil.move(src, dst)
+        shutil.rmtree("Results")
+    os.symlink(DRIVE_RESULTS, "Results")
+
+os.environ["MC_SWEEP_NO_GIT"] = "1"
+print("Results/ ->", os.path.realpath("Results"))
+print("Git commit/push is now skipped -- results persist to Google Drive instead.")
+"""),
+
+md("""
+## 5. Run the sweep
+
+Re-runnable and resumable: points already in the CSV are skipped.
+
+The full log goes to `/content/mc_sweep.log`; only the meaningful progress
+lines are shown here, since the raw output includes per-word training chatter
+and would otherwise be megabytes of scrollback.
+"""),
+code("""
+import re, subprocess, sys
+
+LOG = "/content/mc_sweep.log"
+# Progress lines worth surfacing, plus anything that indicates a stop -- a
+# failed push raises, and its traceback must not be filtered out of view.
+KEEP = re.compile(r"\\[run\\]|\\[plan\\]|\\[done\\]|\\[skip\\]|\\[extend\\]|\\[censored\\]"
+                  r"|\\[git\\]|\\[ERROR\\]|All points complete"
+                  r"|Traceback|Error|Exception")
+
+with open(LOG, "w") as log:
+    proc = subprocess.Popen(["python", "-u", "run_mc_sweep.py"],
+                            stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                            text=True, bufsize=1)
+    for line in proc.stdout:
+        log.write(line)
+        # tqdm redraws with \\r; keep only the last redraw of a chunk so the
+        # notebook does not accumulate megabytes of progress-bar scrollback.
+        tail = line.rsplit("\\r", 1)[-1]
+        if KEEP.search(tail):
+            print(tail.rstrip())
+            sys.stdout.flush()
+    proc.wait()
+
+print("\\n--- exit code %d ---" % proc.returncode)
+print("full log: %s" % LOG)
+"""),
+
+md("""
+## 5b. Or: run all three models in parallel instead
+
+An alternative to cell 5, not an addition to it -- pick one. A single GPU
+runtime has one accelerator but plenty of spare RAM/disk, so `ClassicViterbi`,
+`ViterbiNet`, and `Transformer` can each run as their own process instead of
+one process working through all three in sequence, where a single slow or
+restart-prone point in one model (Transformer's online training is the
+slowest) blocks progress on the other two even though they have nothing to
+do with why that point is stuck.
+
+Each model gets its own full clone of this branch (simpler and safer in a
+notebook than a shared working directory three processes would all write
+CSV rows and weights files into at once) and its own log file. Commits from
+all three land on the same `mc-sweep-colab-gpu` branch -- `push_with_retry`
+in `run_mc_sweep.py` rebases onto the latest tip before retrying a failed
+push, and every commit here is a pure append (one new CSV row, one model's
+own weights file), so this doesn't collide in practice.
+
+If you're on the Drive path (cell 4c) instead of git, note that only applies
+to the clone cell 1 made -- the two extra clones this cell creates each get
+their own local (non-Drive) `Results/`, so only the model running in the
+original clone persists to Drive across a disconnect. Symlink each extra
+clone's `Results/` into its own Drive subfolder first if you need all three
+to survive one.
+"""),
+code("""
+import os, subprocess
+
+PARALLEL_MODELS = ["ClassicViterbi", "ViterbiNet", "Transformer"]
+base_dir = os.getcwd()
+parallel_dirs = {PARALLEL_MODELS[0]: base_dir}
+
+have_token = "token" in globals() and token
+
+for model in PARALLEL_MODELS[1:]:
+    clone_dir = base_dir + "_" + model.lower()
+    if not os.path.exists(clone_dir):
+        # Cloning only reads a public repo -- no credential needed for this
+        # part, so this works whether you set up git (cell 4/4b) or Drive
+        # (cell 4c) instead.
+        subprocess.run(["git", "clone", "--branch", BRANCH, REPO_URL, clone_dir], check=True)
+    subprocess.run(["git", "-C", clone_dir, "config", "user.email", "gil.zukerman@gmail.com"], check=True)
+    subprocess.run(["git", "-C", clone_dir, "config", "user.name", "Gil Zukerman"], check=True)
+    if have_token:
+        # Only this clone's pushes need the token -- irrelevant on the Drive
+        # path, where MC_SWEEP_NO_GIT=1 (inherited from cell 4c) skips every
+        # push anyway.
+        subprocess.run(["git", "-C", clone_dir, "remote", "set-url", "origin",
+                        "https://{}@github.com/Gilzuk/viterbitransformed.git".format(token)],
+                        check=True)
+    parallel_dirs[model] = clone_dir
+
+if not have_token:
+    print("No 'token' from cells 4/4b -- these clones won't push (fine on the "
+          "Drive path from cell 4c; if you meant to use git, run cell 4 first).")
+
+parallel_procs = {}
+parallel_logs = {}
+for model, d in parallel_dirs.items():
+    log_path = "/content/mc_sweep_{}.log".format(model.lower())
+    logf = open(log_path, "w")
+    proc = subprocess.Popen(["python", "-u", "run_mc_sweep.py", model],
+                            cwd=d, stdout=logf, stderr=subprocess.STDOUT)
+    parallel_procs[model] = proc
+    parallel_logs[model] = (log_path, logf)
+    print("started {} (pid {}) in {} -- log: {}".format(model, proc.pid, d, log_path))
+"""),
+md("Watch progress across all three (interrupt any time -- the processes keep running; re-run this cell to keep watching):"),
+code("""
+import re, time
+
+KEEP = re.compile(r"\\[run\\]|\\[plan\\]|\\[resume\\]|\\[done\\]|\\[skip\\]|\\[extend\\]"
+                  r"|\\[censored\\]|\\[thin\\]|\\[git\\]|\\[ERROR\\]|All points complete"
+                  r"|Traceback|Error|Exception")
+positions = {model: 0 for model in parallel_procs}
+
+try:
+    while any(p.poll() is None for p in parallel_procs.values()):
+        for model, (log_path, _) in parallel_logs.items():
+            with open(log_path) as f:
+                f.seek(positions[model])
+                for line in f:
+                    tail = line.rsplit("\\r", 1)[-1]
+                    if KEEP.search(tail):
+                        print("[{}] {}".format(model, tail.rstrip()))
+                positions[model] = f.tell()
+        time.sleep(5)
+except KeyboardInterrupt:
+    print("Stopped watching -- the processes are still running in the background.")
+
+for model, p in parallel_procs.items():
+    code_ = p.poll()
+    print("{}: {}".format(model, "still running" if code_ is None else "exited " + str(code_)))
+"""),
+
+md("## 6. Progress so far"),
+code("""
+import os
+import pandas as pd
+
+CSV = "Results/metrics/mc_sweep_validation_colab.csv"
+if os.path.exists(CSV):
+    df = pd.read_csv(CSV)
+    print("%d point(s) complete" % len(df))
+    if len(df):
+        cols = ["model", "snr", "ser_mean", "ser_ci95", "n_reps",
+                "bits_run", "errors_observed", "censored", "run_time_sec"]
+        display(df[[c for c in cols if c in df.columns]])
+        print("\\nRemaining: %d of %d" % (3 * 18 - len(df), 3 * 18))
+else:
+    print("No results yet -- run cell 5.")
+"""),
+
+md("""
+## 7. Plot (once there is enough data)
+"""),
+code("""
+import os
+import pandas as pd
+import matplotlib.pyplot as plt
+
+CSV = "Results/metrics/mc_sweep_validation_colab.csv"
+if os.path.exists(CSV) and len(pd.read_csv(CSV)):
+    df = pd.read_csv(CSV).sort_values("snr")
+    fig, ax = plt.subplots(figsize=(7, 4.5))
+    for model, g in df.groupby("model"):
+        solid = g[g.censored == 0]
+        ax.errorbar(solid.snr, solid.ser_mean, yerr=solid.ser_ci95,
+                    marker="o", capsize=3, label=model)
+        # censored points are upper bounds, not measurements -- mark them apart
+        cens = g[g.censored == 1]
+        if len(cens):
+            ax.scatter(cens.snr, 1.0 / cens.bits_run, marker="v", s=60,
+                       label="%s (upper bound, 0 errors)" % model)
+    ax.set_yscale("log")
+    ax.set_xlabel("SNR [dB]")
+    ax.set_ylabel("Coded SER")
+    ax.grid(True, which="both", alpha=0.25)
+    ax.legend(fontsize=8)
+    plt.tight_layout()
+    plt.show()
+else:
+    print("No results yet -- run cell 5.")
+"""),
+
+md("""
+## Troubleshooting
+
+**The sweep stopped with a `git push failed` / `git commit failed` error.**
+That is deliberate. A point that is committed locally but never pushed would
+be lost outright when the runtime is reclaimed, so the script stops loudly
+rather than continuing and stranding results. Fix the credentials (cell 4)
+and re-run cell 5 -- it resumes.
+
+**It is slower than expected.** Trim the SNR ladder rather than cutting reps:
+edit `SNR_VALUES` near the top of `run_mc_sweep.py` (the 0-6 dB points sit well
+below the interesting crossover region). Cutting reps below 25 starts to
+compromise the confidence intervals.
+
+**A point reports `censored=1`.** That means zero errors were observed even
+after extending, so its SER is reported as an upper bound (`< 1/bits_run`),
+not a converged zero. That is the honest result at high SNR, not a failure.
+""")
+]
+
+nb = {
+    "cells": cells,
+    "metadata": {
+        "accelerator": "GPU",
+        "colab": {"provenance": [], "toc_visible": True},
+        "kernelspec": {"display_name": "Python 3", "name": "python3"},
+        "language_info": {"name": "python"},
+    },
+    "nbformat": 4,
+    "nbformat_minor": 0,
+}
+
+with open("run_mc_sweep_colab.ipynb", "w") as f:
+    json.dump(nb, f, indent=1)
+print("wrote run_mc_sweep_colab.ipynb with %d cells" % len(cells))
