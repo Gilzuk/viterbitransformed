@@ -38,7 +38,7 @@ class ChannelModelDataset(Dataset):
                  fading_in_channel: bool,
                  fading_in_decoder: bool,
                  phase: str,
-                 cache_max_rep: Optional[int] = 200):
+                 cache_rep_limit_exclusive: Optional[int] = 200):
 
         self.block_length = block_length
         self.transmission_length = transmission_length
@@ -55,7 +55,7 @@ class ChannelModelDataset(Dataset):
         self.n_symbols = n_symbols
         self.phase = phase
         self.use_cache = True  # Enable caching by default
-        self.cache_max_rep = cache_max_rep
+        self.cache_rep_limit_exclusive = cache_rep_limit_exclusive
         if use_ecc:
             self.encoding = lambda b: encode(b, self.n_symbols)
         else:
@@ -116,10 +116,13 @@ class ChannelModelDataset(Dataset):
         training set reused across minibatches) simply omit it.
         """
 
-        # Check if we can use cache for all SNRs. cache_max_rep bounds how many
-        # repeated evaluation draws are persisted to disk; later reps are still
-        # generated, just not cached. Set it to None to cache every rep.
-        can_cache_rep = rep is None or self.cache_max_rep is None or rep < self.cache_max_rep
+        # Check if we can use cache for all SNRs. cache_rep_limit_exclusive
+        # is a zero-based exclusive upper bound on which repeated evaluation
+        # draws are persisted to disk; later reps are still generated, just
+        # not cached. Set it to None to cache every rep.
+        can_cache_rep = (rep is None or
+                         self.cache_rep_limit_exclusive is None or
+                         rep < self.cache_rep_limit_exclusive)
         if self.use_cache and len(snr_list) == 1 and can_cache_rep:
             snr = snr_list[0]
             # The fading flag actually used by get_snr_data depends on the phase
