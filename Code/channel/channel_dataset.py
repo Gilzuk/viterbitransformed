@@ -18,6 +18,15 @@ print(device)
 # Global cache instance
 _data_cache = ChannelDataCache()
 
+# Only the first CACHE_MAX_REP repetitions of a point are persisted to disk.
+# Each cached draw is ~0.24 MB, so a high-SNR point running 100k repetitions
+# (needed to accumulate errors down at the error floor) would otherwise write
+# ~23 GB of cache files and fill the disk. Caching the opening repetitions
+# still gives the useful property -- different models evaluated at the same
+# rep index see the same channel draw, so comparisons stay paired -- while
+# the long tail is generated fresh and simply not persisted.
+CACHE_MAX_REP = 200
+
 
 class ChannelModelDataset(Dataset):
     """
@@ -102,11 +111,21 @@ class ChannelModelDataset(Dataset):
             raise Exception('No such channel defined!!!')
         return y
 
-    def __getitem__(self, snr_list: List[float], gamma: float) -> Tuple[torch.Tensor, torch.Tensor]:
-        """Get data for given SNRs and gamma. Uses cache if available."""
-        
+    def __getitem__(self, snr_list: List[float], gamma: float, rep: int = None) -> Tuple[torch.Tensor, torch.Tensor]:
+        """Get data for given SNRs and gamma. Uses cache if available.
+
+        `rep`, when given, distinguishes independent repeated draws under
+        otherwise-identical parameters -- e.g. Monte-Carlo evaluation
+        repetitions, which are supposed to be independent trials. Without it,
+        every call with the same (snr, gamma, phase, ...) hits the same cache
+        entry and gets back byte-identical data every time, silently
+        collapsing "N repetitions" into one repetition measured N times.
+        Callers that want the old "one fixed draw, reused" behavior (e.g. a
+        training set reused across minibatches) simply omit it.
+        """
+
         # Check if we can use cache for all SNRs
-        if self.use_cache and len(snr_list) == 1:
+        if self.use_cache and len(snr_list) == 1 and (rep is None or rep < CACHE_MAX_REP):
             snr = snr_list[0]
             # The fading flag actually used by get_snr_data depends on the phase
             fading = self.fading_in_channel if self.phase == 'val' else self.fading_in_decoder
@@ -121,7 +140,8 @@ class ChannelModelDataset(Dataset):
                 noisy_est_var=self.noisy_est_var,
                 fading_taps_type=self.fading_taps_type,
                 n_symbols=self.n_symbols,
-                fading=fading
+                fading=fading,
+                rep=rep
             )
             cache_filename = _data_cache.get_cache_filename(**cache_params)
 

@@ -1,10 +1,32 @@
 from Code.dir_definitions import COST2100_DIR
+from functools import lru_cache
 import matplotlib.pyplot as plt
 import numpy as np
 import scipy.io
 import os
 
 COST_LENGTH = 300
+
+
+@lru_cache(maxsize=None)
+def _load_cost2100_taps(memory_length: int) -> np.ndarray:
+    """Load the COST2100 tap traces once and reuse them.
+
+    These are static .mat files on disk, but estimate_channel used to re-read
+    all `memory_length` of them on EVERY call, build the full [300, L] matrix,
+    and then keep a single row. ClassicViterbi calls estimate_channel
+    val_words times per compute_likelihood_priors, and that runs once per
+    word -- 125*125*4 = 62,500 loadmat calls per repetition, which measured at
+    6.5 s/rep and accounted for essentially all of its runtime.
+
+    Returns the shared [COST_LENGTH, memory_length] array; callers must copy
+    any row they intend to mutate (estimate_channel does).
+    """
+    total_h = np.empty([COST_LENGTH, memory_length])
+    for i in range(memory_length):
+        total_h[:, i] = scipy.io.loadmat(os.path.join(COST2100_DIR, f'h_{i}'))[
+            'h_channel_response_mag'].reshape(-1)
+    return total_h
 
 
 def estimate_channel(memory_length: int, gamma: float, channel_coefficients: str, noisy_est_var: float = 0,
@@ -22,11 +44,10 @@ def estimate_channel(memory_length: int, gamma: float, channel_coefficients: str
     if channel_coefficients == 'time_decay':
         h = np.reshape(np.exp(-gamma * np.arange(memory_length)), [1, memory_length])
     elif channel_coefficients == 'cost2100':
-        total_h = np.empty([COST_LENGTH, memory_length])
-        for i in range(memory_length):
-            total_h[:, i] = scipy.io.loadmat(os.path.join(COST2100_DIR, f'h_{i}'))[
-                'h_channel_response_mag'].reshape(-1)
-        h = np.reshape(total_h[index], [1, memory_length])
+        # .copy() is required: the cached matrix is shared across calls, and h
+        # is mutated in place below (noisy_est_var, and the fading branch).
+        total_h = _load_cost2100_taps(memory_length)
+        h = np.reshape(total_h[index], [1, memory_length]).copy()
     else:
         raise ValueError('No such channel_coefficients value!!!')
     #breakpoint()

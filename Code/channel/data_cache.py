@@ -24,27 +24,34 @@ class ChannelDataCache:
                           channel_coefficients: str, phase: str,
                           memory_length: int, noisy_est_var: float,
                           fading_taps_type: int, n_symbols: int,
-                          fading: bool) -> str:
+                          fading: bool, rep: int = None) -> str:
         """Generate unique cache filename based on parameters.
 
         Every parameter that changes the generated data must appear here, otherwise
         data generated under one setting would be silently reused under another.
+
+        `rep` distinguishes independent repeated draws under otherwise-identical
+        parameters (e.g. Monte-Carlo evaluation repetitions) -- omitted (None) by
+        any caller that wants the old "one cached draw, reused" behavior (e.g. a
+        single fixed training/validation set reused across minibatches/models).
         """
+        rep_suffix = f'_rep{rep}' if rep is not None else ''
         filename = (f"data_snr{snr}_gamma{gamma}_bl{block_length}_tl{transmission_length}"
                     f"_w{words}_ch{channel_coefficients}_ml{memory_length}_nev{noisy_est_var}"
-                    f"_ftt{fading_taps_type}_ns{n_symbols}_fad{int(fading)}_{phase}.pkl")
+                    f"_ftt{fading_taps_type}_ns{n_symbols}_fad{int(fading)}{rep_suffix}_{phase}.pkl")
         return str(self.cache_dir / filename)
     
     def cache_exists(self, filename: str) -> bool:
         """Check if cache file exists"""
         return os.path.exists(filename)
     
-    def save_to_cache(self, filename: str, b: np.ndarray, y: np.ndarray, 
-                     snr: float, gamma: float, block_length: int, 
-                     transmission_length: int, words: int, 
+    def save_to_cache(self, filename: str, b: np.ndarray, y: np.ndarray,
+                     snr: float, gamma: float, block_length: int,
+                     transmission_length: int, words: int,
                      channel_coefficients: str, phase: str,
                      memory_length: int, noisy_est_var: float,
-                     fading_taps_type: int, n_symbols: int, fading: bool):
+                     fading_taps_type: int, n_symbols: int, fading: bool,
+                     rep: int = None):
         """Save generated data to cache file with metadata for validation"""
         print(f"[DataCache] Saving to cache: {Path(filename).name}")
         metadata = {
@@ -59,19 +66,20 @@ class ChannelDataCache:
             'noisy_est_var': noisy_est_var,
             'fading_taps_type': fading_taps_type,
             'n_symbols': n_symbols,
-            'fading': fading
+            'fading': fading,
+            'rep': rep
         }
         with open(filename, 'wb') as f:
             pickle.dump({'b': b, 'y': y, 'metadata': metadata}, f, protocol=pickle.HIGHEST_PROTOCOL)
         file_size_mb = os.path.getsize(filename) / (1024 * 1024)
         print(f"[DataCache] Saved {file_size_mb:.2f} MB to disk")
     
-    def validate_cache(self, filename: str, snr: float, gamma: float, 
-                      block_length: int, transmission_length: int, 
+    def validate_cache(self, filename: str, snr: float, gamma: float,
+                      block_length: int, transmission_length: int,
                       words: int, channel_coefficients: str, phase: str,
                       memory_length: int, noisy_est_var: float,
                       fading_taps_type: int, n_symbols: int,
-                      fading: bool) -> bool:
+                      fading: bool, rep: int = None) -> bool:
         """Check if cached file matches expected parameters"""
         if not os.path.exists(filename):
             return False
@@ -99,7 +107,8 @@ class ChannelDataCache:
                 'noisy_est_var': noisy_est_var,
                 'fading_taps_type': fading_taps_type,
                 'n_symbols': n_symbols,
-                'fading': fading
+                'fading': fading,
+                'rep': rep
             }
 
             # Cache files written before these keys existed cannot be trusted
