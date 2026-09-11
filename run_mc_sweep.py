@@ -45,6 +45,20 @@ training fires on almost every word during each eval rep, making each rep
 on the order of minutes there -- see COLAB_MC_SWEEP.md for why this copy of
 the script targets a GPU runtime instead.
 
+Sizing max_bits, from measured throughput on the Colab/GPU box after that
+cache fix:
+  - ClassicViterbi  1.15 s/rep = ~1760 bits/s  -> 2e7 bits = 3.2 h/point
+  - Transformer     ~210 s/rep = ~9.5 bits/s   -> 1e5 bits = 2.9 h/point
+ClassicViterbi's speedup here is the same CPU-side cache win that landed in
+the main branch; the model-based caps remain GPU-focused because their eval
+loop still includes online-training backprop.
+
+ViterbiNet's max_bits (100_000, matching Transformer) is still an
+uncalibrated placeholder until its first real run on this branch completes.
+It stays in the sweep because the data-cache bug invalidated its old n=84
+baseline too, so the paper's three-way comparison still needs it under the
+fixed pipeline.
+
 RESILIENCE (this matters a lot more here than on a persistent machine --
 a Colab runtime is ephemeral: on disconnect/restart, everything not already
 pushed to GitHub is gone, full stop):
@@ -105,7 +119,7 @@ import torch
 from Code.dir_definitions import RESULTS_DIR, WEIGHTS_DIR
 from Code.trainer import Trainer
 
-CSV_PATH = os.path.join(RESULTS_DIR, 'metrics', 'mc_sweep_validation_colab.csv')
+CSV_PATH = os.path.join(RESULTS_DIR, 'metrics', 'mc_sweep_validation.csv')
 FIELDNAMES = ['model', 'snr', 'ser_mean', 'ser_std', 'ser_ci95', 'n_reps',
               'words_run', 'bits_run', 'errors_observed', 'censored',
               'model_size', 'run_time_sec']
@@ -130,25 +144,34 @@ THIN_ERROR_THRESHOLD = 10
 #                 away when the first error never comes.
 #   step       -- minimum rep increment while extending
 #
-# ClassicViterbi's max_bits (20M) is copied from the CPU branch's
-# measured-throughput calibration: the COST2100 tap-load cache fix is CPU
-# logic, not GPU-dependent, so the same throughput should transfer here.
+# Sizing max_bits, from MEASURED throughput on this box (2000 bits/rep):
+#   ClassicViterbi  1.15 s/rep = ~1760 bits/s  -> 2e7 bits = 3.2 h/point
+#   Transformer     ~210 s/rep = ~9.5 bits/s   -> 1e5 bits = 2.9 h/point
+# (ClassicViterbi was 6.5 s/rep before the COST2100 tap-load cache in
+# 0ad20cd; that is a 5.7x end-to-end speedup, not the 224x that applies to
+# estimate_channel alone.)
 #
-# ViterbiNet and Transformer max_bits (2M) are an UNCALIBRATED placeholder --
-# no run has completed on this branch yet, so GPU throughput for their
-# per-word online-training backprop is unknown. Check the first [done] log
-# lines' run_time_sec once this actually runs, recompute bits/sec, and raise
-# or lower max_bits to target a similar few-hours-per-point budget as
-# ClassicViterbi -- do not leave this unexamined after the first real timing
-# comes back.
+# ViterbiNet's max_bits (100_000, matching Transformer) is an UNCALIBRATED
+# placeholder -- no run has completed on this branch yet. It is included
+# because the data-cache bug invalidated its old n=84 baseline
+# (Results/metrics/model_performance_final_mc_83.csv) too -- the paper's
+# three-way comparison needs all three detectors measured under the fix, and
+# it is already in the Colab branch's MODELS list for the same reason. Check
+# the first [done] log line's run_time_sec once this actually runs, recompute
+# bits/sec, and raise or lower max_bits to target a similar per-point budget
+# as the other two -- do not leave this unexamined after the first real
+# timing comes back.
 #
-# ViterbiNet is included because the cache bug invalidated its old n=84
-# baseline (Results/metrics/model_performance_final_mc_83.csv) too -- the
-# paper's three-way comparison needs all three detectors measured under the fix.
+# What this does and does not buy: ~100 errors needs ~100/SER bits, so
+# SNR<=13 (SER >= 5.5e-6) now reaches a full 100 errors. The error floor at
+# SNR>=14 (SER < 5e-7) would need ~2e8 bits = 31.5 h for ONE point, so those
+# stay censored -- but at 2e7 bits their upper bound tightens 10x, to
+# ~1.5e-7. Brute force cannot reach the floor here; that needs importance
+# sampling, or a much faster detector implementation.
 MODELS = [
+    ('Transformer', 'ModelBased', 20, 30, 100_000, 5),
+    ('ViterbiNet', 'ModelBased', 20, 30, 100_000, 5),
     ('ClassicViterbi', 'Statistical', 100, 500, 20_000_000, 100),
-    ('ViterbiNet', 'ModelBased', 20, 30, 2_000_000, 5),
-    ('Transformer', 'ModelBased', 20, 30, 2_000_000, 5),
 ]
 BRANCH = 'mc-sweep-colab-gpu'
 # Set MC_SWEEP_NO_GIT=1 to skip every git commit/push in this file entirely
@@ -298,7 +321,7 @@ def weights_dir_for(model_name, detector_method):
     method_name = f'{model_name}_{detector_method}'
     return os.path.join(
         WEIGHTS_DIR,
-        f'{method_name}_training_120_2_channel1_cost2100_mcsweep_colab')
+        f'{method_name}_training_120_2_channel1_cost2100_mcsweep')
 
 
 def push_with_retry(context):
@@ -383,7 +406,7 @@ def commit_and_push(model, detector_method, snr):
     # no-op here: commit_weights_snapshot already committed them right after
     # training, before the eval-rep phase ran.)
     weights_dir = weights_dir_for(model, detector_method)
-    add_paths = ['Results/metrics/mc_sweep_validation_colab.csv']
+    add_paths = ['Results/metrics/mc_sweep_validation.csv']
     if os.path.isdir(weights_dir):
         add_paths.append(os.path.relpath(weights_dir, repo_dir()))
     subprocess.run(['git', 'add'] + add_paths, check=True, cwd=repo_dir())
