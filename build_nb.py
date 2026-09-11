@@ -318,15 +318,29 @@ PARALLEL_MODELS = ["ClassicViterbi", "ViterbiNet", "Transformer"]
 base_dir = os.getcwd()
 parallel_dirs = {PARALLEL_MODELS[0]: base_dir}
 
+have_token = "token" in globals() and token
+
 for model in PARALLEL_MODELS[1:]:
     clone_dir = base_dir + "_" + model.lower()
     if not os.path.exists(clone_dir):
-        subprocess.run(["git", "clone", "--branch", BRANCH,
-                        "https://{}@github.com/Gilzuk/viterbitransformed.git".format(token),
-                        clone_dir], check=True)
+        # Cloning only reads a public repo -- no credential needed for this
+        # part, so this works whether you set up git (cell 4/4b) or Drive
+        # (cell 4c) instead.
+        subprocess.run(["git", "clone", "--branch", BRANCH, REPO_URL, clone_dir], check=True)
     subprocess.run(["git", "-C", clone_dir, "config", "user.email", "gil.zukerman@gmail.com"], check=True)
     subprocess.run(["git", "-C", clone_dir, "config", "user.name", "Gil Zukerman"], check=True)
+    if have_token:
+        # Only this clone's pushes need the token -- irrelevant on the Drive
+        # path, where MC_SWEEP_NO_GIT=1 (inherited from cell 4c) skips every
+        # push anyway.
+        subprocess.run(["git", "-C", clone_dir, "remote", "set-url", "origin",
+                        "https://{}@github.com/Gilzuk/viterbitransformed.git".format(token)],
+                        check=True)
     parallel_dirs[model] = clone_dir
+
+if not have_token:
+    print("No 'token' from cells 4/4b -- these clones won't push (fine on the "
+          "Drive path from cell 4c; if you meant to use git, run cell 4 first).")
 
 parallel_procs = {}
 parallel_logs = {}
