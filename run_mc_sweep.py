@@ -119,7 +119,7 @@ import torch
 from Code.dir_definitions import RESULTS_DIR, WEIGHTS_DIR
 from Code.trainer import Trainer
 
-CSV_PATH = os.path.join(RESULTS_DIR, 'metrics', 'mc_sweep_validation.csv')
+CSV_PATH = os.path.join(RESULTS_DIR, 'metrics', 'mc_sweep_validation_colab.csv')
 FIELDNAMES = ['model', 'snr', 'ser_mean', 'ser_std', 'ser_ci95', 'n_reps',
               'words_run', 'bits_run', 'errors_observed', 'censored',
               'model_size', 'run_time_sec']
@@ -321,7 +321,7 @@ def weights_dir_for(model_name, detector_method):
     method_name = f'{model_name}_{detector_method}'
     return os.path.join(
         WEIGHTS_DIR,
-        f'{method_name}_training_120_2_channel1_cost2100_mcsweep')
+        f'{method_name}_training_120_2_channel1_cost2100_mcsweep_colab')
 
 
 def push_with_retry(context):
@@ -406,7 +406,7 @@ def commit_and_push(model, detector_method, snr):
     # no-op here: commit_weights_snapshot already committed them right after
     # training, before the eval-rep phase ran.)
     weights_dir = weights_dir_for(model, detector_method)
-    add_paths = ['Results/metrics/mc_sweep_validation.csv']
+    add_paths = ['Results/metrics/mc_sweep_validation_colab.csv']
     if os.path.isdir(weights_dir):
         add_paths.append(os.path.relpath(weights_dir, repo_dir()))
     subprocess.run(['git', 'add'] + add_paths, check=True, cwd=repo_dir())
