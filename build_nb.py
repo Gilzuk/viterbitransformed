@@ -205,6 +205,50 @@ print("\\nSANITY CHECK: {}".format(
 """),
 
 md("""
+## 4c. No GitHub access? Save to Google Drive instead
+
+An alternative to cells 4/4b, for when push access to this repo isn't
+available at all (wrong token scope, no write access, etc.) -- skip them
+and run this instead. Cell 1's clone still works either way (reading a
+public repo needs no credential); this cell only replaces how *results*
+persist.
+
+`Results/` (where the CSV, per-model weights, and mid-point checkpoints all
+live) becomes a symlink into your Google Drive, and `MC_SWEEP_NO_GIT=1`
+tells `run_mc_sweep.py` to skip every commit/push and rely on that instead.
+Every point still lands on disk the moment it finishes -- just in your
+Drive instead of on GitHub -- so a disconnect still only costs the one
+point in flight. The trade-off: results sit only in your Drive, not shared
+via the repo, until you upload `mc_sweep_validation_colab.csv` yourself.
+"""),
+code("""
+from google.colab import drive
+drive.mount("/content/drive")
+
+import os, shutil
+
+DRIVE_RESULTS = "/content/drive/MyDrive/viterbitransformed_mc_sweep_results"
+os.makedirs(DRIVE_RESULTS, exist_ok=True)
+
+if os.path.islink("Results"):
+    print("Results/ is already a symlink -- nothing to do.")
+else:
+    if os.path.exists("Results"):
+        # Keep whatever the clone already pulled in (earlier committed points,
+        # if any) by moving it into the Drive folder rather than discarding it.
+        for item in os.listdir("Results"):
+            src, dst = os.path.join("Results", item), os.path.join(DRIVE_RESULTS, item)
+            if not os.path.exists(dst):
+                shutil.move(src, dst)
+        shutil.rmtree("Results")
+    os.symlink(DRIVE_RESULTS, "Results")
+
+os.environ["MC_SWEEP_NO_GIT"] = "1"
+print("Results/ ->", os.path.realpath("Results"))
+print("Git commit/push is now skipped -- results persist to Google Drive instead.")
+"""),
+
+md("""
 ## 5. Run the sweep
 
 Re-runnable and resumable: points already in the CSV are skipped.
@@ -259,6 +303,13 @@ all three land on the same `mc-sweep-colab-gpu` branch -- `push_with_retry`
 in `run_mc_sweep.py` rebases onto the latest tip before retrying a failed
 push, and every commit here is a pure append (one new CSV row, one model's
 own weights file), so this doesn't collide in practice.
+
+If you're on the Drive path (cell 4c) instead of git, note that only applies
+to the clone cell 1 made -- the two extra clones this cell creates each get
+their own local (non-Drive) `Results/`, so only the model running in the
+original clone persists to Drive across a disconnect. Symlink each extra
+clone's `Results/` into its own Drive subfolder first if you need all three
+to survive one.
 """),
 code("""
 import os, subprocess

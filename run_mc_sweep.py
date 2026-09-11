@@ -151,6 +151,13 @@ MODELS = [
     ('Transformer', 'ModelBased', 20, 30, 2_000_000, 5),
 ]
 BRANCH = 'mc-sweep-colab-gpu'
+# Set MC_SWEEP_NO_GIT=1 to skip every git commit/push in this file entirely
+# and rely on RESULTS_DIR/WEIGHTS_DIR pointing at persistent storage instead
+# (e.g. a Google Drive mount symlinked over Results/ before this runs) --
+# for when GitHub push access isn't available. Results are then only as
+# durable as wherever those directories actually live; nothing here backs
+# them up a second way.
+NO_GIT = os.environ.get('MC_SWEEP_NO_GIT') == '1'
 
 
 # Effective-SNR penalty of the ISI channel relative to ideal single-tap AWGN.
@@ -343,6 +350,8 @@ def commit_weights_snapshot(model_name, detector_method, snr):
     this, a freshly-written weights file sits untracked on disk for the
     whole point's runtime, not just the training step's -- narrowing that
     window means training output is never far from being pushed."""
+    if NO_GIT:
+        return
     weights_dir = weights_dir_for(model_name, detector_method)
     if not os.path.isdir(weights_dir):
         return
@@ -362,6 +371,11 @@ def commit_weights_snapshot(model_name, detector_method, snr):
 
 
 def commit_and_push(model, detector_method, snr):
+    if NO_GIT:
+        print(f'[git] skipped (MC_SWEEP_NO_GIT=1) for {model} snr={snr} -- '
+              f'relying on RESULTS_DIR/WEIGHTS_DIR for persistence instead', flush=True)
+        return
+
     # Other models' weight checkpoints are already tracked in this repo (see
     # Results/weights/*), so this sweep's are too -- add them alongside the
     # CSV row so each point's commit is atomic and a training run this sweep
