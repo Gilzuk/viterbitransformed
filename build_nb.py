@@ -304,21 +304,44 @@ in `run_mc_sweep.py` rebases onto the latest tip before retrying a failed
 push, and every commit here is a pure append (one new CSV row, one model's
 own weights file), so this doesn't collide in practice.
 
-If you're on the Drive path (cell 4c) instead of git, note that only applies
-to the clone cell 1 made -- the two extra clones this cell creates each get
-their own local (non-Drive) `Results/`, so only the model running in the
-original clone persists to Drive across a disconnect. Symlink each extra
-clone's `Results/` into its own Drive subfolder first if you need all three
-to survive one.
+**On the Drive path (cell 4c):** three processes are not three commits --
+there's no git to serialize concurrent writes to one shared CSV file, so
+pointing all three at the single folder cell 4c set up would race and can
+corrupt it. Instead each model gets its **own** subfolder under the same
+Drive folder (`<drive folder>_by_model/<model>/`), so all three persist
+independently and safely. If cell 4c's folder already has real progress
+(from an earlier cell-5 or single-model run), this cell **moves** it into
+the first model's subfolder the first time it runs, so nothing already
+completed is lost -- it becomes that model's history, not orphaned.
 """),
 code("""
-import os, subprocess
+import os, subprocess, shutil
 
 PARALLEL_MODELS = ["ClassicViterbi", "ViterbiNet", "Transformer"]
 base_dir = os.getcwd()
 parallel_dirs = {PARALLEL_MODELS[0]: base_dir}
 
 have_token = "token" in globals() and token
+base_results = os.path.join(base_dir, "Results")
+using_drive = os.path.islink(base_results)
+
+if using_drive:
+    # Give each model its own persistent subfolder instead of sharing the one
+    # cell 4c set up -- see the markdown above for why. This folder is a new
+    # sibling of cell 4c's, not a child of it (a child would nest the move
+    # target inside the thing being moved).
+    old_shared_dir = os.path.realpath(base_results)
+    by_model_root = old_shared_dir + "_by_model"
+    os.makedirs(by_model_root, exist_ok=True)
+
+    first_model_dir = os.path.join(by_model_root, PARALLEL_MODELS[0].lower())
+    if not os.path.exists(first_model_dir):
+        shutil.move(old_shared_dir, first_model_dir)
+        os.makedirs(old_shared_dir, exist_ok=True)  # leave cell 4c's path valid if re-run
+        print("Moved cell 4c's existing Drive results into", first_model_dir,
+              "-- that becomes", PARALLEL_MODELS[0] + "'s persistent history.")
+    os.remove(base_results)
+    os.symlink(first_model_dir, base_results)
 
 for model in PARALLEL_MODELS[1:]:
     clone_dir = base_dir + "_" + model.lower()
@@ -336,11 +359,19 @@ for model in PARALLEL_MODELS[1:]:
         subprocess.run(["git", "-C", clone_dir, "remote", "set-url", "origin",
                         "https://{}@github.com/Gilzuk/viterbitransformed.git".format(token)],
                         check=True)
+    if using_drive:
+        model_dir = os.path.join(by_model_root, model.lower())
+        os.makedirs(model_dir, exist_ok=True)
+        local_results = os.path.join(clone_dir, "Results")
+        if os.path.islink(local_results) or os.path.exists(local_results):
+            (os.remove if os.path.islink(local_results) else shutil.rmtree)(local_results)
+        os.symlink(model_dir, local_results)
     parallel_dirs[model] = clone_dir
 
-if not have_token:
-    print("No 'token' from cells 4/4b -- these clones won't push (fine on the "
-          "Drive path from cell 4c; if you meant to use git, run cell 4 first).")
+if not have_token and not using_drive:
+    print("No 'token' from cells 4/4b and no Drive symlink from 4c -- these "
+          "clones won't push and won't persist to Drive either. Run cell 4, "
+          "4b, or 4c first.")
 
 parallel_procs = {}
 parallel_logs = {}
@@ -381,35 +412,48 @@ for model, p in parallel_procs.items():
     print("{}: {}".format(model, "still running" if code_ is None else "exited " + str(code_)))
 """),
 
-md("## 6. Progress so far"),
+md("""
+## 6. Progress so far
+
+On the Drive + parallel path (cell 5b), each model's results live in their
+own subfolder (`by_model_root`), not the single `Results/` this cell reads
+by default -- the helper below checks for that and reads all three if so.
+"""),
 code("""
-import os
+import os, glob
 import pandas as pd
 
-CSV = "Results/metrics/mc_sweep_validation_colab.csv"
-if os.path.exists(CSV):
-    df = pd.read_csv(CSV)
+def load_all_results():
+    if "by_model_root" in globals() and os.path.isdir(by_model_root):
+        frames = []
+        for csv_path in glob.glob(os.path.join(by_model_root, "*", "metrics",
+                                                 "mc_sweep_validation_colab.csv")):
+            frames.append(pd.read_csv(csv_path))
+        return pd.concat(frames, ignore_index=True) if frames else pd.DataFrame()
+    csv_path = "Results/metrics/mc_sweep_validation_colab.csv"
+    return pd.read_csv(csv_path) if os.path.exists(csv_path) else pd.DataFrame()
+
+df = load_all_results()
+if len(df):
     print("%d point(s) complete" % len(df))
-    if len(df):
-        cols = ["model", "snr", "ser_mean", "ser_ci95", "n_reps",
-                "bits_run", "errors_observed", "censored", "run_time_sec"]
-        display(df[[c for c in cols if c in df.columns]])
-        print("\\nRemaining: %d of %d" % (3 * 18 - len(df), 3 * 18))
+    cols = ["model", "snr", "ser_mean", "ser_ci95", "n_reps",
+            "bits_run", "errors_observed", "censored", "run_time_sec"]
+    display(df[[c for c in cols if c in df.columns]])
+    print("\\nRemaining: %d of %d" % (3 * 18 - len(df), 3 * 18))
 else:
-    print("No results yet -- run cell 5.")
+    print("No results yet -- run cell 5 or 5b.")
 """),
 
 md("""
 ## 7. Plot (once there is enough data)
 """),
 code("""
-import os
 import pandas as pd
 import matplotlib.pyplot as plt
 
-CSV = "Results/metrics/mc_sweep_validation_colab.csv"
-if os.path.exists(CSV) and len(pd.read_csv(CSV)):
-    df = pd.read_csv(CSV).sort_values("snr")
+df = load_all_results()
+if len(df):
+    df = df.sort_values("snr")
     fig, ax = plt.subplots(figsize=(7, 4.5))
     for model, g in df.groupby("model"):
         solid = g[g.censored == 0]
@@ -428,7 +472,7 @@ if os.path.exists(CSV) and len(pd.read_csv(CSV)):
     plt.tight_layout()
     plt.show()
 else:
-    print("No results yet -- run cell 5.")
+    print("No results yet -- run cell 5 or 5b.")
 """),
 
 md("""
