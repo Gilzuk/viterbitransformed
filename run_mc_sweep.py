@@ -6,7 +6,7 @@ meaningful number of errors, rather than a fixed rep count that silently
 floors to a meaningless "0" once the true SER drops below what that many
 bits can resolve.
 
-Sizing method (per point):
+Sizing method (per point) -- calculated once, run once, no iteration:
   1. Predict the SER at this SNR with Q(sqrt(2*snr_eff_linear)), where
      snr_eff = snr - ISI_PENALTY_DB. The ideal single-tap AWGN expression
      (penalty 0) is badly miscalibrated for this 4-tap ISI channel --
@@ -14,30 +14,27 @@ Sizing method (per point):
      measurements -- but the gap is a near-constant effective-SNR shift,
      so applying that shift makes it a usable prior. See ISI_PENALTY_DB.
   2. Target ~100 expected errors (the standard rule of thumb for a stable
-     Monte-Carlo BER/SER estimate) purely to size the OPENING run:
-     required_bits = 100 / predicted_ser. This is only a prior -- the
-     observed error count, not the prediction, decides what happens next.
+     Monte-Carlo BER/SER estimate): required_bits = TARGET_ERRORS /
+     predicted_ser, capped at the per-model max_bits so a point cannot run
+     away when the prediction is optimistic.
   3. Convert to repetitions via the trainer's actual words/rep and bits/word,
-     clipped to a per-model [MIN_REPS, MAX_REPS].
-  4. If the opening run sees zero errors, double the bits and look again
-     ("run until the first error") -- there is nothing to estimate a rate
-     from yet.
-  5. Once the first error is observed, at bits_to_first_error, run to a
-     FIXED cap of FIRST_ERROR_BITS_MULTIPLIER (100) times that bit count and
-     stop -- e.g. first error at 1e6 bits means run to 1e8 bits, then stop,
-     however many errors that ends up with. This is deliberately NOT
-     re-estimated from the running SER as more errors come in: re-targeting
-     off a noisy observed rate can keep chasing a moving goalpost and never
-     converge, whereas the first-error bit count is measured once and the
-     cap it sets is fixed. Bounded by the per-model max_bits so a point
-     cannot run away.
-  6. If max_bits is spent with still zero errors, the point is recorded as
-     CENSORED: ser_mean is 0.0, but `censored=1` and `bits_run` are recorded
-     so it reads as an honest upper bound rather than a converged zero. (For
-     zero errors in N bits the correct 95% bound is the rule of three, 3/N.)
-     If the 100x-first-error cap is reached with very few errors (bursty
-     luck), the point is kept and flagged `[thin]` in the log -- its CI is
-     real but wide.
+     floored at a per-model MIN_REPS. Run exactly that many reps, in
+     checkpointed `step`-sized chunks for restart safety, and stop --
+     whatever error count that ends up with is the result. There is
+     deliberately no adaptive re-estimation or extending after this: a
+     previous version doubled the bit budget over and over hunting for a
+     first error at high SNR, which could run for days without ever
+     stopping when the true SER was far below what the predictor assumed.
+     Calculating once and running exactly that is fast and bounded; if the
+     prediction was too optimistic, the point comes back censored or thin
+     (see below) instead of running forever.
+  4. If the run sees zero errors, the point is recorded as CENSORED:
+     ser_mean is 0.0, but `censored=1` and `bits_run` are recorded so it
+     reads as an honest upper bound rather than a converged zero. (For zero
+     errors in N bits the correct 95% bound is the rule of three, 3/N.) If
+     it finishes with some errors but fewer than THIN_ERROR_THRESHOLD, the
+     point is kept and flagged `[thin]` in the log -- its CI is real but
+     wide.
 
 On CPU, ClassicViterbi was ~6.5s/rep before the COST2100 tap-load cache fix
 (now ~0.02s/rep); the Transformer's and ViterbiNet's self-supervised online
@@ -126,25 +123,20 @@ FIELDNAMES = ['model', 'snr', 'ser_mean', 'ser_std', 'ser_ci95', 'n_reps',
               'words_run', 'bits_run', 'errors_observed', 'censored',
               'model_size', 'run_time_sec']
 SNR_VALUES = list(range(0, 18))
-# Used only to size the opening run (see docstring step 2) -- NOT the
-# stopping condition. The actual stopping rule is FIRST_ERROR_BITS_MULTIPLIER.
-INITIAL_SIZING_TARGET_ERRORS = 100
-# Once the first error is observed at N bits, run to a fixed cap of this many
-# times N and stop, rather than re-targeting an error count from the
-# (noisy) observed rate as more errors accumulate. See docstring step 5.
-FIRST_ERROR_BITS_MULTIPLIER = 100
-# Below this many observed errors at the cap, flag the point [thin] -- the
-# result is still a valid unbiased estimate, just with a wide CI.
+# Target expected error count the sizing calculation aims for (see docstring
+# step 2). This is the ONLY thing that decides how many bits a point runs --
+# calculated once up front, not adjusted afterward based on what's observed.
+TARGET_ERRORS = 100
+# Below this many observed errors at the end of the run, flag the point
+# [thin] -- the result is still a valid unbiased estimate, just wide CI.
 THIN_ERROR_THRESHOLD = 10
 
-# (model_name, detector_method, min_reps, max_reps, max_bits, step)
-#   min_reps   -- floor
-#   max_reps   -- cap on the predictor-sized opening run
-#   max_bits   -- total bit budget for the point. The run keeps going past
-#                 max_reps until the FIRST_ERROR_BITS_MULTIPLIER cap is
-#                 reached (see docstring); this is what stops it running
-#                 away when the first error never comes.
-#   step       -- minimum rep increment while extending
+# (model_name, detector_method, min_reps, max_bits, step)
+#   min_reps   -- floor on the calculated rep count
+#   max_bits   -- ceiling on the calculated bit budget, so an optimistic
+#                 prediction (or a genuinely very low SER) cannot make a
+#                 point run away; the point comes back censored/thin instead
+#   step       -- checkpoint every this many reps, for restart safety
 #
 # ClassicViterbi's max_bits (20M) is copied from the CPU branch's
 # measured-throughput calibration: the COST2100 tap-load cache fix is CPU
@@ -162,9 +154,9 @@ THIN_ERROR_THRESHOLD = 10
 # baseline (Results/metrics/model_performance_final_mc_83.csv) too -- the
 # paper's three-way comparison needs all three detectors measured under the fix.
 MODELS = [
-    ('ClassicViterbi', 'Statistical', 100, 500, 20_000_000, 100),
-    ('ViterbiNet', 'ModelBased', 20, 30, 2_000_000, 5),
-    ('Transformer', 'ModelBased', 20, 30, 2_000_000, 5),
+    ('ClassicViterbi', 'Statistical', 100, 20_000_000, 100),
+    ('ViterbiNet', 'ModelBased', 20, 2_000_000, 5),
+    ('Transformer', 'ModelBased', 20, 2_000_000, 5),
 ]
 BRANCH = 'mc-sweep-colab-gpu'
 # Set MC_SWEEP_NO_GIT=1 to skip every git commit/push in this file entirely
@@ -425,7 +417,7 @@ def commit_and_push(model, detector_method, snr):
     push_with_retry(f'{model} snr={snr}')
 
 
-def run_point(model_name, detector_method, snr, min_reps, max_reps, max_bits, step):
+def run_point(model_name, detector_method, snr, min_reps, max_bits, step):
     weights_dir = weights_dir_for(model_name, detector_method)
 
     t0 = time.time()
@@ -493,18 +485,6 @@ def run_point(model_name, detector_method, snr, min_reps, max_reps, max_bits, st
     def total_errors():
         return sum(m * bits_per_rep for m in per_rep_means)
 
-    def bits_at_first_error():
-        """Total bits run through the first rep at which the cumulative
-        error count first became nonzero, or None if no error has been
-        observed yet. Reconstructed from per_rep_means so it is correct
-        across a checkpoint resume, not just within one process's run."""
-        cum = 0.0
-        for i, m in enumerate(per_rep_means):
-            cum += m * bits_per_rep
-            if cum > 0:
-                return (i + 1) * bits_per_rep
-        return None
-
     def run_batch(n):
         nonlocal reps_done
         # Chunk into at most `step` reps per trainer call and checkpoint
@@ -522,43 +502,20 @@ def run_point(model_name, detector_method, snr, min_reps, max_reps, max_bits, st
             remaining -= chunk
             save_checkpoint(model_name, snr, per_rep_means)
 
+    # Calculate the required bit budget once, up front, and run exactly that
+    # many reps -- no doubling, no re-targeting off what gets observed. See
+    # the "Sizing method" note at the top of this file.
     predicted_ser = max(expected_ser_isi(snr), 1e-300)
-    required_bits = INITIAL_SIZING_TARGET_ERRORS / predicted_ser
+    required_bits = TARGET_ERRORS / predicted_ser
     required_reps = math.ceil(required_bits / bits_per_rep)
-    planned_reps = int(min(max(required_reps, min_reps), max_reps))
+    capped_reps = max_bits // bits_per_rep
+    planned_reps = int(min(max(required_reps, min_reps), capped_reps))
 
     print(f'[plan] {model_name} snr={snr}: predicted_ser={predicted_ser:.3e}, '
-          f'planned_reps={planned_reps} (min={min_reps}, max={max_reps})', flush=True)
+          f'planned_reps={planned_reps} (min={min_reps}, cap={capped_reps})', flush=True)
 
     if reps_done < planned_reps:
         run_batch(planned_reps - reps_done)
-
-    # Phase 1: run until the first error is actually observed. The predictor
-    # only sizes the opening move -- if it undershoots, there is nothing to
-    # estimate a rate from yet, so double the bits and look again.
-    while total_errors() == 0 and reps_done * bits_per_rep < max_bits:
-        bits_so_far = reps_done * bits_per_rep
-        target_reps = min(reps_done * 2, max_bits // bits_per_rep)
-        batch = max(step, target_reps - reps_done)
-        if batch <= 0:
-            break
-        print(f'[extend] {model_name} snr={snr}: 0 errors in {bits_so_far:,} bits -- '
-              f'doubling toward first error; running {batch} more', flush=True)
-        run_batch(batch)
-
-    # Phase 2: once the first error is observed at N bits, run to a FIXED cap
-    # of FIRST_ERROR_BITS_MULTIPLIER x N bits and stop -- not re-targeted off
-    # the observed rate as more errors come in, since that can chase a moving
-    # goalpost and never converge. Bounded by max_bits as always.
-    first_bits = bits_at_first_error()
-    if first_bits is not None:
-        cap_bits = min(FIRST_ERROR_BITS_MULTIPLIER * first_bits, max_bits)
-        cap_reps = int(cap_bits // bits_per_rep)
-        if reps_done < cap_reps:
-            print(f'[extend] {model_name} snr={snr}: first error at {first_bits:,} bits -- '
-                  f'running to {FIRST_ERROR_BITS_MULTIPLIER}x cap = {cap_bits:,.0f} bits '
-                  f'({cap_reps} reps)', flush=True)
-            run_batch(cap_reps - reps_done)
 
     censored = total_errors() == 0
     if censored:
@@ -567,7 +524,7 @@ def run_point(model_name, detector_method, snr, min_reps, max_reps, max_bits, st
               flush=True)
     elif total_errors() < THIN_ERROR_THRESHOLD:
         print(f'[thin] {model_name} snr={snr}: only {total_errors():.0f} errors in '
-              f'{reps_done * bits_per_rep:,} bits (100x-first-error cap reached) -- '
+              f'{reps_done * bits_per_rep:,} bits (one-shot budget reached) -- '
               f'CI will be wide', flush=True)
 
     run_time = time.time() - t0
@@ -627,7 +584,7 @@ def main():
     # sweep has to finish before the other model's points at the same SNR
     # are even attempted.
     for snr in SNR_VALUES:
-        for model_name, detector_method, min_reps, max_reps, max_bits, step in models:
+        for model_name, detector_method, min_reps, max_bits, step in models:
             key = (model_name, snr)
             if key in done:
                 print(f'[skip] {model_name} snr={snr} already in CSV', flush=True)
@@ -636,7 +593,7 @@ def main():
             print(f'\n{"="*70}\n[run] {model_name} snr={snr}\n{"="*70}', flush=True)
             try:
                 row = run_point(model_name, detector_method, snr,
-                                 min_reps, max_reps, max_bits, step)
+                                 min_reps, max_bits, step)
             except Exception as e:
                 print(f'[ERROR] {model_name} snr={snr} failed: {e}', flush=True)
                 import traceback
