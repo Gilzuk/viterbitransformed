@@ -294,19 +294,21 @@ def push_with_retry(context):
         f'locally but not on the remote yet).')
 
 
-def commit_weights_snapshot(model_name, detector_method, snr):
-    """Commit+push a point's just-trained weights right after training
-    finishes, before the (often much longer) eval-rep phase runs. Without
-    this, a freshly-written weights file sits untracked on disk for the
-    whole point's runtime, not just the training step's -- narrowing that
-    window means training output is never far from being pushed."""
+def commit_weights_snapshot(model_name, detector_method, snr, in_progress=False):
+    """Commit+push a snapshot of a point's weights. Called once right after
+    training finishes, before the (often much longer) eval-rep phase runs --
+    and, with in_progress=True, also periodically *during* training (see
+    make_training_committer) so that even a full disk loss mid-training
+    (not just a process restart, which local disk alone already survives)
+    cannot erase more than a bounded amount of training progress."""
     weights_dir = weights_dir_for(model_name, detector_method)
     if not os.path.isdir(weights_dir):
         return
     subprocess.run(['git', 'add', os.path.relpath(weights_dir, repo_dir())],
                     check=True, cwd=repo_dir())
+    suffix = ' (training in progress)' if in_progress else ''
     commit = subprocess.run(
-        ['git', 'commit', '-q', '-m', f'Train MC-sweep weights: {model_name} snr={snr}'],
+        ['git', 'commit', '-q', '-m', f'Train MC-sweep weights: {model_name} snr={snr}{suffix}'],
         cwd=repo_dir(), capture_output=True, text=True)
     if commit.returncode != 0:
         combined = (commit.stdout or '') + (commit.stderr or '')
@@ -316,6 +318,29 @@ def commit_weights_snapshot(model_name, detector_method, snr):
             f'git commit failed for {model_name} snr={snr} weights snapshot '
             f'(not a "nothing to commit" case): {combined.strip()}')
     push_with_retry(f'{model_name} snr={snr} weights snapshot')
+
+
+def make_training_committer(model_name, detector_method, snr):
+    """Callback for Trainer.train()'s on_checkpoint hook: commits+pushes the
+    weights file every time training saves improved weights, rate-limited so
+    it does not push on every single improving minibatch. A failure here is
+    logged and swallowed rather than raised -- it runs deep inside the
+    training loop, and a transient git/network hiccup mid-training should
+    not abort the run; the next improvement (or the unconditional snapshot
+    once training finishes) will pick it up."""
+    last_commit = [0.0]
+    min_interval_sec = 120
+    def on_checkpoint():
+        now = time.time()
+        if now - last_commit[0] < min_interval_sec:
+            return
+        last_commit[0] = now
+        try:
+            commit_weights_snapshot(model_name, detector_method, snr, in_progress=True)
+        except Exception as e:
+            print(f'[git] mid-training commit failed for {model_name} snr={snr}: {e} '
+                  f'-- continuing training, will retry at the next improvement', flush=True)
+    return on_checkpoint
 
 
 def commit_and_push(model, detector_method, snr):
@@ -379,15 +404,19 @@ def run_point(model_name, detector_method, snr, min_reps, max_bits, step):
     # disk -- left there by a previous run_point() call for this same point
     # that got interrupted before its point was fully done (a finished point
     # is never re-entered; see the `done` skip in main()) -- load it first so
-    # training continues from there instead of from scratch.
-    weights_path = os.path.join(weights_dir, f'snr_{snr}_gamma_{trainer.gamma}.pt')
-    if detector_method != 'Statistical' and os.path.isfile(weights_path):
-        prior = torch.load(weights_path)
-        trainer.detector.model.load_state_dict(prior['model_state_dict'])
-        print(f'[resume] {model_name} snr={snr}: warm-starting training from '
-              f'existing weights on disk (loss={prior["loss"]:.4f})', flush=True)
+    # training continues from there instead of from scratch. Local disk alone
+    # already survives a plain process restart, but not necessarily a full
+    # container/disk loss -- on_checkpoint commits+pushes each improvement
+    # (rate-limited) during training too, so that case is covered as well.
+    if detector_method != 'Statistical':
+        weights_path = os.path.join(weights_dir, f'snr_{snr}_gamma_{trainer.gamma}.pt')
+        if os.path.isfile(weights_path):
+            prior = torch.load(weights_path)
+            trainer.detector.model.load_state_dict(prior['model_state_dict'])
+            print(f'[resume] {model_name} snr={snr}: warm-starting training from '
+                  f'existing weights on disk (loss={prior["loss"]:.4f})', flush=True)
         trainer.fading_taps_type = 1
-        trainer.train()
+        trainer.train(on_checkpoint=make_training_committer(model_name, detector_method, snr))
         trainer.fading_taps_type = 2
         final = torch.load(weights_path)
         trainer.detector.model.load_state_dict(final['model_state_dict'])

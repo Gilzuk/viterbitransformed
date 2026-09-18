@@ -239,11 +239,16 @@ class Trainer(object):
         self.load_train_weights(run_over)
         return self.online_evaluation(num_of_rep=num_of_rep)
 
-    def train(self):
+    def train(self, on_checkpoint=None):
         """
         Main training loop. Runs in minibatches.
         Evaluates performance over validation SNR.
         Saves weights given the best validation SER result.
+
+        on_checkpoint: optional no-argument callback invoked right after
+        each time improved weights are written to disk, so a caller can
+        mirror that progress elsewhere (e.g. committing it to git) without
+        this method knowing anything about that.
         """
         if self.detector_method == 'Statistical':
             raise NotImplementedError("No training implemented for Statistical decoder!!!")
@@ -297,6 +302,8 @@ class Trainer(object):
             if ser < best_ser:
                 self.save_weights(current_loss)  # save best weights
                 best_ser = ser
+                if on_checkpoint is not None:
+                    on_checkpoint()
             # stopping if SER is 0
             if ser == 0:
                 print(f'\nmodel:{self.model_name}, snr:{self.curr_SNR} [INFO] stopping as training reached minimum of 0')
