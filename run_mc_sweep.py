@@ -371,8 +371,28 @@ def run_point(model_name, detector_method, snr, min_reps, max_bits, step):
         params = filter(lambda p: p.requires_grad, trainer.detector.model.parameters())
         model_size = sum(torch.numel(p) for p in params)
 
-    # Train once (no-op for ClassicViterbi/Statistical).
-    trainer.load_train_weights(run_over=2)
+    # Train once (no-op for ClassicViterbi/Statistical). trainer.train() always
+    # starts from the model's current in-memory weights -- Trainer.__init__
+    # leaves those at a fresh random init, so a restart mid-training would
+    # normally throw away whatever progress the interrupted attempt made and
+    # start over. If this exact (model, snr) already has a weights file on
+    # disk -- left there by a previous run_point() call for this same point
+    # that got interrupted before its point was fully done (a finished point
+    # is never re-entered; see the `done` skip in main()) -- load it first so
+    # training continues from there instead of from scratch.
+    weights_path = os.path.join(weights_dir, f'snr_{snr}_gamma_{trainer.gamma}.pt')
+    if detector_method != 'Statistical' and os.path.isfile(weights_path):
+        prior = torch.load(weights_path)
+        trainer.detector.model.load_state_dict(prior['model_state_dict'])
+        print(f'[resume] {model_name} snr={snr}: warm-starting training from '
+              f'existing weights on disk (loss={prior["loss"]:.4f})', flush=True)
+        trainer.fading_taps_type = 1
+        trainer.train()
+        trainer.fading_taps_type = 2
+        final = torch.load(weights_path)
+        trainer.detector.model.load_state_dict(final['model_state_dict'])
+    else:
+        trainer.load_train_weights(run_over=2)
     commit_weights_snapshot(model_name, detector_method, snr)
 
     # Total words drawn per online_evaluation repetition (matches
