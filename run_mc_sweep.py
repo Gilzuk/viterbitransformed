@@ -378,8 +378,15 @@ def commit_weights_snapshot(model_name, detector_method, snr, in_progress=False)
     # it, so the two can never drift apart on the remote: a restart that
     # pulls this commit gets banked reps and the model they were measured
     # against together, or neither.
-    if os.path.isdir(CHECKPOINT_DIR):
-        add_paths.append(os.path.relpath(CHECKPOINT_DIR, repo_dir()))
+    #
+    # Stage only THIS point's files, never the whole directory. The directory
+    # is shared: sibling worktrees running other models pull each other's
+    # checkpoints in, so staging all of it would commit this worktree's
+    # possibly-stale copy of another model's file and revert that model's
+    # progress on the remote.
+    for path in (checkpoint_path(model_name, snr), training_state_path(model_name, snr)):
+        if os.path.isfile(path):
+            add_paths.append(os.path.relpath(path, repo_dir()))
     if not add_paths:
         return
     subprocess.run(['git', 'add'] + add_paths, check=True, cwd=repo_dir())
@@ -420,6 +427,25 @@ def make_training_committer(model_name, detector_method, snr):
     return on_checkpoint
 
 
+def stageable_paths(*paths):
+    """Of the given paths, the ones `git add` will accept: present on disk,
+    or absent but tracked (so the deletion stages). Passing a path that is
+    neither makes git fail the whole invocation with "pathspec did not
+    match", staging nothing at all -- which would silently drop the CSV row
+    staged alongside it."""
+    out = []
+    for path in paths:
+        rel = os.path.relpath(path, repo_dir())
+        if os.path.exists(path):
+            out.append(rel)
+            continue
+        tracked = subprocess.run(['git', 'ls-files', '--', rel],
+                                  cwd=repo_dir(), capture_output=True, text=True)
+        if tracked.stdout.strip():
+            out.append(rel)
+    return out
+
+
 def commit_and_push(model, detector_method, snr):
     # Other models' weight checkpoints are already tracked in this repo (see
     # Results/weights/*), so this sweep's are too -- add them alongside the
@@ -431,7 +457,15 @@ def commit_and_push(model, detector_method, snr):
     add_paths = ['Results/metrics/mc_sweep_validation.csv']
     if os.path.isdir(weights_dir):
         add_paths.append(os.path.relpath(weights_dir, repo_dir()))
-    subprocess.run(['git', 'add'] + add_paths, check=True, cwd=repo_dir())
+    # The finished point's resume state is cleared here rather than by the
+    # caller, so its removal lands in the same commit as the CSV row that
+    # supersedes it -- otherwise the tracked checkpoint files would stay in
+    # git forever and show as an unstaged deletion after every point.
+    clear_checkpoint(model, snr)
+    add_paths += stageable_paths(checkpoint_path(model, snr),
+                                 training_state_path(model, snr))
+    # -A so the deletions above are staged, not just modifications.
+    subprocess.run(['git', 'add', '-A', '--'] + add_paths, check=True, cwd=repo_dir())
     commit = subprocess.run(
         ['git', 'commit', '-q', '-m', f'Add MC-sweep validation point: {model} snr={snr}'],
         cwd=repo_dir(), capture_output=True, text=True)
@@ -750,8 +784,7 @@ def main():
             drop_existing_row(model_name, snr)
             append_row(row)
             print(f'[done] {row}', flush=True)
-            commit_and_push(model_name, detector_method, snr)
-            clear_checkpoint(model_name, snr)
+            commit_and_push(model_name, detector_method, snr)  # also clears resume state
             done.add(key)
 
     print('\nAll points complete.', flush=True)

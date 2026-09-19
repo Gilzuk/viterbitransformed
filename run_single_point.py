@@ -17,7 +17,7 @@ import sys
 
 from run_mc_sweep import (
     MODELS, ensure_header, drop_existing_row, append_row, commit_and_push,
-    clear_checkpoint, run_point,
+    run_point,
 )
 
 
@@ -37,8 +37,7 @@ def main():
     drop_existing_row(model_name, snr)
     append_row(row)
     print(f'[done] {row}', flush=True)
-    commit_and_push(model_name, detector_method, snr)
-    clear_checkpoint(model_name, snr)
+    commit_and_push(model_name, detector_method, snr)  # also clears resume state
 
 
 if __name__ == '__main__':
