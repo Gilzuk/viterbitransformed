@@ -192,9 +192,32 @@ points reachable.
 """)
 
 code("""
-import subprocess, sys
-# -u so progress streams into the cell instead of sitting in a buffer.
-subprocess.run([sys.executable, '-u', 'run_mc_sweep.py', MODEL])
+import subprocess, sys, time
+
+# Pipe the child's output back and print it here. A bare subprocess.run()
+# inherits the kernel's stdout, which in a notebook is NOT the cell -- its
+# output disappears into the kernel log and the cell looks dead for hours.
+# Printing goes through IPython's captured stdout, so it lands in the cell.
+print('launching', MODEL, '-- first lines should appear within a minute', flush=True)
+proc = subprocess.Popen([sys.executable, '-u', 'run_mc_sweep.py', MODEL],
+                        stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                        text=True, bufsize=1)
+
+# The sweep prints a lot of per-word chatter and tqdm redraws. Keep the
+# decision lines, and let the progress bar through once a minute so there is
+# a visible heartbeat without flooding the cell over a multi-hour run.
+KEEP = ('[plan]', '[resume]', '[skip]', '[run]', '[done]', '[csv]', '[git]',
+        '[censored]', '[thin]', 'ERROR', 'Traceback')
+last_tick = 0
+for line in proc.stdout:
+    s = line.rstrip()
+    if any(k in s for k in KEEP):
+        print(s, flush=True)
+    elif ('Eval Reps' in s or 'Training (SNR' in s) and time.time() - last_tick > 60:
+        print(s[-110:], flush=True)
+        last_tick = time.time()
+proc.wait()
+print('exited with', proc.returncode, flush=True)
 """)
 
 md("""
