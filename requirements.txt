@@ -1,0 +1,10 @@
+# Pinned to the versions this repo's MC-sweep (run_mc_sweep.py) has been
+# running against successfully. Install PyTorch separately first, matching
+# your GPU/CUDA driver (see README "Installing" section) -- it's not pinned
+# here since the right build is platform/CUDA-version specific.
+numpy==2.4.6
+scipy==1.17.1
+pandas==3.0.5
+matplotlib==3.11.1
+tqdm==4.70.0
+PyYAML==6.0.1

@@ -57,6 +57,17 @@ In addition, it contains `HYPERPARAMS_DICT` with configurable parameters and mai
 2.4.	*`main.ipynb`* – Juypiter notebook to be used in Google Colab.  
 2.4.	*`main_with_results.yml`* -  Juypiter notebook post execution in Google Colab.  
 ## 3.	Installing <a name="install"></a>
+
+### 3.0. Quick setup (pip, any OS) -- recommended for the MC-sweep scripts
+The versions below are what `run_mc_sweep.py` has actually been run against; `project_env.yml` (3.1 below) is the
+original Windows/Anaconda environment and is older. For a local GPU (e.g. an NVIDIA GTX 16-series card), install
+PyTorch first with the command from [pytorch.org](https://pytorch.org/get-started/locally/) for your CUDA version,
+then the rest:
+```bash
+pip install -r requirements.txt
+```
+
+### 3.1. Conda (original environment)
 3.1.	In order to execute the project,  first make sure you have Anaconda and PyCharm (IDE) installed, then install the project_env.yml: 
 ```bash
 conda env create -f project_env.yml
