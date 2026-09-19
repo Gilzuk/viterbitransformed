@@ -546,10 +546,6 @@ class Trainer(object):
             # received_words = self.get_overlapping_rx(received_words)
             if first_run:
                 ser_by_word = np.zeros(num_of_rep*transmitted_words.shape[0])
-                # query for all detected words
-                buffer_rx = torch.empty([0, received_words.shape[1]]).to(device)
-                buffer_tx = torch.empty([0, received_words.shape[1]]).to(device)
-                buffer_ser = torch.empty([0]).to(device)
                 first_run = False
 
             for count, (transmitted_word, received_word) in enumerate(zip(transmitted_words, received_words)):
@@ -584,17 +580,22 @@ class Trainer(object):
                     avg_ser = total_ser / max(1, (rep * len(self.data_indices) + sum(1 for c in range(count+1) if c in self.data_indices)))
                     rep_pbar.set_postfix({'avg_SER': f'{avg_ser:.6f}'})
                 
-                # save the encoded word in the buffer
+                # Only the most recently buffered word is ever read (by the
+                # online_training call just below -- it took buffer_*[-1]),
+                # so keep just that word instead of growing a tensor with
+                # torch.cat on every clean one. The old buffers copied their
+                # whole contents per word, making evaluation O(words^2) and
+                # unusably slow exactly where almost every word passes the
+                # threshold, i.e. at high SNR: measured ~2h per repetition at
+                # snr=7 against ~20s at snr=6. Same values, no accumulation.
                 if ser <= self.ser_thresh:
-                    buffer_rx = torch.cat([buffer_rx, received_word])
-                    buffer_tx = torch.cat([buffer_tx,
-                                           detected_word.reshape(1, -1) if ser > 0 else
-                                           encoded_word.reshape(1, -1)],dim=0)
-                    buffer_ser = torch.cat([buffer_ser, torch.FloatTensor([ser]).to(device)])
+                    last_rx = received_word
+                    last_tx = (detected_word.reshape(1, -1) if ser > 0
+                               else encoded_word.reshape(1, -1))
 
-                if self.self_supervised and ser <= self.ser_thresh:
-                    # use last word inserted in the buffer for training
-                    self.online_training(buffer_tx[-1].reshape(1, -1), buffer_rx[-1].reshape(1, -1))
+                    if self.self_supervised:
+                        # use last word inserted in the buffer for training
+                        self.online_training(last_tx.reshape(1, -1), last_rx.reshape(1, -1))
 
                 if (count + 1) % 300 == 0:
                     print(f'model:{self.model_name}, snr:{self.curr_SNR} , Self-supervised: {rep*transmitted_words.shape[0] + count + 1}/{transmitted_words.shape[0] * num_of_rep}, Average SER {total_ser / (rep*transmitted_words.shape[0] + count + 1)}')
