@@ -207,6 +207,10 @@ import torch
 # the next cell show progress on demand -- which suits a run measured in hours
 # far better than one cell blocking the whole notebook.
 LOG = '/content/sweep.log'
+PIDFILE = LOG + '.pid'   # tracks THIS launch specifically -- see section 6b,
+                         # where a second model's process also matches
+                         # "run_mc_sweep.py" in a plain pgrep and would
+                         # otherwise be indistinguishable from this one.
 
 RESTART = False   # set True to kill a running sweep and start it fresh
 
@@ -225,28 +229,41 @@ os.environ.setdefault('MC_SWEEP_SOURCE', 'colab:' + (
 print('MC_SWEEP_NO_GIT =', os.environ.get('MC_SWEEP_NO_GIT'),
       '| MC_SWEEP_SOURCE =', os.environ['MC_SWEEP_SOURCE'])
 
-running = subprocess.run(['pgrep', '-f', 'run_mc_sweep.py'],
-                         capture_output=True, text=True).stdout.split()
+def pid_alive(pid):
+    try:
+        os.kill(pid, 0)
+        return True
+    except (OSError, ValueError):
+        return False
 
-# An earlier attempt may still be running WITHOUT writing to LOG (e.g. one
-# started by a cell that let the child inherit the kernel's stdout). That
-# looks identical to a healthy run whose log is merely slow, so say so rather
-# than tailing an empty file forever.
-if running and not os.path.exists(LOG):
-    print(f'A sweep is running (pids {running}) but {LOG} does not exist, so it was not\\n'
-          f'started by this cell and its output is not being captured anywhere you can\\n'
-          f'see. Set RESTART = True above and re-run to replace it -- nothing is lost,\\n'
-          f'it resumes from the banked repetitions.')
-elif running and not RESTART:
-    print('already running, pids:', running)
+tracked = None
+if os.path.exists(PIDFILE):
+    try:
+        tracked = int(open(PIDFILE).read().strip())
+    except ValueError:
+        pass
+
+if tracked and pid_alive(tracked) and RESTART:
+    subprocess.run(['kill', str(tracked)]); time.sleep(3)
+    print('stopped pid', tracked)
+    tracked = None
+
+if tracked and pid_alive(tracked):
+    print('already running, pid', tracked)
 else:
-    if running and RESTART:
-        subprocess.run(['pkill', '-f', 'run_mc_sweep.py'])
-        time.sleep(3)
-        print('stopped', running)
-    subprocess.Popen(f'nohup python -u run_mc_sweep.py {MODEL} > {LOG} 2>&1 &',
-                     shell=True)
-    print('launched', MODEL)
+    # A process from an untracked launch (no pidfile -- e.g. an older cell
+    # version already run this session) looks identical to a hung run. Say so
+    # rather than launching a duplicate or tailing a log nothing writes to.
+    stray = subprocess.run(['pgrep', '-f', f'run_mc_sweep.py {MODEL}'],
+                           capture_output=True, text=True).stdout.split()
+    if stray and not os.path.exists(LOG):
+        print(f'A {MODEL} sweep is running (pid {stray}) but was not started by this cell '
+              f'-- set RESTART = True and re-run to replace it. Nothing is lost.')
+    else:
+        subprocess.Popen(
+            f'nohup python -u run_mc_sweep.py {MODEL} > {LOG} 2>&1 & echo $! > {PIDFILE}',
+            shell=True)
+        print('launched', MODEL)
 
 time.sleep(25)
 try:
@@ -273,9 +290,138 @@ for f in sorted(glob.glob('Results/metrics/.mc_sweep_checkpoints/*.json')):
     d = json.load(open(f))
     n = f.split('/')[-1]
     print(' ', n, '->', f"{len(d['per_rep_means'])} reps" if 'per_rep_means' in d else d)
-alive = subprocess.run(['pgrep', '-f', 'run_mc_sweep.py'],
-                       capture_output=True, text=True).stdout.split()
-print('\\nprocess:', 'running ' + str(alive) if alive else 'NOT running (finished or died)')
+try:
+    pid = int(open('/content/sweep.log.pid').read().strip())
+    os.kill(pid, 0)
+    alive = True
+except (FileNotFoundError, ValueError, ProcessLookupError, OSError):
+    alive = False
+print('\\nprocess:', f'running (pid {pid})' if alive else 'NOT running (finished or died)')
+""")
+
+md("""
+## 6b. (Optional) Run a second model in parallel, e.g. ViterbiNet
+
+Runs alongside `MODEL` above, in the **same** Colab session, sharing its one GPU. This does
+**not** touch the process launched in section 6 -- it is a separate clone, a separate
+process, a separate log.
+
+A second, separate clone directory is required: two `run_mc_sweep.py` processes writing to
+the same local `mc_sweep_validation.csv` / checkpoint files would corrupt them, for the same
+reason the CPU-container runs use one git worktree per model rather than one shared
+directory. If both push (`PUSH = True` above), `run_mc_sweep.py`'s own retry logic already
+handles two runners appending to the same branch -- it fetches and rebases on a
+non-fast-forward push, which is exactly how the CPU container's parallel worktrees stay
+consistent with each other.
+
+Sharing one GPU between two models means neither gets the full ~2.5 min/rep Transformer saw
+running alone -- expect roughly half the throughput each.
+""")
+
+code("""
+SECOND_MODEL = 'ViterbiNet'   # a model nobody else is running
+SECOND_DIR = '/content/viterbitransformed_2'
+SECOND_LOG = '/content/sweep_2.log'
+SECOND_PIDFILE = SECOND_LOG + '.pid'
+""")
+
+code(f"""
+import os, subprocess
+if not os.path.isdir(SECOND_DIR):
+    subprocess.run(['git', 'clone', '-b', BRANCH, REPO, SECOND_DIR], check=True)
+subprocess.run(['git', '-C', SECOND_DIR, 'pull', '--rebase', 'origin', BRANCH], check=False)
+print(subprocess.run(['git', '-C', SECOND_DIR, 'log', '--oneline', '-1'],
+                     capture_output=True, text=True).stdout)
+
+import csv
+csv_path = os.path.join(SECOND_DIR, 'Results/metrics/mc_sweep_validation.csv')
+rows = list(csv.DictReader(open(csv_path)))
+have = sorted(int(r['snr']) for r in rows if r['model'] == SECOND_MODEL)
+print(f'{{SECOND_MODEL}}: {{len(have)}} points already done -> {{have}}')
+print('missing ->', [s for s in range(18) if s not in have])
+""")
+
+code("""
+import os, subprocess, time
+
+RESTART_SECOND = False   # set True to kill and restart just this second run
+
+# git credentials (~/.git-credentials) are set up globally by section 5 in the
+# FIRST clone's directory -- git itself does not care which clone reads them,
+# so PUSH here reuses that same login rather than needing its own token cell.
+env = os.environ.copy()
+if 'PUSH' not in globals():
+    PUSH = False
+if not PUSH:
+    env['MC_SWEEP_NO_GIT'] = '1'
+else:
+    env['MC_SWEEP_BRANCH'] = PUSH_BRANCH
+    env.pop('MC_SWEEP_NO_GIT', None)
+env['MC_SWEEP_SOURCE'] = 'colab:' + (
+    torch.cuda.get_device_name(0).replace(' ', '_') if torch.cuda.is_available() else 'cpu')
+print('MC_SWEEP_NO_GIT =', env.get('MC_SWEEP_NO_GIT'), '| MC_SWEEP_SOURCE =', env['MC_SWEEP_SOURCE'])
+
+def pid_alive(pid):
+    try:
+        os.kill(pid, 0)
+        return True
+    except (OSError, ValueError):
+        return False
+
+tracked = None
+if os.path.exists(SECOND_PIDFILE):
+    try:
+        tracked = int(open(SECOND_PIDFILE).read().strip())
+    except ValueError:
+        pass
+
+if tracked and pid_alive(tracked) and RESTART_SECOND:
+    subprocess.run(['kill', str(tracked)]); time.sleep(3)
+    print('stopped pid', tracked)
+    tracked = None
+
+if tracked and pid_alive(tracked):
+    print('already running, pid', tracked)
+else:
+    stray = subprocess.run(['pgrep', '-f', f'run_mc_sweep.py {SECOND_MODEL}'],
+                           capture_output=True, text=True).stdout.split()
+    if stray and not os.path.exists(SECOND_LOG):
+        print(f'A {SECOND_MODEL} sweep is running (pid {stray}) but was not started by this '
+              f'cell -- set RESTART_SECOND = True and re-run to replace it. Nothing is lost.')
+    else:
+        subprocess.Popen(
+            f'cd {SECOND_DIR} && nohup python -u run_mc_sweep.py {SECOND_MODEL} '
+            f'> {SECOND_LOG} 2>&1 & echo $! > {SECOND_PIDFILE}',
+            shell=True, env=env)
+        print('launched', SECOND_MODEL, 'in', SECOND_DIR)
+
+time.sleep(25)
+try:
+    tail = open(SECOND_LOG).read()[-3000:]
+except FileNotFoundError:
+    tail = ''
+print(tail or '(no log yet -- re-run this cell in a few seconds)')
+""")
+
+md("""
+### Progress (second model)
+""")
+
+code("""
+import subprocess, glob, json, os
+print(subprocess.run(['tail', '-25', SECOND_LOG], capture_output=True, text=True).stdout)
+print('--- banked so far ---')
+for f in sorted(glob.glob(os.path.join(SECOND_DIR, 'Results/metrics/.mc_sweep_checkpoints/*.json'))):
+    d = json.load(open(f))
+    n = f.split('/')[-1]
+    print(' ', n, '->', f"{len(d['per_rep_means'])} reps" if 'per_rep_means' in d else d)
+try:
+    pid = int(open(SECOND_PIDFILE).read().strip())
+    os.kill(pid, 0)
+    alive = True
+except (FileNotFoundError, ValueError, ProcessLookupError, OSError):
+    alive = False
+print('\\nprocess:', f'running (pid {pid})' if alive else 'NOT running (finished or died)')
 """)
 
 md("""
