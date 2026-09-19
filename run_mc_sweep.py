@@ -108,7 +108,17 @@ MODELS = [
     ('ViterbiNet', 'ModelBased', 20, 100_000, 5),
     ('ClassicViterbi', 'Statistical', 100, 20_000_000, 100),
 ]
-BRANCH = 'claude/transformer-sionna-mlp-comparison-wc67zp'
+# Push target. Override with MC_SWEEP_BRANCH when running this on a second
+# machine so it does not push into the same branch another runner is already
+# advancing -- see "Resuming on another machine" in README.md.
+BRANCH = os.environ.get('MC_SWEEP_BRANCH') or 'claude/transformer-sionna-mlp-comparison-wc67zp'
+
+# Set MC_SWEEP_NO_GIT=1 to keep results local: no commits, no pushes. Resume is
+# unaffected -- a restart reads the same CSV row / weights / checkpoint files
+# from disk either way; they just are not mirrored to a remote. Needed on a
+# machine without push credentials, where the default behaviour would otherwise
+# abort the sweep after push_with_retry exhausts its attempts.
+NO_GIT = (os.environ.get('MC_SWEEP_NO_GIT') or '').lower() not in ('', '0', 'false', 'no')
 
 
 # Effective-SNR penalty of the ISI channel relative to ideal single-tap AWGN.
@@ -370,6 +380,8 @@ def commit_weights_snapshot(model_name, detector_method, snr, in_progress=False)
     make_training_committer) so that even a full disk loss mid-training
     (not just a process restart, which local disk alone already survives)
     cannot erase more than a bounded amount of training progress."""
+    if NO_GIT:
+        return
     weights_dir = weights_dir_for(model_name, detector_method)
     add_paths = []
     if os.path.isdir(weights_dir):
@@ -462,6 +474,10 @@ def commit_and_push(model, detector_method, snr):
     # supersedes it -- otherwise the tracked checkpoint files would stay in
     # git forever and show as an unstaged deletion after every point.
     clear_checkpoint(model, snr)
+    if NO_GIT:
+        # The CSV row on disk is the result; clearing the resume state above
+        # still matters so a finished point leaves nothing stale behind.
+        return
     add_paths += stageable_paths(checkpoint_path(model, snr),
                                  training_state_path(model, snr))
     # -A so the deletions above are staged, not just modifications.
