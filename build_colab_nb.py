@@ -110,6 +110,8 @@ A Colab session is reclaimed after a few hours and its disk goes with it. Pick *
 * **Push to GitHub** -- set `PUSH = True` above and add a `GITHUB_TOKEN` in the Colab
   Secrets panel (key icon, left sidebar) with `Contents: read and write` on this repo.
   Each repetition is committed and pushed, so a new session resumes from the last push.
+  Read the token from Secrets only -- never type or print it in a cell, since cell output
+  is saved into the notebook and a token has leaked that way before.
 * **Google Drive** -- run the cell below. It points `Results/` at a Drive folder, so
   progress survives the session. Merge it back into git yourself afterwards.
 
@@ -144,16 +146,32 @@ os.environ['MC_SWEEP_SOURCE'] = 'colab:' + (
 if PUSH:
     from google.colab import userdata
     token = userdata.get('GITHUB_TOKEN')
-    os.environ['MC_SWEEP_BRANCH'] = PUSH_BRANCH
-    os.environ.pop('MC_SWEEP_NO_GIT', None)
+
+    # Keep the token OUT of the remote URL. git echoes the remote back in its
+    # error messages ("could not read Password for 'https://<token>@github...'"),
+    # which writes the secret straight into saved notebook output -- that is
+    # how a token has already been leaked once here. A credentials file keeps
+    # the remote clean, so git has nothing sensitive to print.
+    os.makedirs('/root', exist_ok=True)
+    with open('/root/.git-credentials', 'w') as f:
+        f.write(f'https://x-access-token:{token}@github.com\\n')
+    os.chmod('/root/.git-credentials', 0o600)
+    subprocess.run(['git', 'config', 'credential.helper', 'store'], check=True)
     subprocess.run(['git', 'remote', 'set-url', 'origin',
-                    f'https://{token}@github.com/Gilzuk/viterbitransformed'], check=True)
+                    'https://github.com/Gilzuk/viterbitransformed'], check=True)
     subprocess.run(['git', 'config', 'user.email', 'colab@example.com'], check=True)
     subprocess.run(['git', 'config', 'user.name', 'colab-runner'], check=True)
-    # Fail here rather than hours into the run.
+
+    os.environ['MC_SWEEP_BRANCH'] = PUSH_BRANCH
+    os.environ.pop('MC_SWEEP_NO_GIT', None)
+
+    # Fail here rather than hours into the run. Scrub the token from whatever
+    # git says, in case any path still surfaces it.
     probe = subprocess.run(['git', 'push', '--dry-run', 'origin', f'HEAD:{PUSH_BRANCH}'],
                            capture_output=True, text=True)
-    print('push check:', 'OK' if probe.returncode == 0 else 'FAILED\\n' + probe.stderr)
+    msg = (probe.stderr or '').replace(token, '<redacted>')
+    print('push check:', 'OK -> will push to ' + PUSH_BRANCH if probe.returncode == 0
+          else 'FAILED\\n' + msg)
 else:
     os.environ['MC_SWEEP_NO_GIT'] = '1'
     print('MC_SWEEP_NO_GIT=1 (no commits or pushes)')
