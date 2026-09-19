@@ -49,6 +49,7 @@ import hashlib
 import json
 import math
 import os
+import socket
 import subprocess
 import sys
 import time
@@ -62,7 +63,11 @@ from Code.trainer import Trainer
 CSV_PATH = os.path.join(RESULTS_DIR, 'metrics', 'mc_sweep_validation.csv')
 FIELDNAMES = ['model', 'snr', 'ser_mean', 'ser_std', 'ser_ci95', 'n_reps',
               'words_run', 'bits_run', 'errors_observed', 'censored',
-              'model_size', 'run_time_sec']
+              'model_size', 'run_time_sec', 'source']
+
+# Label recorded on rows written before provenance was tracked. Not a guess at
+# which machine produced them -- just an honest "not recorded".
+PRE_TRACKING_SOURCE = 'unknown'
 SNR_VALUES = list(range(0, 18))
 # Target expected error count the sizing calculation aims for (see docstring
 # step 2). This is the ONLY thing that decides how many bits a point runs --
@@ -119,6 +124,24 @@ BRANCH = os.environ.get('MC_SWEEP_BRANCH') or 'claude/transformer-sionna-mlp-com
 # machine without push credentials, where the default behaviour would otherwise
 # abort the sweep after push_with_retry exhausts its attempts.
 NO_GIT = (os.environ.get('MC_SWEEP_NO_GIT') or '').lower() not in ('', '0', 'false', 'no')
+
+
+def default_source():
+    """Which machine produced a result. Rows from several machines end up in
+    one CSV once a second runner's branch is merged back, and the hardware is
+    part of how a row should be read -- run_time_sec in particular is not
+    comparable between a CPU container and a local GPU. Override with
+    MC_SWEEP_SOURCE to label a run explicitly."""
+    host = socket.gethostname()
+    try:
+        device = (torch.cuda.get_device_name(0).replace(' ', '_')
+                  if torch.cuda.is_available() else 'cpu')
+    except Exception:
+        device = 'cpu'
+    return f'{host}:{device}'
+
+
+SOURCE = os.environ.get('MC_SWEEP_SOURCE') or default_source()
 
 
 # Effective-SNR penalty of the ISI channel relative to ideal single-tap AWGN.
@@ -192,6 +215,28 @@ def ensure_header():
     if not os.path.isfile(CSV_PATH):
         with open(CSV_PATH, 'w', newline='') as f:
             csv.DictWriter(f, fieldnames=FIELDNAMES).writeheader()
+        return
+
+    # Upgrade a CSV written before a column existed. Without this, appending a
+    # row with the new field to a file still carrying the old header writes
+    # more values than there are columns, and every later read misaligns.
+    with open(CSV_PATH, newline='') as f:
+        reader = csv.DictReader(f)
+        if (reader.fieldnames or []) == FIELDNAMES:
+            return
+        rows = list(reader)
+    for row in rows:
+        if not row.get('source'):
+            row['source'] = PRE_TRACKING_SOURCE
+    tmp = CSV_PATH + '.tmp'
+    with open(tmp, 'w', newline='') as f:
+        writer = csv.DictWriter(f, fieldnames=FIELDNAMES, restval='',
+                                extrasaction='ignore')
+        writer.writeheader()
+        writer.writerows(rows)
+    os.replace(tmp, CSV_PATH)
+    print(f'[csv] upgraded {len(rows)} existing rows to the current columns '
+          f'(source={PRE_TRACKING_SOURCE!r} for rows predating provenance)', flush=True)
 
 
 def drop_existing_row(model, snr):
@@ -204,14 +249,16 @@ def drop_existing_row(model, snr):
         rows = [r for r in reader
                 if not (r['model'] == model and int(r['snr']) == snr)]
     with open(CSV_PATH, 'w', newline='') as f:
-        writer = csv.DictWriter(f, fieldnames=FIELDNAMES)
+        writer = csv.DictWriter(f, fieldnames=FIELDNAMES, restval='',
+                                extrasaction='ignore')
         writer.writeheader()
         writer.writerows(rows)
 
 
 def append_row(row):
     with open(CSV_PATH, 'a', newline='') as f:
-        csv.DictWriter(f, fieldnames=FIELDNAMES).writerow(row)
+        csv.DictWriter(f, fieldnames=FIELDNAMES, restval='',
+                       extrasaction='ignore').writerow(row)
 
 
 # In-progress-point resume state. A point can take hours (an extend batch is a
@@ -752,6 +799,7 @@ def run_point(model_name, detector_method, snr, min_reps, max_bits, step):
         'censored': int(censored),
         'model_size': int(model_size),
         'run_time_sec': run_time,
+        'source': SOURCE,
     }
 
 
