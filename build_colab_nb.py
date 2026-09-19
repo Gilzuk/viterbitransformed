@@ -156,11 +156,18 @@ if PUSH:
     with open('/root/.git-credentials', 'w') as f:
         f.write(f'https://x-access-token:{token}@github.com\\n')
     os.chmod('/root/.git-credentials', 0o600)
-    subprocess.run(['git', 'config', 'credential.helper', 'store'], check=True)
+    # --global, not local to this one clone: section 6b below clones a SECOND
+    # repo to run a model in parallel, and a bare `git config key value` (no
+    # --global) writes only to THIS repo's .git/config. Verified on a clean
+    # HOME with no pre-existing identity: the second clone's first commit hit
+    # "fatal: unable to auto-detect email address" and its push would have no
+    # credential helper at all -- global config is what makes both apply
+    # identically to any repo on this VM, present or cloned later.
+    subprocess.run(['git', 'config', '--global', 'credential.helper', 'store'], check=True)
     subprocess.run(['git', 'remote', 'set-url', 'origin',
                     'https://github.com/Gilzuk/viterbitransformed'], check=True)
-    subprocess.run(['git', 'config', 'user.email', 'colab@example.com'], check=True)
-    subprocess.run(['git', 'config', 'user.name', 'colab-runner'], check=True)
+    subprocess.run(['git', 'config', '--global', 'user.email', 'colab@example.com'], check=True)
+    subprocess.run(['git', 'config', '--global', 'user.name', 'colab-runner'], check=True)
 
     os.environ['MC_SWEEP_BRANCH'] = PUSH_BRANCH
     os.environ.pop('MC_SWEEP_NO_GIT', None)
