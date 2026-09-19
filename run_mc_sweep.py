@@ -79,6 +79,17 @@ THIN_ERROR_THRESHOLD = 10
 
 # (model_name, detector_method, min_reps, max_bits, step)
 #   min_reps   -- floor on the calculated rep count
+#   step       -- repetitions per online_evaluation() call, i.e. how much work
+#                 is in flight and unsaved at any moment. Nothing is written
+#                 until the call returns, so this is a DATA-LOSS window, and it
+#                 is counted in reps while the risk is measured in hours: at
+#                 step=100 ClassicViterbi went ~10h between saves, and at
+#                 step=5 Transformer ~4h, so a container reclaim could discard
+#                 most of a day. It is 1 everywhere now -- one repetition is
+#                 the smallest unit online_evaluation can return, so a restart
+#                 loses at most the rep in progress. Chunking bought nothing
+#                 anyway: each repetition already reloads its own data inside
+#                 the loop, so the per-call overhead it avoided is negligible.
 #   max_bits   -- ceiling on the calculated bit budget, so an optimistic
 #                 prediction (or a genuinely very low SER) cannot make a
 #                 point run away; the point comes back censored/thin instead
@@ -109,9 +120,9 @@ THIN_ERROR_THRESHOLD = 10
 # ~1.5e-7. Brute force cannot reach the floor here; that needs importance
 # sampling, or a much faster detector implementation.
 MODELS = [
-    ('Transformer', 'ModelBased', 20, 100_000, 5),
-    ('ViterbiNet', 'ModelBased', 20, 100_000, 5),
-    ('ClassicViterbi', 'Statistical', 100, 20_000_000, 100),
+    ('Transformer', 'ModelBased', 20, 100_000, 1),
+    ('ViterbiNet', 'ModelBased', 20, 100_000, 1),
+    ('ClassicViterbi', 'Statistical', 100, 20_000_000, 1),
 ]
 # Push target. Override with MC_SWEEP_BRANCH when running this on a second
 # machine so it does not push into the same branch another runner is already
@@ -613,8 +624,16 @@ def run_point(model_name, detector_method, snr, min_reps, max_bits, step):
                   f'({state["minibatches_done"]}/{trainer.train_minibatch_num} minibatches, '
                   f'best_ser={state["best_ser"]:.6f}) -- skipping to evaluation', flush=True)
         else:
+            commit_training = make_training_committer(model_name, detector_method, snr)
+
             def record_progress(minibatch, best_ser):
                 save_training_state(model_name, snr, minibatch, best_ser, complete=False)
+                # Push after every minibatch, not only the ones that improve
+                # the loss. Training can run a long stretch without improving,
+                # and that stretch is still real progress: the minibatch index
+                # is what lets a restart skip it. It is rate-limited inside, so
+                # this is cheap when minibatches are fast.
+                commit_training()
 
             done_so_far = state['minibatches_done']
             if done_so_far:
@@ -623,7 +642,7 @@ def run_point(model_name, detector_method, snr, min_reps, max_bits, step):
                       f'(best_ser={state["best_ser"]:.6f})', flush=True)
             trainer.fading_taps_type = 1
             trainer.train(
-                on_checkpoint=make_training_committer(model_name, detector_method, snr),
+                on_checkpoint=commit_training,
                 start_minibatch=done_so_far + 1,
                 best_ser=state['best_ser'],
                 on_minibatch=record_progress)
