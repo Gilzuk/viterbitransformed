@@ -460,17 +460,17 @@ def commit_weights_snapshot(model_name, detector_method, snr, in_progress=False)
     if not add_paths:
         return
     subprocess.run(['git', 'add'] + add_paths, check=True, cwd=repo_dir())
+    if nothing_staged():
+        return
     suffix = ' (training in progress)' if in_progress else ''
     commit = subprocess.run(
         ['git', 'commit', '-q', '-m', f'Train MC-sweep weights: {model_name} snr={snr}{suffix}'],
         cwd=repo_dir(), capture_output=True, text=True)
     if commit.returncode != 0:
         combined = (commit.stdout or '') + (commit.stderr or '')
-        if 'nothing to commit' in combined.lower():
-            return
         raise RuntimeError(
-            f'git commit failed for {model_name} snr={snr} weights snapshot '
-            f'(not a "nothing to commit" case): {combined.strip()}')
+            f'git commit failed for {model_name} snr={snr} weights snapshot: '
+            f'{combined.strip()}')
     push_with_retry(f'{model_name} snr={snr} weights snapshot')
 
 
@@ -495,6 +495,18 @@ def make_training_committer(model_name, detector_method, snr):
             print(f'[git] mid-training commit failed for {model_name} snr={snr}: {e} '
                   f'-- continuing training, will retry at the next improvement', flush=True)
     return on_checkpoint
+
+
+def nothing_staged():
+    """True when the index holds no changes, so there is nothing to commit.
+
+    Asked of git directly rather than matched out of its output: git says
+    "nothing to commit" when the tree is clean but "no changes added to
+    commit" when something else is merely unstaged, and a guard keyed to the
+    first phrase mistook the second for a real failure -- which aborted a
+    point, and the sweep then skipped it."""
+    return subprocess.run(['git', 'diff', '--cached', '--quiet'],
+                          cwd=repo_dir()).returncode == 0
 
 
 def stageable_paths(*paths):
@@ -540,24 +552,20 @@ def commit_and_push(model, detector_method, snr):
                                  training_state_path(model, snr))
     # -A so the deletions above are staged, not just modifications.
     subprocess.run(['git', 'add', '-A', '--'] + add_paths, check=True, cwd=repo_dir())
+    # append_row wrote a fresh row just before this, so the index should never
+    # be empty here -- but ask git rather than assume, so that a genuine
+    # failure below (say an unconfigured git identity) still raises instead of
+    # being waved through as "probably nothing to commit".
+    if nothing_staged():
+        print(f'[git] nothing staged for {model} snr={snr}', flush=True)
+        return
     commit = subprocess.run(
         ['git', 'commit', '-q', '-m', f'Add MC-sweep validation point: {model} snr={snr}'],
         cwd=repo_dir(), capture_output=True, text=True)
     if commit.returncode != 0:
-        # The only expected/benign failure is "nothing to commit" (append_row
-        # already wrote a fresh row before this is called, so that should
-        # never actually happen -- but check for it specifically rather than
-        # swallowing every commit failure, since a real failure here (e.g.
-        # git identity not configured: "Please tell me who you are") would
-        # otherwise be silently mislabeled as "nothing to commit" and the
-        # point would never reach the remote.
         combined = (commit.stdout or '') + (commit.stderr or '')
-        if 'nothing to commit' in combined.lower():
-            print(f'[git] nothing to commit for {model} snr={snr}', flush=True)
-            return
         raise RuntimeError(
-            f'git commit failed for {model} snr={snr} (not a "nothing to commit" '
-            f'case): {combined.strip()}')
+            f'git commit failed for {model} snr={snr}: {combined.strip()}')
 
     push_with_retry(f'{model} snr={snr}')
 
