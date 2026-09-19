@@ -226,6 +226,9 @@ def load_checkpoint(model, snr):
         return json.load(f)
 
 
+_UNTAGGED = object()  # sentinel: checkpoint predates weights tagging
+
+
 def weights_fingerprint(weights_dir, snr, gamma):
     """Identity of the exact weights a point's eval reps were measured
     against, or None for a method with no weights (Statistical). Checkpoints
@@ -565,23 +568,35 @@ def run_point(model_name, detector_method, snr, min_reps, max_bits, step):
         weights_dir if detector_method != 'Statistical' else None, snr, trainer.gamma)
 
     checkpoint = load_checkpoint(model_name, snr)
-    if checkpoint and detector_method != 'Statistical' and not training_complete_on_entry:
-        print(f'[resume] {model_name} snr={snr}: discarding stale eval checkpoint with '
-              f'{len(checkpoint["per_rep_means"])} reps -- training ran again this pass, '
-              f'so those reps were computed against a different trained model and '
-              f'cannot be mixed with this one\'s', flush=True)
-        clear_eval_checkpoint(model_name, snr)
-        checkpoint = None
-    elif checkpoint and checkpoint.get('weights_tag') != weights_tag:
-        # Checkpoints are committed, so one can arrive from another worktree
-        # (or an older run) carrying reps measured against different weights.
-        # The complete-flag check above cannot catch that; the fingerprint can.
-        print(f'[resume] {model_name} snr={snr}: discarding eval checkpoint with '
-              f'{len(checkpoint["per_rep_means"])} reps -- it is tagged to different '
-              f'weights than the ones loaded here, so its reps belong to another '
-              f'model and cannot be mixed in', flush=True)
-        clear_eval_checkpoint(model_name, snr)
-        checkpoint = None
+    if checkpoint:
+        banked = len(checkpoint['per_rep_means'])
+        stored_tag = checkpoint.get('weights_tag', _UNTAGGED)
+        discard_reason = None
+
+        if detector_method != 'Statistical' and not training_complete_on_entry:
+            discard_reason = ('training ran again this pass, so those reps were '
+                              'computed against a different trained model')
+        elif stored_tag is _UNTAGGED:
+            # Written before checkpoints carried a weights tag. Training is
+            # complete and the weights have not changed since (save_weights
+            # only runs during training), so these reps do belong to the model
+            # loaded here: adopt them and let the next save stamp the tag,
+            # rather than discarding valid evaluation over a format change.
+            print(f'[resume] {model_name} snr={snr}: adopting untagged eval checkpoint '
+                  f'with {banked} reps (predates weight tagging); it will be tagged to '
+                  f'the current weights on the next save', flush=True)
+        elif stored_tag != weights_tag:
+            # Checkpoints are committed, so one can arrive from another
+            # worktree or an older run carrying reps measured against
+            # different weights. The complete-flag check cannot see that.
+            discard_reason = ('it is tagged to different weights than the ones '
+                              'loaded here, so its reps belong to another model')
+
+        if discard_reason:
+            print(f'[resume] {model_name} snr={snr}: discarding eval checkpoint with '
+                  f'{banked} reps -- {discard_reason}', flush=True)
+            clear_eval_checkpoint(model_name, snr)
+            checkpoint = None
     per_rep_means = list(checkpoint['per_rep_means']) if checkpoint else []
     reps_done = len(per_rep_means)
     if reps_done:
