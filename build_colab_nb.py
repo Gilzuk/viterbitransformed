@@ -192,32 +192,74 @@ points reachable.
 """)
 
 code("""
-import subprocess, sys, time
+import os, subprocess, time
 
-# Pipe the child's output back and print it here. A bare subprocess.run()
-# inherits the kernel's stdout, which in a notebook is NOT the cell -- its
-# output disappears into the kernel log and the cell looks dead for hours.
-# Printing goes through IPython's captured stdout, so it lands in the cell.
-print('launching', MODEL, '-- first lines should appear within a minute', flush=True)
-proc = subprocess.Popen([sys.executable, '-u', 'run_mc_sweep.py', MODEL],
-                        stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-                        text=True, bufsize=1)
+# Run detached, writing to a log file, instead of streaming into this cell.
+#
+# Streaming from a notebook cell is unreliable here: a subprocess inherits the
+# KERNEL's stdout, which is not the cell, so a plain subprocess.run() prints
+# into the kernel log and the cell just sits blank -- indistinguishable from a
+# hung run. Piping it back has its own trap: iterating proc.stdout uses a
+# read-ahead buffer, so lines arrive late or not at all.
+#
+# A log file sidesteps both, survives this cell being interrupted, and lets
+# the next cell show progress on demand -- which suits a run measured in hours
+# far better than one cell blocking the whole notebook.
+LOG = '/content/sweep.log'
 
-# The sweep prints a lot of per-word chatter and tqdm redraws. Keep the
-# decision lines, and let the progress bar through once a minute so there is
-# a visible heartbeat without flooding the cell over a multi-hour run.
-KEEP = ('[plan]', '[resume]', '[skip]', '[run]', '[done]', '[csv]', '[git]',
-        '[censored]', '[thin]', 'ERROR', 'Traceback')
-last_tick = 0
-for line in proc.stdout:
-    s = line.rstrip()
-    if any(k in s for k in KEEP):
-        print(s, flush=True)
-    elif ('Eval Reps' in s or 'Training (SNR' in s) and time.time() - last_tick > 60:
-        print(s[-110:], flush=True)
-        last_tick = time.time()
-proc.wait()
-print('exited with', proc.returncode, flush=True)
+RESTART = False   # set True to kill a running sweep and start it fresh
+
+running = subprocess.run(['pgrep', '-f', 'run_mc_sweep.py'],
+                         capture_output=True, text=True).stdout.split()
+
+# An earlier attempt may still be running WITHOUT writing to LOG (e.g. one
+# started by a cell that let the child inherit the kernel's stdout). That
+# looks identical to a healthy run whose log is merely slow, so say so rather
+# than tailing an empty file forever.
+if running and not os.path.exists(LOG):
+    print(f'A sweep is running (pids {running}) but {LOG} does not exist, so it was not\\n'
+          f'started by this cell and its output is not being captured anywhere you can\\n'
+          f'see. Set RESTART = True above and re-run to replace it -- nothing is lost,\\n'
+          f'it resumes from the banked repetitions.')
+elif running and not RESTART:
+    print('already running, pids:', running)
+else:
+    if running and RESTART:
+        subprocess.run(['pkill', '-f', 'run_mc_sweep.py'])
+        time.sleep(3)
+        print('stopped', running)
+    subprocess.Popen(f'nohup python -u run_mc_sweep.py {MODEL} > {LOG} 2>&1 &',
+                     shell=True)
+    print('launched', MODEL)
+
+time.sleep(25)
+try:
+    tail = open(LOG).read()[-3000:]
+except FileNotFoundError:
+    tail = ''
+print(tail or '(no log yet -- re-run this cell in a few seconds)')
+""")
+
+md("""
+### Progress
+Re-run this cell whenever you want an update -- the sweep keeps going regardless. A crash
+shows up here as a traceback; a healthy run shows `[resume]`/`[plan]` lines and a climbing
+repetition count.
+""")
+
+code("""
+import subprocess
+print(subprocess.run(['tail', '-25', '/content/sweep.log'],
+                     capture_output=True, text=True).stdout)
+print('--- banked so far ---')
+import glob, json
+for f in sorted(glob.glob('Results/metrics/.mc_sweep_checkpoints/*.json')):
+    d = json.load(open(f))
+    n = f.split('/')[-1]
+    print(' ', n, '->', f"{len(d['per_rep_means'])} reps" if 'per_rep_means' in d else d)
+alive = subprocess.run(['pgrep', '-f', 'run_mc_sweep.py'],
+                       capture_output=True, text=True).stdout.split()
+print('\\nprocess:', 'running ' + str(alive) if alive else 'NOT running (finished or died)')
 """)
 
 md("""
