@@ -193,6 +193,7 @@ points reachable.
 
 code("""
 import os, subprocess, time
+import torch
 
 # Run detached, writing to a log file, instead of streaming into this cell.
 #
@@ -208,6 +209,21 @@ import os, subprocess, time
 LOG = '/content/sweep.log'
 
 RESTART = False   # set True to kill a running sweep and start it fresh
+
+# Configure the environment HERE rather than relying on an earlier cell having
+# been run. Skipping the setup cell leaves MC_SWEEP_NO_GIT unset, so the sweep
+# commits every repetition and tries to push; with no credentials the push
+# raises, the point is abandoned, main() walks through the remaining SNRs
+# failing each one, and the run exits -- looking exactly like it "just stopped".
+if 'PUSH' not in globals():
+    PUSH = False
+if not PUSH:
+    os.environ['MC_SWEEP_NO_GIT'] = '1'
+os.environ.setdefault('MC_SWEEP_SOURCE', 'colab:' + (
+    torch.cuda.get_device_name(0).replace(' ', '_')
+    if torch.cuda.is_available() else 'cpu'))
+print('MC_SWEEP_NO_GIT =', os.environ.get('MC_SWEEP_NO_GIT'),
+      '| MC_SWEEP_SOURCE =', os.environ['MC_SWEEP_SOURCE'])
 
 running = subprocess.run(['pgrep', '-f', 'run_mc_sweep.py'],
                          capture_output=True, text=True).stdout.split()
