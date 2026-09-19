@@ -67,6 +67,35 @@ then the rest:
 pip install -r requirements.txt
 ```
 
+### 3.0.1. Resuming the MC sweep on another machine (e.g. a local GPU box)
+The sweep's full state is committed, so a clone continues from where the last run got to instead of
+recomputing: finished points as CSV rows in `Results/metrics/mc_sweep_validation.csv`, trained weights under
+`Results/weights/*_mcsweep/`, and mid-point resume state (banked evaluation repetitions, training minibatch
+index) in `Results/metrics/.mc_sweep_checkpoints/`.
+
+```bash
+git clone -b claude/transformer-sionna-mlp-comparison-wc67zp <repo-url> && cd viterbitransformed
+pip install -r requirements.txt        # plus PyTorch for your CUDA version, see 3.0
+MC_SWEEP_NO_GIT=1 python run_mc_sweep.py ViterbiNet      # one model per process
+```
+
+On start each point reports what it reused — `already in CSV` (skipped entirely), `training already complete
+-- skipping to evaluation`, `continuing training at minibatch N/25`, or `found checkpoint with N reps already
+done`. If it instead starts a finished point from scratch, the clone is missing that state.
+
+Two environment variables matter when a second machine is involved:
+
+| Variable | Effect |
+|---|---|
+| `MC_SWEEP_NO_GIT=1` | No commits or pushes; results stay local. Use this without push credentials — otherwise the sweep *aborts* when pushing fails, rather than just not publishing. |
+| `MC_SWEEP_BRANCH=<name>` | Pushes to `<name>` instead of the default branch, so two machines do not race to advance the same one. |
+
+Run a given model on only one machine at a time — two runners on the same point duplicate the work and race
+on its CSV row. To hand a model over, stop it on the first machine, let it push, then pull and start it on the
+second. Evaluation repetitions are tagged with a hash of the weights that produced them and are discarded if
+they do not match the model actually loaded, so a stale or mismatched checkpoint cannot silently contaminate a
+result.
+
 ### 3.1. Conda (original environment)
 3.1.	In order to execute the project,  first make sure you have Anaconda and PyCharm (IDE) installed, then install the project_env.yml: 
 ```bash
