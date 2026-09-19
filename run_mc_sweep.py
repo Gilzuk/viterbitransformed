@@ -234,8 +234,57 @@ def save_checkpoint(model, snr, per_rep_means):
     os.replace(tmp, path)  # atomic: a restart mid-write never leaves a corrupt checkpoint
 
 
-def clear_checkpoint(model, snr):
+def clear_eval_checkpoint(model, snr):
+    """Drop only the banked eval reps, keeping training progress."""
     path = checkpoint_path(model, snr)
+    if os.path.isfile(path):
+        os.remove(path)
+
+
+def clear_checkpoint(model, snr):
+    """Clear all per-point resume state -- called once the point is finished
+    and committed, so the next run starts it clean if it ever re-runs."""
+    clear_eval_checkpoint(model, snr)
+    clear_training_state(model, snr)
+
+
+def training_state_path(model, snr):
+    return os.path.join(CHECKPOINT_DIR, f'{model}_snr{snr}_training.json')
+
+
+def load_training_state(model, snr):
+    """Where training got to for this point, across restarts: how many
+    minibatches have run, the best validation SER seen so far (so a resumed
+    run does not overwrite good weights with a worse first evaluation), and
+    whether the full training budget has been spent. Without this, every
+    restart replayed the whole minibatch loop from 1 -- and a point whose
+    training takes longer than the container lives (e.g. ~6 min/minibatch x
+    25 at high SNR, vs a ~1h container) could never finish training at all,
+    so it never reached the eval phase and never produced a CSV row."""
+    path = training_state_path(model, snr)
+    if not os.path.isfile(path):
+        return {'minibatches_done': 0, 'best_ser': math.inf, 'complete': False}
+    with open(path) as f:
+        state = json.load(f)
+    # json has no inf: it round-trips as None.
+    if state.get('best_ser') is None:
+        state['best_ser'] = math.inf
+    return state
+
+
+def save_training_state(model, snr, minibatches_done, best_ser, complete):
+    os.makedirs(CHECKPOINT_DIR, exist_ok=True)
+    path = training_state_path(model, snr)
+    tmp = path + '.tmp'
+    with open(tmp, 'w') as f:
+        json.dump({'minibatches_done': minibatches_done,
+                   'best_ser': None if math.isinf(best_ser) else best_ser,
+                   'complete': complete}, f)
+    os.replace(tmp, path)
+
+
+def clear_training_state(model, snr):
+    path = training_state_path(model, snr)
     if os.path.isfile(path):
         os.remove(path)
 
@@ -408,18 +457,57 @@ def run_point(model_name, detector_method, snr, min_reps, max_bits, step):
     # already survives a plain process restart, but not necessarily a full
     # container/disk loss -- on_checkpoint commits+pushes each improvement
     # (rate-limited) during training too, so that case is covered as well.
+    #
+    # The minibatch loop itself also resumes: load_training_state() says how
+    # much of the training budget this point has already spent, so a point
+    # whose training takes longer than the container lives finishes it over
+    # several restarts instead of restarting the loop every time and never
+    # reaching the eval phase at all.
+    training_complete_on_entry = False
     if detector_method != 'Statistical':
+        # load_train_weights() used to do this before calling train(); calling
+        # train() directly means save_weights() would otherwise fail on a
+        # model whose weights directory does not exist yet.
+        os.makedirs(weights_dir, exist_ok=True)
         weights_path = os.path.join(weights_dir, f'snr_{snr}_gamma_{trainer.gamma}.pt')
+        state = load_training_state(model_name, snr)
+        training_complete_on_entry = state['complete'] and os.path.isfile(weights_path)
         if os.path.isfile(weights_path):
             prior = torch.load(weights_path)
             trainer.detector.model.load_state_dict(prior['model_state_dict'])
             print(f'[resume] {model_name} snr={snr}: warm-starting training from '
                   f'existing weights on disk (loss={prior["loss"]:.4f})', flush=True)
-        trainer.fading_taps_type = 1
-        trainer.train(on_checkpoint=make_training_committer(model_name, detector_method, snr))
-        trainer.fading_taps_type = 2
-        final = torch.load(weights_path)
-        trainer.detector.model.load_state_dict(final['model_state_dict'])
+
+        if training_complete_on_entry:
+            # Training already spent its full budget in an earlier run, and
+            # those exact weights are what we just loaded. Re-running it would
+            # produce a *different* model and invalidate any eval reps already
+            # banked against this one, so leave the model frozen here and go
+            # straight to eval.
+            print(f'[resume] {model_name} snr={snr}: training already complete '
+                  f'({state["minibatches_done"]}/{trainer.train_minibatch_num} minibatches, '
+                  f'best_ser={state["best_ser"]:.6f}) -- skipping to evaluation', flush=True)
+        else:
+            def record_progress(minibatch, best_ser):
+                save_training_state(model_name, snr, minibatch, best_ser, complete=False)
+
+            done_so_far = state['minibatches_done']
+            if done_so_far:
+                print(f'[resume] {model_name} snr={snr}: continuing training at minibatch '
+                      f'{done_so_far + 1}/{trainer.train_minibatch_num} '
+                      f'(best_ser={state["best_ser"]:.6f})', flush=True)
+            trainer.fading_taps_type = 1
+            trainer.train(
+                on_checkpoint=make_training_committer(model_name, detector_method, snr),
+                start_minibatch=done_so_far + 1,
+                best_ser=state['best_ser'],
+                on_minibatch=record_progress)
+            trainer.fading_taps_type = 2
+            save_training_state(model_name, snr, trainer.train_minibatch_num,
+                                load_training_state(model_name, snr)['best_ser'],
+                                complete=True)
+            final = torch.load(weights_path)
+            trainer.detector.model.load_state_dict(final['model_state_dict'])
     else:
         trainer.load_train_weights(run_over=2)
     commit_weights_snapshot(model_name, detector_method, snr)
@@ -438,21 +526,23 @@ def run_point(model_name, detector_method, snr, min_reps, max_bits, step):
     # row and has no checkpoint). per_rep_means is the only state needed to
     # reconstruct every final statistic exactly; see save_checkpoint().
     #
-    # This is only valid for methods with no training step (Statistical):
-    # load_train_weights(run_over=2) above ALWAYS retrains from scratch for
-    # model-based methods, so a restarted run_point trains a genuinely
-    # different model than whatever produced an existing checkpoint's eval
-    # reps. Resuming that checkpoint would silently blend SER measurements
-    # from two different trained models into one point's statistics -- an
-    # invalid Monte-Carlo estimate. Discard it and start eval fresh; only
-    # the (usually short) training step is repeated, not the whole point.
+    # For a model-based method this is only valid once the model is FROZEN.
+    # If training ran again in this process (training_complete_on_entry is
+    # False), it produced a genuinely different model than the one an
+    # existing checkpoint's reps were measured against, and mixing the two
+    # would blend SER measurements from two different models into one
+    # point's statistics -- an invalid Monte-Carlo estimate. Discard those
+    # reps and start eval fresh in that case. When training was already
+    # complete on entry, though, the weights loaded above are byte-identical
+    # to the ones that produced those reps, so they accumulate legitimately
+    # and the point can finish its eval budget across several restarts.
     checkpoint = load_checkpoint(model_name, snr)
-    if checkpoint and detector_method != 'Statistical':
+    if checkpoint and detector_method != 'Statistical' and not training_complete_on_entry:
         print(f'[resume] {model_name} snr={snr}: discarding stale eval checkpoint with '
-              f'{len(checkpoint["per_rep_means"])} reps -- training just ran fresh (not '
-              f'itself resumable), so those reps were computed against a different '
-              f'trained model and cannot be mixed with this one\'s', flush=True)
-        clear_checkpoint(model_name, snr)
+              f'{len(checkpoint["per_rep_means"])} reps -- training ran again this pass, '
+              f'so those reps were computed against a different trained model and '
+              f'cannot be mixed with this one\'s', flush=True)
+        clear_eval_checkpoint(model_name, snr)
         checkpoint = None
     per_rep_means = list(checkpoint['per_rep_means']) if checkpoint else []
     reps_done = len(per_rep_means)

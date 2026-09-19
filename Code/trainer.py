@@ -239,7 +239,8 @@ class Trainer(object):
         self.load_train_weights(run_over)
         return self.online_evaluation(num_of_rep=num_of_rep)
 
-    def train(self, on_checkpoint=None):
+    def train(self, on_checkpoint=None, start_minibatch=1, best_ser=math.inf,
+              on_minibatch=None):
         """
         Main training loop. Runs in minibatches.
         Evaluates performance over validation SNR.
@@ -249,6 +250,14 @@ class Trainer(object):
         each time improved weights are written to disk, so a caller can
         mirror that progress elsewhere (e.g. committing it to git) without
         this method knowing anything about that.
+
+        start_minibatch/best_ser: resume point for a run that was
+        interrupted partway through the minibatch loop -- pass the
+        minibatch to continue from and the best validation SER reached so
+        far, so the loop finishes the remaining budget instead of
+        replaying it, and does not overwrite already-better weights.
+        on_minibatch: optional callback(minibatch, best_ser) invoked after
+        every minibatch, for persisting that resume point.
         """
         if self.detector_method == 'Statistical':
             raise NotImplementedError("No training implemented for Statistical decoder!!!")
@@ -259,13 +268,14 @@ class Trainer(object):
         
         from tqdm import tqdm
         
-        best_ser = math.inf
         # Progress bar for training minibatches
-        pbar = tqdm(range(1, self.train_minibatch_num + 1), 
+        pbar = tqdm(range(start_minibatch, self.train_minibatch_num + 1),
                     desc=f"🔥 Training (SNR={self.curr_SNR})",
                     unit="batch",
                     ncols=120,
                     colour='green',
+                    initial=start_minibatch - 1,
+                    total=self.train_minibatch_num,
                     bar_format='{l_bar}{bar}| {n_fmt}/{total_fmt} [{elapsed}<{remaining}, {postfix}]')
         
         for minibatch in pbar:
@@ -304,6 +314,8 @@ class Trainer(object):
                 best_ser = ser
                 if on_checkpoint is not None:
                     on_checkpoint()
+            if on_minibatch is not None:
+                on_minibatch(minibatch, best_ser)
             # stopping if SER is 0
             if ser == 0:
                 print(f'\nmodel:{self.model_name}, snr:{self.curr_SNR} [INFO] stopping as training reached minimum of 0')
