@@ -45,6 +45,7 @@ fixes) -- everything else already in the CSV is left alone.
 Run standalone: python run_mc_sweep.py
 """
 import csv
+import hashlib
 import json
 import math
 import os
@@ -225,12 +226,28 @@ def load_checkpoint(model, snr):
         return json.load(f)
 
 
-def save_checkpoint(model, snr, per_rep_means):
+def weights_fingerprint(weights_dir, snr, gamma):
+    """Identity of the exact weights a point's eval reps were measured
+    against, or None for a method with no weights (Statistical). Checkpoints
+    are committed and therefore travel between worktrees via git, so reps
+    must be matched to their model rather than trusted by filename alone --
+    the on-disk weights file does not change during evaluation (save_weights
+    is only called from train()), so this is stable across the whole run."""
+    if weights_dir is None:
+        return None
+    path = os.path.join(weights_dir, f'snr_{snr}_gamma_{gamma}.pt')
+    if not os.path.isfile(path):
+        return None
+    with open(path, 'rb') as f:
+        return hashlib.sha256(f.read()).hexdigest()
+
+
+def save_checkpoint(model, snr, per_rep_means, weights_tag=None):
     os.makedirs(CHECKPOINT_DIR, exist_ok=True)
     path = checkpoint_path(model, snr)
     tmp = path + '.tmp'
     with open(tmp, 'w') as f:
-        json.dump({'per_rep_means': per_rep_means}, f)
+        json.dump({'per_rep_means': per_rep_means, 'weights_tag': weights_tag}, f)
     os.replace(tmp, path)  # atomic: a restart mid-write never leaves a corrupt checkpoint
 
 
@@ -351,10 +368,18 @@ def commit_weights_snapshot(model_name, detector_method, snr, in_progress=False)
     (not just a process restart, which local disk alone already survives)
     cannot erase more than a bounded amount of training progress."""
     weights_dir = weights_dir_for(model_name, detector_method)
-    if not os.path.isdir(weights_dir):
+    add_paths = []
+    if os.path.isdir(weights_dir):
+        add_paths.append(os.path.relpath(weights_dir, repo_dir()))
+    # Stage the resume state in the SAME commit as the weights that produced
+    # it, so the two can never drift apart on the remote: a restart that
+    # pulls this commit gets banked reps and the model they were measured
+    # against together, or neither.
+    if os.path.isdir(CHECKPOINT_DIR):
+        add_paths.append(os.path.relpath(CHECKPOINT_DIR, repo_dir()))
+    if not add_paths:
         return
-    subprocess.run(['git', 'add', os.path.relpath(weights_dir, repo_dir())],
-                    check=True, cwd=repo_dir())
+    subprocess.run(['git', 'add'] + add_paths, check=True, cwd=repo_dir())
     suffix = ' (training in progress)' if in_progress else ''
     commit = subprocess.run(
         ['git', 'commit', '-q', '-m', f'Train MC-sweep weights: {model_name} snr={snr}{suffix}'],
@@ -536,12 +561,25 @@ def run_point(model_name, detector_method, snr, min_reps, max_bits, step):
     # complete on entry, though, the weights loaded above are byte-identical
     # to the ones that produced those reps, so they accumulate legitimately
     # and the point can finish its eval budget across several restarts.
+    weights_tag = weights_fingerprint(
+        weights_dir if detector_method != 'Statistical' else None, snr, trainer.gamma)
+
     checkpoint = load_checkpoint(model_name, snr)
     if checkpoint and detector_method != 'Statistical' and not training_complete_on_entry:
         print(f'[resume] {model_name} snr={snr}: discarding stale eval checkpoint with '
               f'{len(checkpoint["per_rep_means"])} reps -- training ran again this pass, '
               f'so those reps were computed against a different trained model and '
               f'cannot be mixed with this one\'s', flush=True)
+        clear_eval_checkpoint(model_name, snr)
+        checkpoint = None
+    elif checkpoint and checkpoint.get('weights_tag') != weights_tag:
+        # Checkpoints are committed, so one can arrive from another worktree
+        # (or an older run) carrying reps measured against different weights.
+        # The complete-flag check above cannot catch that; the fingerprint can.
+        print(f'[resume] {model_name} snr={snr}: discarding eval checkpoint with '
+              f'{len(checkpoint["per_rep_means"])} reps -- it is tagged to different '
+              f'weights than the ones loaded here, so its reps belong to another '
+              f'model and cannot be mixed in', flush=True)
         clear_eval_checkpoint(model_name, snr)
         checkpoint = None
     per_rep_means = list(checkpoint['per_rep_means']) if checkpoint else []
@@ -559,6 +597,20 @@ def run_point(model_name, detector_method, snr, min_reps, max_bits, step):
     def total_errors():
         return sum(m * bits_per_rep for m in per_rep_means)
 
+    last_eval_commit = [0.0]
+    eval_commit_interval_sec = 120
+
+    def commit_eval_progress():
+        now = time.time()
+        if now - last_eval_commit[0] < eval_commit_interval_sec:
+            return
+        last_eval_commit[0] = now
+        try:
+            commit_weights_snapshot(model_name, detector_method, snr, in_progress=True)
+        except Exception as e:
+            print(f'[git] mid-eval commit failed for {model_name} snr={snr}: {e} '
+                  f'-- continuing, will retry after the next chunk', flush=True)
+
     def run_batch(n):
         nonlocal reps_done
         # Chunk into at most `step` reps per trainer call and checkpoint
@@ -574,7 +626,13 @@ def run_point(model_name, detector_method, snr, min_reps, max_bits, step):
             per_rep_means.extend(float(m) for m in chunk_means)
             reps_done += chunk
             remaining -= chunk
-            save_checkpoint(model_name, snr, per_rep_means)
+            save_checkpoint(model_name, snr, per_rep_means, weights_tag)
+            # Push each banked chunk. Saving it locally only protected against
+            # a process restart; a point can now represent tens of hours of
+            # evaluation, so get it onto the remote where a container/disk
+            # loss cannot take it. Rate-limited, and failures are logged
+            # rather than raised so a git hiccup never aborts the run.
+            commit_eval_progress()
 
     # Calculate the required bit budget once, up front, and run exactly that
     # many reps -- no doubling, no re-targeting off what gets observed. See
