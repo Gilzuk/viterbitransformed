@@ -96,6 +96,11 @@ second. Evaluation repetitions are tagged with a hash of the weights that produc
 they do not match the model actually loaded, so a stale or mismatched checkpoint cannot silently contaminate a
 result.
 
+A finished point's eval checkpoint (its per-repetition SER values) is kept, not deleted, once the CSV row is
+written — it is the raw data behind that row's aggregated stats, and keeping it means a point can later be
+extended with more repetitions on the same trained weights, without retraining, for a tighter confidence
+interval.
+
 ### 3.1. Conda (original environment)
 3.1.	In order to execute the project,  first make sure you have Anaconda and PyCharm (IDE) installed, then install the project_env.yml: 
 ```bash

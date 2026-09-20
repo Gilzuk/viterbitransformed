@@ -329,13 +329,6 @@ def clear_eval_checkpoint(model, snr):
         os.remove(path)
 
 
-def clear_checkpoint(model, snr):
-    """Clear all per-point resume state -- called once the point is finished
-    and committed, so the next run starts it clean if it ever re-runs."""
-    clear_eval_checkpoint(model, snr)
-    clear_training_state(model, snr)
-
-
 def training_state_path(model, snr):
     return os.path.join(CHECKPOINT_DIR, f'{model}_snr{snr}_training.json')
 
@@ -539,13 +532,17 @@ def commit_and_push(model, detector_method, snr):
     add_paths = ['Results/metrics/mc_sweep_validation.csv']
     if os.path.isdir(weights_dir):
         add_paths.append(os.path.relpath(weights_dir, repo_dir()))
-    # The finished point's resume state is cleared here rather than by the
-    # caller, so its removal lands in the same commit as the CSV row that
-    # supersedes it -- otherwise the tracked checkpoint files would stay in
-    # git forever and show as an unstaged deletion after every point.
-    clear_checkpoint(model, snr)
+    # Training resume state is cleared here rather than by the caller, so its
+    # removal lands in the same commit as the CSV row that supersedes it --
+    # otherwise the tracked training-state file would stay in git forever and
+    # show as an unstaged deletion after every point. The eval checkpoint
+    # (per-rep SER means) is deliberately KEPT, not cleared: it is the raw
+    # data the CSV row's aggregated stats were computed from, and keeping it
+    # lets a finished point be extended with more reps later (same weights,
+    # no retraining) without redoing the reps it already has.
+    clear_training_state(model, snr)
     if NO_GIT:
-        # The CSV row on disk is the result; clearing the resume state above
+        # The CSV row on disk is the result; clearing the training state above
         # still matters so a finished point leaves nothing stale behind.
         return
     add_paths += stageable_paths(checkpoint_path(model, snr),
