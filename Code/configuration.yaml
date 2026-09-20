@@ -9,6 +9,7 @@ memory_length: 4 # Memory length of the channel. values: int. Tested with values
 channel_type: 'ISI_AWGN' # Channel type. For this paper, we only used ISI AWGN. values: ['ISI_AWGN'].
 channel_coefficients: 'cost2100' # The taps of the channel. values: ['time_decay','cost2100'].
 noisy_est_var: 0 # Adds noise to channel taps, with variance set by this value and zero mean. values: int.
+csi_uncertainty: 0 # ClassicViterbi only: fraction of the true channel's own energy used as the std of noise added to ITS OWN channel estimate (taps 1+), independent of noisy_est_var above -- models a decoder mismatched against an otherwise-exact channel. values: float in [0, 1].
 fading_in_channel: True # If the channel is fading/non-fading. values: [True, False]
 fading_in_decoder: True # If the decoder is aware of the fading, only used in the full-CSI VA. values: [True, False]
 fading_taps_type: 1 # Fading type, see paper for more details. The synthetic train channel is 1, the test is 2.

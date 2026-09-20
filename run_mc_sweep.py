@@ -560,18 +560,28 @@ def commit_and_push(model, detector_method, snr):
     push_with_retry(f'{model} snr={snr}')
 
 
-def run_point(model_name, detector_method, snr, min_reps, max_bits, step, forced_reps=None):
+def run_point(model_name, detector_method, snr, min_reps, max_bits, step, forced_reps=None,
+             trainer_model_name=None, trainer_kwargs=None):
+    """trainer_model_name/trainer_kwargs let a caller run a variant of an
+    existing Trainer-dispatchable model (e.g. ClassicViterbi with a non-zero
+    csi_uncertainty) under a distinct model_name for every CSV row,
+    checkpoint file, and weights directory this function touches -- so the
+    variant's results and resume state never collide with the base model's.
+    trainer_model_name is the literal name Trainer's own model dispatch dict
+    needs (e.g. 'ClassicViterbi'); it defaults to model_name, which is what
+    every other caller already relies on."""
     weights_dir = weights_dir_for(model_name, detector_method)
 
     t0 = time.time()
     trainer = Trainer(
-        model_name=model_name,
+        model_name=trainer_model_name or model_name,
         detector_method=detector_method,
         curr_SNR=snr,
         val_block_length=120,
         train_block_length=120,
         pilots_num=25,
         weights_dir=weights_dir,
+        **(trainer_kwargs or {}),
     )
 
     model_size = 0

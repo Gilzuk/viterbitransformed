@@ -45,6 +45,7 @@ class Trainer(object):
         self.channel_type = None
         self.channel_coefficients = None
         self.noisy_est_var = None
+        self.csi_uncertainty = None
         self.fading_in_channel = None
         self.fading_in_decoder = None
         self.fading_taps_type = None
@@ -153,7 +154,8 @@ class Trainer(object):
                                    noisy_est_var=self.noisy_est_var,
                                    fading=self.fading_in_decoder,
                                    fading_taps_type=self.fading_taps_type,
-                                   channel_coefficients=self.channel_coefficients),
+                                   channel_coefficients=self.channel_coefficients,
+                                   csi_uncertainty=self.csi_uncertainty or 0.0),
             'ViterbiNet': lambda: ViterbiNet(input_size=1, n_classes=self.n_states),
             'LSTM': lambda: LSTM(INPUT_SIZE, HIDDEN_SIZE, NUM_LAYERS, n_classes),
             'ADNN': lambda: ADNN(input_size=INPUT_SIZE, dim=N_DIM, n_classes=n_classes),

@@ -972,11 +972,13 @@ class ClassicViterbi(nn.Module):
                  noisy_est_var: float,
                  fading: bool,
                  fading_taps_type: int,
-                 channel_coefficients: str):
+                 channel_coefficients: str,
+                 csi_uncertainty: float = 0.0):
 
         super(ClassicViterbi, self).__init__()
         self.memory_length = memory_length
         self.gamma = gamma
+        self.csi_uncertainty = csi_uncertainty
         self.val_words = val_words
         self.n_classes = n_classes
         self.channel_type = channel_type
@@ -1002,6 +1004,18 @@ class ClassicViterbi(nn.Module):
         h = np.concatenate([estimate_channel(self.memory_length, self.gamma, noisy_est_var=self.noisy_est_var,
                                              fading=self.fading, index=index, fading_taps_type=self.fading_taps_type,
                                              channel_coefficients=self.channel_coefficients) for index in range(self.val_words)], axis=0)
+        # CSI uncertainty: perturbs only the decoder's own belief about the
+        # channel (used below for the Viterbi metric), not the channel that
+        # actually transmitted the word -- that stays exact, generated
+        # separately in ChannelModelDataset with its own noisy_est_var (left
+        # at 0). This models a decoder mismatched against a perfect channel,
+        # not a noisier physical channel. csi_uncertainty is a fraction of
+        # each word's own channel energy (sqrt(mean(h**2)) that draw), used
+        # as the noise std applied uniformly to taps 1..L-1, matching the
+        # existing noisy_est_var convention of never perturbing tap 0.
+        if self.csi_uncertainty > 0:
+            std = self.csi_uncertainty * np.sqrt(np.mean(h ** 2, axis=1, keepdims=True))
+            h[:, 1:] += np.random.normal(0, 1, [self.val_words, self.memory_length - 1]) * std
         if count is not None:
             h = h[count].reshape(1, -1)
         # compute priors
