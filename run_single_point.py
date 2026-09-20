@@ -37,7 +37,7 @@ def main():
     drop_existing_row(model_name, snr)
     append_row(row)
     print(f'[done] {row}', flush=True)
-    commit_and_push(model_name, detector_method, snr)  # also clears resume state
+    commit_and_push(model_name, detector_method, snr)
 
 
 if __name__ == '__main__':

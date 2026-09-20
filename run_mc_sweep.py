@@ -364,12 +364,6 @@ def save_training_state(model, snr, minibatches_done, best_ser, complete):
     os.replace(tmp, path)
 
 
-def clear_training_state(model, snr):
-    path = training_state_path(model, snr)
-    if os.path.isfile(path):
-        os.remove(path)
-
-
 def repo_dir():
     return os.path.dirname(os.path.abspath(__file__))
 
@@ -532,18 +526,17 @@ def commit_and_push(model, detector_method, snr):
     add_paths = ['Results/metrics/mc_sweep_validation.csv']
     if os.path.isdir(weights_dir):
         add_paths.append(os.path.relpath(weights_dir, repo_dir()))
-    # Training resume state is cleared here rather than by the caller, so its
-    # removal lands in the same commit as the CSV row that supersedes it --
-    # otherwise the tracked training-state file would stay in git forever and
-    # show as an unstaged deletion after every point. The eval checkpoint
-    # (per-rep SER means) is deliberately KEPT, not cleared: it is the raw
-    # data the CSV row's aggregated stats were computed from, and keeping it
-    # lets a finished point be extended with more reps later (same weights,
-    # no retraining) without redoing the reps it already has.
-    clear_training_state(model, snr)
+    # Both the eval checkpoint (per-rep SER means) and the training state are
+    # deliberately KEPT, not cleared, once a point finishes: together they are
+    # the raw data the CSV row's aggregated stats were computed from, and
+    # keeping both lets a finished point be extended with more reps later
+    # (extend_point.py) on the exact same trained weights, no retraining,
+    # without redoing the reps it already has. run_point()'s own resume logic
+    # already treats "training complete + matching weights" as a signal to
+    # skip straight to eval, so a later extend call needs the training state
+    # to still say complete=True -- if it were cleared, extending would
+    # silently retrain from scratch instead of reusing the finished model.
     if NO_GIT:
-        # The CSV row on disk is the result; clearing the training state above
-        # still matters so a finished point leaves nothing stale behind.
         return
     add_paths += stageable_paths(checkpoint_path(model, snr),
                                  training_state_path(model, snr))
@@ -567,7 +560,7 @@ def commit_and_push(model, detector_method, snr):
     push_with_retry(f'{model} snr={snr}')
 
 
-def run_point(model_name, detector_method, snr, min_reps, max_bits, step):
+def run_point(model_name, detector_method, snr, min_reps, max_bits, step, forced_reps=None):
     weights_dir = weights_dir_for(model_name, detector_method)
 
     t0 = time.time()
@@ -591,9 +584,10 @@ def run_point(model_name, detector_method, snr, min_reps, max_bits, step):
     # leaves those at a fresh random init, so a restart mid-training would
     # normally throw away whatever progress the interrupted attempt made and
     # start over. If this exact (model, snr) already has a weights file on
-    # disk -- left there by a previous run_point() call for this same point
-    # that got interrupted before its point was fully done (a finished point
-    # is never re-entered; see the `done` skip in main()) -- load it first so
+    # disk -- left there by a previous run_point() call for this same point,
+    # either interrupted mid-training (see the `done` skip in main(), which
+    # keeps a normal sweep from re-entering a finished point) or finished and
+    # now being re-entered deliberately by extend_point.py -- load it first so
     # training continues from there instead of from scratch. Local disk alone
     # already survives a plain process restart, but not necessarily a full
     # container/disk loss -- on_checkpoint commits+pushes each improvement
@@ -670,10 +664,13 @@ def run_point(model_name, detector_method, snr, min_reps, max_bits, step):
     bits_per_word = trainer.n_symbols * 8
     bits_per_rep = words_per_rep * bits_per_word
 
-    # Resume from a checkpoint left by a run that was interrupted mid-point
-    # (a restart, not a clean finish -- a finished point is a committed CSV
-    # row and has no checkpoint). per_rep_means is the only state needed to
-    # reconstruct every final statistic exactly; see save_checkpoint().
+    # Resume from a checkpoint: either left by a run that was interrupted
+    # mid-point, or the finished point's own checkpoint when this call comes
+    # from extend_point.py asking for more reps on top of it (a normal sweep
+    # never reaches here for a finished point -- main() skips it via the
+    # `done` check in append_row/drop_existing_row's caller). per_rep_means is
+    # the only state needed to reconstruct every final statistic exactly; see
+    # save_checkpoint().
     #
     # For a model-based method this is only valid once the model is FROZEN.
     # If training ran again in this process (training_complete_on_entry is
@@ -773,14 +770,25 @@ def run_point(model_name, detector_method, snr, min_reps, max_bits, step):
     # Calculate the required bit budget once, up front, and run exactly that
     # many reps -- no doubling, no re-targeting off what gets observed. See
     # the "Sizing method" note at the top of this file.
-    predicted_ser = max(expected_ser_isi(snr), 1e-300)
-    required_bits = TARGET_ERRORS / predicted_ser
-    required_reps = math.ceil(required_bits / bits_per_rep)
-    capped_reps = max_bits // bits_per_rep
-    planned_reps = int(min(max(required_reps, min_reps), capped_reps))
+    #
+    # forced_reps bypasses this sizing formula entirely: extend_point.py sets
+    # it to an explicit target (current banked reps + however many more the
+    # caller asked for) when adding reps to an already-finished point, since
+    # the point being "finished" by the normal sizing formula is exactly the
+    # situation being deliberately overridden here.
+    if forced_reps is not None:
+        planned_reps = forced_reps
+        print(f'[plan] {model_name} snr={snr}: forced_reps={planned_reps} '
+              f'(explicit extend request, sizing formula bypassed)', flush=True)
+    else:
+        predicted_ser = max(expected_ser_isi(snr), 1e-300)
+        required_bits = TARGET_ERRORS / predicted_ser
+        required_reps = math.ceil(required_bits / bits_per_rep)
+        capped_reps = max_bits // bits_per_rep
+        planned_reps = int(min(max(required_reps, min_reps), capped_reps))
 
-    print(f'[plan] {model_name} snr={snr}: predicted_ser={predicted_ser:.3e}, '
-          f'planned_reps={planned_reps} (min={min_reps}, cap={capped_reps})', flush=True)
+        print(f'[plan] {model_name} snr={snr}: predicted_ser={predicted_ser:.3e}, '
+              f'planned_reps={planned_reps} (min={min_reps}, cap={capped_reps})', flush=True)
 
     if reps_done < planned_reps:
         run_batch(planned_reps - reps_done)
