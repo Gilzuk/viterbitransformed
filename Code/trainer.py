@@ -1,4 +1,4 @@
-from Code.models import ClassicViterbi, ViterbiNet, LSTM, SionnaNeuralReceiver, SionnaSkip, SionnaViterbiPlus, SionnaViterbiAdd, ECC_Transformer, ADNN
+from Code.models import ClassicViterbi, ViterbiNet, LSTM, SionnaNeuralReceiver, SionnaSkip, SionnaViterbiPlus, SionnaViterbiAdd, ECC_Transformer, ADNN, Mamba2Detector
 from Code.detector import Detector
 from Code.channel.channel_dataset import ChannelModelDataset
 from Code.ecc.rs_main import decode, encode
@@ -164,8 +164,11 @@ class Trainer(object):
             'SionnaAdd': lambda: SionnaViterbiAdd(input_size=1, n_input_channels=1, n_output_channels=N_DIM, n_classes=n_classes),
             'SionnaSkip': lambda: SionnaSkip(input_size=1, n_input_channels=1, n_output_channels=N_DIM, n_classes=n_classes),
             'Transformer': lambda: ECC_Transformer(INPUT_SIZE, N_DIM, N_HEADS, NUM_LAYERS, n_classes),
-            'Mamba': lambda: MambaLM(MambaLMConfig(d_model=4, n_layers=12, vocab_size=n_classes,pad_vocab_size_multiple=n_classes),n_classes,input_size=4)
-
+            'Mamba': lambda: MambaLM(MambaLMConfig(d_model=4, n_layers=12, vocab_size=n_classes,pad_vocab_size_multiple=n_classes),n_classes,input_size=4),
+            # Sized to match ViterbiNet's 7,002-parameter MLP as closely as
+            # possible (6,996 params) -- see Code/mamba2.py's docstring.
+            'Mamba2': lambda: Mamba2Detector(input_size=INPUT_SIZE, d_model=20, n_layers=2, n_classes=n_classes,
+                                              d_state=8, expand_factor=2, head_dim=4, d_conv=4),
         }
         selected_model = models[self.model_name]().to(device)
         model_parameters = filter(lambda p: p.requires_grad, selected_model.parameters())

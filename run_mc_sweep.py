@@ -123,6 +123,9 @@ MODELS = [
     ('Transformer', 'ModelBased', 20, 100_000, 1),
     ('ViterbiNet', 'ModelBased', 20, 100_000, 1),
     ('ClassicViterbi', 'Statistical', 100, 20_000_000, 1),
+    # Same row shape as ViterbiNet (its size-matched comparison target) --
+    # see Code/mamba2.py.
+    ('Mamba2', 'ModelBased', 20, 100_000, 1),
 ]
 # Push target. Override with MC_SWEEP_BRANCH when running this on a second
 # machine so it does not push into the same branch another runner is already
