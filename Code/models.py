@@ -825,6 +825,59 @@ class ECC_Transformer(nn.Module):
         return out.reshape(batch_size, transmission_length, self.n_classes)
 
 
+class SinusoidalPositionalEncoding(nn.Module):
+    """Standard non-parametric sinusoidal position encoding (Vaswani et al.)."""
+    def __init__(self, d_model, max_len=2048):
+        super(SinusoidalPositionalEncoding, self).__init__()
+        pe = torch.zeros(max_len, d_model)
+        position = torch.arange(0, max_len, dtype=torch.float).unsqueeze(1)
+        div_term = torch.exp(torch.arange(0, d_model, 2).float() * (-math.log(10000.0) / d_model))
+        pe[:, 0::2] = torch.sin(position * div_term)
+        pe[:, 1::2] = torch.cos(position * div_term)
+        self.register_buffer('pe', pe.unsqueeze(0))
+
+    def forward(self, x):
+        return x + self.pe[:, :x.size(1)]
+
+
+class ECC_TransformerV2(nn.Module):
+    """Variant of ECC_Transformer testing 3 fixes identified as likely causes
+    of its failure to outperform ViterbiNet's MLP, all free in parameter count:
+    (1) fewer heads so d_k = d_model/h isn't degenerate (n_heads is caller-set,
+        unlike the original's hardcoded-too-high N_HEADS=8 for d_model=16),
+    (2) sinusoidal positional encoding (non-parametric) since self-attention
+        is otherwise permutation-invariant, and
+    (3) no causal mask -- the ISI channel is causal in x->y (x[t] leaks into
+        future y[t+1..t+L-1]), so a strictly-causal mask throws away exactly
+        the future context that gives Viterbi/BCJR their edge over a
+        memoryless per-sample estimator; a sequence-labeling task has no
+        autoregressive-leakage reason to mask the future the way language
+        modeling does.
+    """
+    def __init__(self, input_size, n_dim, n_heads, n_layers, n_classes, dropout=0):
+        super(ECC_TransformerV2, self).__init__()
+        self.input_size = input_size
+        self.n_classes = n_classes
+
+        cpy = copy.deepcopy
+        attn = MultiHeadedAttention(n_heads, n_dim)
+        ff = PositionwiseFeedForward(n_dim, n_dim*4, dropout)
+        self.input_layer = nn.Linear(input_size, n_dim, bias=False)
+        self.pos_encoding = SinusoidalPositionalEncoding(n_dim)
+        self.transformer_encoder = Encoder(EncoderLayer(n_dim, cpy(attn), cpy(ff), dropout), n_layers)
+
+        self.fc = nn.Linear(n_dim, n_classes)
+
+    def forward(self, input_):
+        batch_size, transmission_length = input_.size(0), input_.size(1)
+
+        x = self.input_layer(input_)
+        x = self.pos_encoding(x)
+        y = self.transformer_encoder(x, mask=None)
+        out = self.fc(y)
+        return out.reshape(batch_size, transmission_length, self.n_classes)
+
+
 class TRANSFORMER(nn.Module):
     def __init__(self, input_size, n_dim, n_heads, num_layers, ff_dim, n_classes, dropout=0):
         super(TRANSFORMER, self).__init__()

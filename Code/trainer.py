@@ -1,4 +1,4 @@
-from Code.models import ClassicViterbi, ViterbiNet, LSTM, SionnaNeuralReceiver, SionnaSkip, SionnaViterbiPlus, SionnaViterbiAdd, ECC_Transformer, ADNN
+from Code.models import ClassicViterbi, ViterbiNet, LSTM, SionnaNeuralReceiver, SionnaSkip, SionnaViterbiPlus, SionnaViterbiAdd, ECC_Transformer, ECC_TransformerV2, ADNN
 from Code.detector import Detector
 from Code.channel.channel_dataset import ChannelModelDataset
 from Code.ecc.rs_main import decode, encode
@@ -24,6 +24,8 @@ INPUT_SIZE = 4    # input rolling number
 N_DIM = 16
 
 N_HEADS = 8       # for Transformers model
+N_HEADS_V2 = 2    # for TransformerV2: keeps d_k = N_DIM/N_HEADS_V2 = 8 instead of the
+                  # degenerate 2 that N_HEADS=8 gives at N_DIM=16 -- same param count
 
 HIDDEN_SIZE = 256  # for LSTM model
 NUM_LAYERS = 2
@@ -164,6 +166,7 @@ class Trainer(object):
             'SionnaAdd': lambda: SionnaViterbiAdd(input_size=1, n_input_channels=1, n_output_channels=N_DIM, n_classes=n_classes),
             'SionnaSkip': lambda: SionnaSkip(input_size=1, n_input_channels=1, n_output_channels=N_DIM, n_classes=n_classes),
             'Transformer': lambda: ECC_Transformer(INPUT_SIZE, N_DIM, N_HEADS, NUM_LAYERS, n_classes),
+            'TransformerV2': lambda: ECC_TransformerV2(INPUT_SIZE, N_DIM, N_HEADS_V2, NUM_LAYERS, n_classes),
             'Mamba': lambda: MambaLM(MambaLMConfig(d_model=4, n_layers=12, vocab_size=n_classes,pad_vocab_size_multiple=n_classes),n_classes,input_size=4)
 
         }
