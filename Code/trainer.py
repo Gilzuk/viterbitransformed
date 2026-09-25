@@ -172,6 +172,9 @@ class Trainer(object):
             'Transformer': lambda: ECC_Transformer(INPUT_SIZE, N_DIM, N_HEADS, NUM_LAYERS, n_classes),
             'TransformerV2': lambda: ECC_TransformerV2(INPUT_SIZE, N_DIM, N_HEADS_V2, NUM_LAYERS, n_classes),
             'TransformerV3': lambda: ECC_TransformerV2(INPUT_SIZE, N_DIM_V3, N_HEADS_V3, NUM_LAYERS, n_classes),
+            # V2 fed only the current sample y[t] (input_size=1, like ViterbiNet), to test
+            # whether the 4-sample window is what holds the trellis-decoded result back.
+            'TransformerV2_in1': lambda: ECC_TransformerV2(1, N_DIM, N_HEADS_V2, NUM_LAYERS, n_classes),
             'Mamba': lambda: MambaLM(MambaLMConfig(d_model=4, n_layers=12, vocab_size=n_classes,pad_vocab_size_multiple=n_classes),n_classes,input_size=4)
 
         }
