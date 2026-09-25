@@ -26,6 +26,10 @@ N_DIM = 16
 N_HEADS = 8       # for Transformers model
 N_HEADS_V2 = 2    # for TransformerV2: keeps d_k = N_DIM/N_HEADS_V2 = 8 instead of the
                   # degenerate 2 that N_HEADS=8 gives at N_DIM=16 -- same param count
+N_DIM_V3 = 64     # for TransformerV3: same 3 fixes as V2, but with parameter parity
+N_HEADS_V3 = 4    # to ViterbiNet deliberately dropped (~101k params, ~14x ViterbiNet's
+                  # ~7k) to test whether the tiny shared param budget, not the attention
+                  # configuration, was the real ceiling on TransformerV2's results.
 
 HIDDEN_SIZE = 256  # for LSTM model
 NUM_LAYERS = 2
@@ -167,6 +171,7 @@ class Trainer(object):
             'SionnaSkip': lambda: SionnaSkip(input_size=1, n_input_channels=1, n_output_channels=N_DIM, n_classes=n_classes),
             'Transformer': lambda: ECC_Transformer(INPUT_SIZE, N_DIM, N_HEADS, NUM_LAYERS, n_classes),
             'TransformerV2': lambda: ECC_TransformerV2(INPUT_SIZE, N_DIM, N_HEADS_V2, NUM_LAYERS, n_classes),
+            'TransformerV3': lambda: ECC_TransformerV2(INPUT_SIZE, N_DIM_V3, N_HEADS_V3, NUM_LAYERS, n_classes),
             'Mamba': lambda: MambaLM(MambaLMConfig(d_model=4, n_layers=12, vocab_size=n_classes,pad_vocab_size_multiple=n_classes),n_classes,input_size=4)
 
         }
