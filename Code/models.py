@@ -1238,3 +1238,34 @@ class ClassicViterbi(nn.Module):
         return -priors
 
 
+class ClassicViterbiLS(ClassicViterbi):
+    """Classical Viterbi with NO channel knowledge: the L taps are estimated by
+    least squares from known symbols -- the pilot word, then every data word
+    that passes the same ECC-accepted gate ViterbiNet's online training uses
+    (decision-directed tracking). Same trellis, same Gaussian metric as
+    ClassicViterbi; only the source of h differs (estimate vs. true taps).
+    The Trainer calls ls_update(tx, rx) where learned detectors take
+    gradient steps (online_training)."""
+    online_ls = True
+
+    def __init__(self, *args, **kwargs):
+        super(ClassicViterbiLS, self).__init__(*args, **kwargs)
+        self.h_est = np.zeros((1, self.memory_length))
+        self.h_est[0, 0] = 1.0  # placeholder until the first pilot arrives
+
+    def state_symbols(self, states: np.ndarray) -> np.ndarray:
+        """Per-state tap-symbol vectors, exactly as compute_state_priors builds them."""
+        bits = np.unpackbits(states.astype(np.uint8).reshape(-1, 1), axis=1).astype(int)
+        return BPSKModulator.modulate(bits[:, -self.memory_length:])
+
+    def ls_update(self, states: torch.Tensor, rx: torch.Tensor):
+        X = self.state_symbols(states.reshape(-1).cpu().numpy())
+        y = rx.reshape(-1).cpu().numpy()[:X.shape[0]]
+        self.h_est = np.linalg.lstsq(X, y, rcond=None)[0].reshape(1, -1)
+
+    def forward(self, y: torch.Tensor) -> torch.Tensor:
+        y = y.reshape(1, -1)
+        state_priors = self.compute_state_priors(self.h_est)
+        priors = (y.unsqueeze(dim=2) - state_priors.T.unsqueeze(dim=1)) ** 2 / 2 - math.log(math.sqrt(2 * math.pi))
+        self.count += 1
+        return -priors

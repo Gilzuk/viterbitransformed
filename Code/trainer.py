@@ -1,4 +1,4 @@
-from Code.models import ClassicViterbi, ViterbiNet, LSTM, SionnaNeuralReceiver, SionnaSkip, SionnaViterbiPlus, SionnaViterbiAdd, ECC_Transformer, ECC_TransformerV2, ViterbiTransformerV3, ViterbiTransformerV4, ViT1D, ViterbiNetMLP, ADNN
+from Code.models import ClassicViterbi, ClassicViterbiLS, ViterbiNet, LSTM, SionnaNeuralReceiver, SionnaSkip, SionnaViterbiPlus, SionnaViterbiAdd, ECC_Transformer, ECC_TransformerV2, ViterbiTransformerV3, ViterbiTransformerV4, ViT1D, ViterbiNetMLP, ADNN
 from Code.detector import Detector
 from Code.channel.channel_dataset import ChannelModelDataset
 from Code.ecc.rs_main import decode, encode
@@ -150,7 +150,7 @@ class Trainer(object):
             n_classes = self.n_states
         else:
             n_classes = N_CLASSES
-        if self.detector_method == 'Statistical':
+        if self.detector_method == 'Statistical' and self.model_name != 'ClassicViterbi_LS':
             self.self_supervised = False
         models = {
             'ClassicViterbi': lambda: ClassicViterbi(n_classes=n_classes,
@@ -163,6 +163,16 @@ class Trainer(object):
                                    fading_taps_type=self.fading_taps_type,
                                    channel_coefficients=self.channel_coefficients,
                                    csi_uncertainty=self.csi_uncertainty or 0.0),
+            # Classical Viterbi without CSI: taps from LS on the pilot + accepted words.
+            'ClassicViterbi_LS': lambda: ClassicViterbiLS(n_classes=n_classes,
+                                   memory_length=self.memory_length,
+                                   gamma=self.gamma,
+                                   val_words=self.val_frames * self.subframes_in_frame,
+                                   channel_type=self.channel_type,
+                                   noisy_est_var=self.noisy_est_var,
+                                   fading=self.fading_in_decoder,
+                                   fading_taps_type=self.fading_taps_type,
+                                   channel_coefficients=self.channel_coefficients),
             'ViterbiNet': lambda: ViterbiNet(input_size=1, n_classes=self.n_states),
             'LSTM': lambda: LSTM(INPUT_SIZE, HIDDEN_SIZE, NUM_LAYERS, n_classes),
             'ADNN': lambda: ADNN(input_size=INPUT_SIZE, dim=N_DIM, n_classes=n_classes),
@@ -525,7 +535,7 @@ class Trainer(object):
         
         from tqdm import tqdm
         
-        if self.self_supervised:
+        if self.self_supervised and not getattr(self.detector.model, 'online_ls', False):
             # Idempotent: a caller running online_evaluation in several
             # smaller batches on the same trainer (e.g. an adaptive
             # run-until-enough-errors loop) keeps one optimizer/criterion
@@ -703,6 +713,10 @@ class Trainer(object):
         :param tx: transmitted word
         :param rx: received word
         """
+        if getattr(self.detector.model, 'online_ls', False):
+            # classical receiver: re-estimate the taps by LS instead of gradient steps
+            self.detector.model.ls_update(self.calculate_states(tx), rx)
+            return
         # run training loops
         for i in range(self.self_supervised_iterations):
             # calculate soft values

@@ -8,6 +8,9 @@ Results/metrics/mc_sweep_validation.csv compare directly with the others.
 
 e.g. ViterbiNet with 5 online adaptation iterations per word:
     python run_variant_sweep.py ViterbiNet_on5 ViterbiNet 5 7 0 2 4 ...
+or classical Viterbi with LS-estimated taps (pilot + decision-directed):
+    VARIANT_METHOD=Statistical VARIANT_MIN_REPS=100 VARIANT_MAX_BITS=2000000 \
+    python run_variant_sweep.py ClassicViterbi_LS ClassicViterbi_LS - 7 0 2 ...
 Several workers can run at once on disjoint SNR lists. Git is left to the
 caller (MC_SWEEP_NO_GIT is forced on); resume uses run_mc_sweep's checkpoints.
 """
@@ -17,6 +20,11 @@ os.environ['MC_SWEEP_NO_GIT'] = '1'
 import run_mc_sweep as sweep
 
 LOCK = sweep.CSV_PATH + '.lock'
+# Protocol overrides (defaults = ViterbiNet's row). A classical/statistical variant uses e.g.
+# VARIANT_METHOD=Statistical VARIANT_MIN_REPS=100 VARIANT_MAX_BITS=2000000.
+METHOD = os.environ.get('VARIANT_METHOD', 'ModelBased')
+MIN_REPS = int(os.environ.get('VARIANT_MIN_REPS', '20'))
+MAX_BITS = int(os.environ.get('VARIANT_MAX_BITS', '100000'))
 
 
 def main(label, trainer_model, online_iters, snrs):
@@ -31,7 +39,7 @@ def main(label, trainer_model, online_iters, snrs):
             print(f'[skip] {label} snr={snr} already in CSV', flush=True)
             continue
         print(f'\n[run] {label} snr={snr}', flush=True)
-        row = sweep.run_point(label, 'ModelBased', snr, 20, 100_000, 1,
+        row = sweep.run_point(label, METHOD, snr, MIN_REPS, MAX_BITS, 1,
                               trainer_model_name=trainer_model, trainer_kwargs=kwargs)
         with open(LOCK, 'w') as lk:
             fcntl.flock(lk, fcntl.LOCK_EX)
