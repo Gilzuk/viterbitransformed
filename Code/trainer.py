@@ -59,6 +59,7 @@ class Trainer(object):
         self.doppler = None  # normalized f_D*T_symbol; > 0 makes the taps vary within a word
         self.rician_k = None  # Rician K-factor of that fast fading (default 3)
         self.psp_step = None  # LMS step of ClassicViterbi_PSP (default 0.05)
+        self.ls_forget = None  # ClassicViterbi_LS forgetting factor over past words (default 0 = last word only)
         self.subframes_in_frame = None
         self.gamma = None
         self.curr_SNR = None
@@ -175,7 +176,8 @@ class Trainer(object):
                                    noisy_est_var=self.noisy_est_var,
                                    fading=self.fading_in_decoder,
                                    fading_taps_type=self.fading_taps_type,
-                                   channel_coefficients=self.channel_coefficients),
+                                   channel_coefficients=self.channel_coefficients,
+                                   forget=self.ls_forget or 0.0),
             # Fast fading reference: Viterbi given the true per-sample taps.
             'ClassicViterbi_genie': lambda: ClassicViterbiGenie(n_classes=n_classes,
                                    memory_length=self.memory_length,

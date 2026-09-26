@@ -1248,10 +1248,16 @@ class ClassicViterbiLS(ClassicViterbi):
     gradient steps (online_training)."""
     online_ls = True
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, forget: float = 0.0, **kwargs):
         super(ClassicViterbiLS, self).__init__(*args, **kwargs)
         self.h_est = np.zeros((1, self.memory_length))
         self.h_est[0, 0] = 1.0  # placeholder until the first pilot arrives
+        # Exponentially-weighted LS over all past known/accepted words:
+        # forget=0 uses only the latest word (plain LS); forget -> 1 approaches
+        # the long-term average channel.
+        self.forget = forget
+        self.R = np.zeros((self.memory_length, self.memory_length))
+        self.r = np.zeros(self.memory_length)
 
     def state_symbols(self, states: np.ndarray) -> np.ndarray:
         """Per-state tap-symbol vectors, exactly as compute_state_priors builds them."""
@@ -1261,7 +1267,12 @@ class ClassicViterbiLS(ClassicViterbi):
     def ls_update(self, states: torch.Tensor, rx: torch.Tensor):
         X = self.state_symbols(states.reshape(-1).cpu().numpy())
         y = rx.reshape(-1).cpu().numpy()[:X.shape[0]]
-        self.h_est = np.linalg.lstsq(X, y, rcond=None)[0].reshape(1, -1)
+        if self.forget == 0:
+            self.h_est = np.linalg.lstsq(X, y, rcond=None)[0].reshape(1, -1)
+            return
+        self.R = self.forget * self.R + X.T @ X
+        self.r = self.forget * self.r + X.T @ y
+        self.h_est = np.linalg.solve(self.R, self.r).reshape(1, -1)
 
     def forward(self, y: torch.Tensor) -> torch.Tensor:
         y = y.reshape(1, -1)

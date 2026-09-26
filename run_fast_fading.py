@@ -6,7 +6,7 @@ diffuse part is a Jakes process with normalized Doppler fd = f_D * T_symbol
 (see Code/channel/channel_dataset.py). Every detector sees the same draws
 (evaluation data is seeded per repetition), so differences are paired.
 
-    python run_fast_fading.py <snr> <fd> <label=trainer_model:method[:online_iters]> ...
+    python run_fast_fading.py <snr> <fd> <label=trainer_model:method[:online_iters][:key=value]> ...
 
 e.g.
     python run_fast_fading.py 7 0.01 ClassicViterbi_genie=ClassicViterbi_genie:Statistical \
@@ -36,12 +36,16 @@ def done_keys():
 def main(snr, fd, specs):
     lock = open(CSV_PATH + '.lock', 'w')
     for spec in specs:
-        label, rest = spec.split('=')
+        label, rest = spec.split('=', 1)
         parts = rest.split(':')
         trainer_model, method = parts[0], parts[1]
         kwargs = {'doppler': fd, 'rician_k': RICIAN_K, 'psp_step': PSP_STEP}
-        if len(parts) > 2:
-            kwargs['self_supervised_iterations'] = int(parts[2])
+        for extra in parts[2:]:
+            if '=' in extra:  # any Trainer attribute, e.g. ls_forget=0.8
+                k, v = extra.split('=')
+                kwargs[k] = float(v)
+            else:
+                kwargs['self_supervised_iterations'] = int(extra)
         if (label, fd, RICIAN_K, snr) in done_keys():
             print(f'[skip] {label} fd={fd} K={RICIAN_K} snr={snr}', flush=True)
             continue
