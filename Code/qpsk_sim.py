@@ -26,6 +26,10 @@ and then it uses that word's transmitted symbols):
     affine        per-sample scores W^T [Re y, Im y] + b  (3C parameters) --
                   the exact form of the Gaussian log-likelihood, learned
     mlp           ViterbiNet-style MLP on [Re y, Im y]
+    sym_affine    4-class symbol classifier: linear map from a window of 2L-1
+                  complex samples around each symbol to the 4 QPSK classes,
+                  argmax decision, no trellis ((4L-2)*4+4 parameters)
+    sym_mlp       same window, small MLP, argmax, no trellis
     tied          'structured affine': the affine scores with their class means
                   tied to L learnable complex taps + a learnable noise scale
                   (2L+1 real parameters), trained by the same gradient steps
@@ -58,7 +62,14 @@ class Config:
     offline_lr = 1e-3
     online_lr = 5e-2
     pilot_iters = 200    # learned receivers: steps on the pilot (once per frame)
+    dd_lr = None         # lr for the per-word tracking steps; default online_lr
     mlp_hidden = (100, 58)
+    sym_hidden = (32, 16)  # 4-class symbol-classifier MLP
+    sym_window = None      # samples per symbol classifier window; default 2L-1
+
+    @property
+    def W(self):
+        return self.sym_window or 2 * self.L - 1
 
     def __init__(self, **kw):
         for k, v in kw.items():
@@ -104,6 +115,17 @@ def features(y):
     return torch.stack([y.real, y.imag], -1)                  # (B, T, 2)
 
 
+def sym_features(cfg, y):
+    """Window y[t-(L-1) .. t+(L-1)] around each data symbol t (its own energy
+    spans y[t..t+L-1]; the previous L-1 symbols' ISI sits in y[t-L+1..t]).
+    y: (B, N+L-1) -> (B, N, 2W)."""
+    back = (cfg.W - 1) // 2
+    need = cfg.N - 1 + cfg.W - back                           # last index needed + 1
+    yp = F.pad(torch.view_as_real(y).transpose(1, 2), [back, max(0, need - y.shape[1])])
+    win = yp.unfold(2, cfg.W, 1)[:, :, :cfg.N]                 # (B, 2, N, W)
+    return win.permute(0, 2, 1, 3).reshape(y.shape[0], cfg.N, 2 * cfg.W)
+
+
 # ---------------------------------------------------------------- viterbi ---
 def viterbi(cfg, scores):
     """scores: (B, T, C) log-scores (higher = better). Returns (B, N) symbol indices."""
@@ -145,7 +167,11 @@ class BatchedNet:
             self.sym = cfg.const[cfg.digits]                   # (C, L) complex
             self.reset_opt()
             return
-        dims = [2] + (list(cfg.mlp_hidden) if kind == 'mlp' else []) + [cfg.C]
+        if kind.startswith('sym'):
+            # 4-class symbol classifier on a window of samples, no trellis
+            dims = [2 * cfg.W] + (list(cfg.sym_hidden) if kind == 'sym_mlp' else []) + [cfg.M]
+        else:
+            dims = [2] + (list(cfg.mlp_hidden) if kind == 'mlp' else []) + [cfg.C]
         for a, b in zip(dims, dims[1:]):
             W = torch.empty(F_, a, b)
             for f in range(F_):
@@ -172,27 +198,37 @@ class BatchedNet:
                 x = torch.sigmoid(x) if i == 0 else torch.relu(x)
         return x
 
+    def prepare(self, y, d, cls):
+        """(inputs, labels) for one word: per-sample features + branch classes
+        for trellis front ends, symbol windows + symbol indices for 4-class ones."""
+        if self.kind.startswith('sym'):
+            return sym_features(self.cfg, y), d
+        return features(y), cls
+
     def scores(self, y):                                      # y: (F, T) -> (F, T, C)
         with torch.no_grad():
             return F.log_softmax(self.forward(features(y)), -1)
+
+    def decide(self, y):                                      # 4-class: (F, N) symbol indices
+        with torch.no_grad():
+            return self.forward(sym_features(self.cfg, y)).argmax(-1)
 
     def reset_opt(self):
         self.m = [torch.zeros_like(p) for p in self.params]
         self.v = [torch.zeros_like(p) for p in self.params]
         self.t = torch.zeros(self.params[0].shape[0])
 
-    def step(self, y, classes, lr, mask=None, iters=1):
-        """iters Adam steps on (y, classes) for the frames in mask."""
-        F_ = y.shape[0]
+    def step(self, x, classes, lr, mask=None, iters=1):
+        """iters Adam steps on (inputs x, labels) for the frames in mask."""
+        F_ = x.shape[0]
         mask = torch.ones(F_, dtype=torch.bool) if mask is None else mask
         if iters == 0 or not mask.any():
             return
-        x = features(y)
         mf = mask.float()
         b1, b2, eps = 0.9, 0.999, 1e-8
         for _ in range(iters):
             logits = self.forward(x)
-            loss = F.cross_entropy(logits.reshape(-1, self.cfg.C), classes.reshape(-1), reduction='none')
+            loss = F.cross_entropy(logits.reshape(-1, logits.shape[-1]), classes.reshape(-1), reduction='none')
             loss = (loss.view(F_, -1).mean(1) * mf).sum()
             grads = torch.autograd.grad(loss, self.params)
             self.t = self.t + mf
@@ -218,9 +254,10 @@ def offline_train(cfg, kind, N0, steps=None):
     steps = cfg.offline_steps if steps is None else steps
     for _ in range(steps):
         h = random_taps(cfg, cfg.offline_words)
-        _, y, cls = transmit(cfg, h, N0)
+        d, y, cls = transmit(cfg, h, N0)
+        x, lab = net.prepare(y, d, cls)
         # one frame, many words: flatten words into the sample axis
-        net.step(y.reshape(1, -1), cls.reshape(1, -1), cfg.offline_lr)
+        net.step(x.reshape(1, -1, x.shape[-1]), lab.reshape(1, -1), cfg.offline_lr)
     return net
 
 
@@ -248,7 +285,7 @@ def run_snr(cfg, snr_db, frames, receivers, online_iters, seed=0):
     N0 = 10 ** (-snr_db / 10)
     nets = {}
     for r in receivers:
-        if r.startswith(('affine', 'mlp', 'tied')):
+        if r.startswith(('affine', 'mlp', 'tied', 'sym')):
             kind = r.split('@')[0]
             off = offline_train(cfg, kind, N0)
             net = BatchedNet(cfg, kind, frames)
@@ -257,28 +294,30 @@ def run_snr(cfg, snr_db, frames, receivers, online_iters, seed=0):
     h = random_taps(cfg, frames)
     stats = {r: [0, 0] for r in receivers}
     ls_state = {}
+    pil = []
     for w in range(cfg.words):
         if w > 0:
             h = evolve_taps(cfg, h)
         d, y, cls = transmit(cfg, h, N0)
         if w < cfg.pilot_words:                               # pilot words
-            pil_y = y if w == 0 else torch.cat([pil_y, y], 1)
-            pil_c = cls if w == 0 else torch.cat([pil_c, cls], 1)
+            pil.append((d, y, cls))
             if w == cfg.pilot_words - 1:
                 for r in receivers:
                     if r == 'classic_ls':
-                        ls_state[r] = ls_estimate(cfg, pil_y, pil_c)
+                        ls_state[r] = ls_estimate(cfg, torch.cat([p[1] for p in pil], 1),
+                                                  torch.cat([p[2] for p in pil], 1))
                     elif r in nets:
-                        nets[r].step(pil_y, pil_c, cfg.online_lr, iters=cfg.pilot_iters)
+                        xs, labs = zip(*[nets[r].prepare(yy, dd, cc) for dd, yy, cc in pil])
+                        nets[r].step(torch.cat(xs, 1), torch.cat(labs, 1), cfg.online_lr, iters=cfg.pilot_iters)
             continue
         for r in receivers:
             if r == 'classic_csi':
                 sc = classic_scores(cfg, y, h, torch.full((frames,), N0))
             elif r == 'classic_ls':
                 sc = classic_scores(cfg, y, *ls_state[r])
-            else:
+            elif not r.startswith('sym'):
                 sc = nets[r].scores(y)
-            dhat = viterbi(cfg, sc)
+            dhat = nets[r].decide(y) if r.startswith('sym') else viterbi(cfg, sc)
             err = (dhat != d).float().mean(1)                 # per-frame word SER
             stats[r][0] += int((dhat != d).sum())
             stats[r][1] += d.numel()
@@ -294,5 +333,7 @@ def run_snr(cfg, snr_db, frames, receivers, online_iters, seed=0):
                 h_old, n_old = ls_state[r]
                 ls_state[r] = (torch.where(ok[:, None], h_new, h_old), torch.where(ok, n_new, n_old))
             elif r in nets:
-                nets[r].step(y, cls, cfg.online_lr, mask=ok, iters=online_iters[r])
+                lab_d = dhat if cfg.adapt == 'dd' else d
+                x, lab = nets[r].prepare(y, lab_d, cls)
+                nets[r].step(x, lab, cfg.dd_lr or cfg.online_lr, mask=ok, iters=online_iters[r])
     return {r: tuple(v) for r, v in stats.items()}, {r: nets[r].n_params() for r in nets}
