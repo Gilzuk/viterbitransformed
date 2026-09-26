@@ -15,6 +15,7 @@ except Exception:
 INK, INK2, MUTED, GRID, SURF = '#0b0b0b', '#52514e', '#8a8983', '#e4e3dd', '#fcfcfb'
 S = [  # (label in CSV, legend, color, marker, linestyle)
     ('ClassicViterbi', 'ClassicViterbi, perfect CSI (reference bound)', '#52514e', 'o', '--'),
+    ('ClassicViterbi_LS', 'Classical Viterbi, LS channel estimate from pilot + decisions (no CSI)', '#e34948', 'o', '-'),
     ('ViterbiNet_on5', 'ViterbiNet MLP, 7,002 params, 5 online steps/word', '#2a78d6', 's', '-'),
     ('VNet_affine', 'Affine VNet, 32 params, 200 online steps/word', '#1baf7a', 'D', '-'),
     ('ViterbiNet', 'ViterbiNet MLP, 7,002 params, 200 online steps/word (default)', '#eb6834', '^', '-'),
