@@ -1,4 +1,4 @@
-from Code.models import ClassicViterbi, ViterbiNet, LSTM, SionnaNeuralReceiver, SionnaSkip, SionnaViterbiPlus, SionnaViterbiAdd, ECC_Transformer, ECC_TransformerV2, ViterbiTransformerV3, ViT1D, ADNN
+from Code.models import ClassicViterbi, ViterbiNet, LSTM, SionnaNeuralReceiver, SionnaSkip, SionnaViterbiPlus, SionnaViterbiAdd, ECC_Transformer, ECC_TransformerV2, ViterbiTransformerV3, ViterbiTransformerV4, ViT1D, ADNN
 from Code.detector import Detector
 from Code.channel.channel_dataset import ChannelModelDataset
 from Code.ecc.rs_main import decode, encode
@@ -175,6 +175,8 @@ class Trainer(object):
             'TransformerV3': lambda: ECC_TransformerV2(INPUT_SIZE, N_DIM_V3, N_HEADS_V3, NUM_LAYERS, n_classes),
             # V2 + nonlinear, biased per-window embedding (MLP front end); ~7.2k params.
             'ViterbiTransformerV3': lambda: ViterbiTransformerV3(INPUT_SIZE, N_DIM, N_HEADS_V2, NUM_LAYERS, n_classes),
+            # MLP feature extraction -> 1 attention layer -> MLP head -> Viterbi; ~6.9k params.
+            'ViterbiTransformerV4': lambda: ViterbiTransformerV4(INPUT_SIZE, N_DIM, N_HEADS_V2, n_classes),
             # V2 fed only the current sample y[t] (input_size=1, like ViterbiNet), to test
             # whether the 4-sample window is what holds the trellis-decoded result back.
             'TransformerV2_in1': lambda: ECC_TransformerV2(1, N_DIM, N_HEADS_V2, NUM_LAYERS, n_classes),

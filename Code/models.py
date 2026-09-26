@@ -896,6 +896,47 @@ class ViterbiTransformerV3(ECC_TransformerV2):
         )
 
 
+class ViterbiTransformerV4(nn.Module):
+    """Feature extraction -> one attention layer -> feature extraction -> Viterbi.
+
+    The snr=7 attention readouts showed the second encoder layer's attention
+    stays near-uniform (96-98% of max entropy), so its ~3.3k parameters are
+    moved into nonlinear feature extraction instead:
+      * front end: a deeper MLP on each rolling window of input_size samples
+        (Linear -> GELU -> Linear -> GELU -> Linear, with biases),
+      * a single bidirectional encoder layer (sinusoidal positions, 2 heads)
+        that gathers context from neighbouring symbols, the job layer 1
+        was already doing,
+      * a per-position MLP head producing the state priors for the trellis.
+    """
+    def __init__(self, input_size, n_dim, n_heads, n_classes, hidden=40, dropout=0):
+        super(ViterbiTransformerV4, self).__init__()
+        self.input_size = input_size
+        self.n_classes = n_classes
+
+        self.feature_extractor = nn.Sequential(
+            nn.Linear(input_size, hidden),
+            nn.GELU(),
+            nn.Linear(hidden, hidden),
+            nn.GELU(),
+            nn.Linear(hidden, n_dim),
+        )
+        self.pos_encoding = SinusoidalPositionalEncoding(n_dim)
+        attn = MultiHeadedAttention(n_heads, n_dim)
+        ff = PositionwiseFeedForward(n_dim, n_dim * 4, dropout)
+        self.transformer_encoder = Encoder(EncoderLayer(n_dim, attn, ff, dropout), 1)
+        self.head = nn.Sequential(
+            nn.Linear(n_dim, 2 * n_dim),
+            nn.GELU(),
+            nn.Linear(2 * n_dim, n_classes),
+        )
+
+    def forward(self, input_):
+        x = self.pos_encoding(self.feature_extractor(input_))
+        y = self.transformer_encoder(x, mask=None)
+        return self.head(y)
+
+
 class ViT1D(nn.Module):
     """Vision-Transformer-style detector for a 1-D received block: the block is
     cut into non-overlapping patches of patch_size samples, each patch is
