@@ -878,6 +878,24 @@ class ECC_TransformerV2(nn.Module):
         return out.reshape(batch_size, transmission_length, self.n_classes)
 
 
+class ViterbiTransformerV3(ECC_TransformerV2):
+    """TransformerV2 with the input embedding replaced by a small MLP with
+    biases (Linear -> GELU -> Linear) applied to each rolling window of
+    input_size samples. The plain bias-free linear embedding is what the
+    snr=7 ablations pointed at: adding just a bias (ViT_overlap) cut
+    TransformerV2's gap to ViterbiNet from ~22% to ~7%, and ViterbiNet itself
+    applies a nonlinearity directly to the raw sample. Everything else --
+    sinusoidal positions, bidirectional attention, 2 heads, 2 layers -- is V2.
+    """
+    def __init__(self, input_size, n_dim, n_heads, n_layers, n_classes, dropout=0):
+        super(ViterbiTransformerV3, self).__init__(input_size, n_dim, n_heads, n_layers, n_classes, dropout)
+        self.input_layer = nn.Sequential(
+            nn.Linear(input_size, n_dim),
+            nn.GELU(),
+            nn.Linear(n_dim, n_dim),
+        )
+
+
 class ViT1D(nn.Module):
     """Vision-Transformer-style detector for a 1-D received block: the block is
     cut into non-overlapping patches of patch_size samples, each patch is
