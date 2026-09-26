@@ -1,0 +1,2 @@
+topology,params,train_minibatches,online_iters,snr,ser_mean,ser_ci95,n_reps,bits_run,run_time_sec
+affine,32,25,200,7,0.024380000591278074,0.00198138905972777,20,40000,2725.4
