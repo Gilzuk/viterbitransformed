@@ -708,6 +708,28 @@ class ViterbiNet(nn.Module):
         return priors
 
 
+class ViterbiNetMLP(nn.Module):
+    """ViterbiNet's per-sample MLP with a configurable topology, for the
+    size/latency study. hidden_sizes=(100, 58) reproduces ViterbiNet exactly
+    (sigmoid after the first hidden layer, ReLU after the rest);
+    hidden_sizes=() is a single affine map y[t] -> 16 state scores, which is
+    the exact form of the Gaussian log-likelihood for a known channel once the
+    state-independent y^2 term is dropped."""
+    def __init__(self, hidden_sizes, n_classes: int):
+        super(ViterbiNetMLP, self).__init__()
+        self.n_classes = n_classes
+        self.input_size = 1
+        layers, width = [], 1
+        for i, h in enumerate(hidden_sizes):
+            layers += [nn.Linear(width, h), nn.Sigmoid() if i == 0 else nn.ReLU()]
+            width = h
+        layers.append(nn.Linear(width, n_classes))
+        self.net = nn.Sequential(*layers).to(device)
+
+    def forward(self, y: torch.Tensor) -> torch.Tensor:
+        return self.net(y.reshape(-1, 1)).reshape(y.size(0), y.size(1), self.n_classes)
+
+
 ####################################### Transformers ##############################################
 
 

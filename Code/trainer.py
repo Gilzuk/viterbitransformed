@@ -1,4 +1,4 @@
-from Code.models import ClassicViterbi, ViterbiNet, LSTM, SionnaNeuralReceiver, SionnaSkip, SionnaViterbiPlus, SionnaViterbiAdd, ECC_Transformer, ECC_TransformerV2, ViterbiTransformerV3, ViterbiTransformerV4, ViT1D, ADNN
+from Code.models import ClassicViterbi, ViterbiNet, LSTM, SionnaNeuralReceiver, SionnaSkip, SionnaViterbiPlus, SionnaViterbiAdd, ECC_Transformer, ECC_TransformerV2, ViterbiTransformerV3, ViterbiTransformerV4, ViT1D, ViterbiNetMLP, ADNN
 from Code.detector import Detector
 from Code.channel.channel_dataset import ChannelModelDataset
 from Code.ecc.rs_main import decode, encode
@@ -187,6 +187,12 @@ class Trainer(object):
             'Mamba': lambda: MambaLM(MambaLMConfig(d_model=4, n_layers=12, vocab_size=n_classes,pad_vocab_size_multiple=n_classes),n_classes,input_size=4)
 
         }
+        # 'VNet_<h1>-<h2>-...' builds ViterbiNet's MLP with those hidden sizes;
+        # 'VNet_affine' has no hidden layer (topology/latency study).
+        if self.model_name.startswith('VNet_'):
+            spec = self.model_name[len('VNet_'):]
+            hidden = () if spec == 'affine' else tuple(int(h) for h in spec.split('-'))
+            models[self.model_name] = lambda: ViterbiNetMLP(hidden, n_classes=self.n_states)
         selected_model = models[self.model_name]().to(device)
         model_parameters = filter(lambda p: p.requires_grad, selected_model.parameters())
         params = sum([np.prod(p.size()) for p in model_parameters])
