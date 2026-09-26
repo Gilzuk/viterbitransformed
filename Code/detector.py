@@ -40,6 +40,9 @@ class Detector(nn.Module):
 
     def forward(self, input_: torch.Tensor, phase: str):
         batch_size, transmission_length = input_.size(0), input_.size(1)
+        if phase == 'val' and hasattr(self.model, 'detect'):
+            # detectors that run their own trellis (e.g. per-survivor processing)
+            return self.model.detect(input_)
         padded_input = torch.nn.functional.pad(input_, [0, self.model.input_size - 1, 0, 0], value=START_PADDING_VALUE)
         sequence_input = torch.cat([torch.roll(padded_input.unsqueeze(1), i, 2) for i in range(self.model.input_size - 1, -1, -1)], dim=1)
         sequence_input = sequence_input.transpose(1, 2)[:, :transmission_length].to(device)

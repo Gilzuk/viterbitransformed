@@ -1269,3 +1269,65 @@ class ClassicViterbiLS(ClassicViterbi):
         priors = (y.unsqueeze(dim=2) - state_priors.T.unsqueeze(dim=1)) ** 2 / 2 - math.log(math.sqrt(2 * math.pi))
         self.count += 1
         return -priors
+
+
+class ClassicViterbiGenie(ClassicViterbi):
+    """Fast-fading reference: the classic Viterbi metric computed with the TRUE
+    per-sample taps h_t (the Trainer hands them over as `taps`, [words, T, L],
+    for every repetition). Lower bound for any receiver on a time-varying channel."""
+    needs_true_taps = True
+    taps = None
+
+    def forward(self, y: torch.Tensor) -> torch.Tensor:
+        y = y.reshape(1, -1)
+        h = self.taps[self.count]  # [T, L]
+        state_priors = self.compute_state_priors(h)  # [n_states, T]
+        priors = (y.unsqueeze(dim=2) - state_priors.T.unsqueeze(dim=0)) ** 2 / 2 - math.log(math.sqrt(2 * math.pi))
+        self.count += 1
+        return -priors
+
+
+class ClassicViterbiPSP(ClassicViterbiLS):
+    """Classical Viterbi without CSI that TRACKS the channel inside the word:
+    per-survivor processing (Raheli et al.), each of the n_states survivors
+    keeps its own tap estimate, updated by LMS along its own path at every
+    step. Same trellis, metric and decision rule as Detector's Viterbi. A word
+    starts from the previous word's best-survivor estimate; pilot and
+    ECC-accepted words refine it (block LS, then an LMS pass over the known
+    symbols, so it ends on the channel at the END of the word)."""
+
+    def __init__(self, *args, step: float = 0.05, **kwargs):
+        super(ClassicViterbiPSP, self).__init__(*args, **kwargs)
+        self.step = step
+        self.symbols = self.state_symbols(np.arange(self.n_classes))  # [S, L]
+        s = np.arange(self.n_classes)
+        self.preds = np.stack([(2 * s) % self.n_classes, (2 * s) % self.n_classes + 1], axis=1)  # [S, 2]
+        self.h_word_start = self.h_est
+
+    def detect(self, y: torch.Tensor) -> torch.Tensor:
+        y_np = y.reshape(-1).cpu().numpy()
+        X, P, mu = self.symbols, self.preds, self.step
+        H = np.repeat(self.h_est, self.n_classes, axis=0)  # [S, L] per-survivor taps
+        self.h_word_start = self.h_est
+        in_prob = np.zeros(self.n_classes)
+        rows = np.arange(self.n_classes)
+        out = np.zeros(y_np.shape[0])
+        for i, yi in enumerate(y_np):
+            out[i] = np.argmin(in_prob) % 2
+            e = yi - np.sum(H * X, axis=1)  # each state's innovation under its own survivor's taps
+            cand = in_prob + e ** 2 / 2
+            best = P[rows, np.argmin(cand[P], axis=1)]
+            in_prob = cand[best]
+            H = H[best] + mu * e[best, None] * X[best]
+        self.h_est = H[np.argmin(in_prob)].reshape(1, -1)
+        self.count += 1
+        return torch.Tensor(out).reshape(1, -1).to(y.device)
+
+    def ls_update(self, states: torch.Tensor, rx: torch.Tensor):
+        idx = states.reshape(-1).cpu().numpy().astype(int)
+        y = rx.reshape(-1).cpu().numpy()[:idx.shape[0]]
+        X = self.symbols[idx]
+        h = np.linalg.lstsq(X, y, rcond=None)[0]
+        for x, yi in zip(X, y):
+            h = h + self.step * (yi - h @ x) * x
+        self.h_est = h.reshape(1, -1)

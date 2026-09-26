@@ -27,6 +27,22 @@ _data_cache = ChannelDataCache()
 # the long tail is generated fresh and simply not persisted.
 CACHE_MAX_REP = 200
 
+# Fast fading (doppler > 0): each tap is the slow COST2100 magnitude times a
+# Rician factor sqrt(K/(K+1)) + sqrt(1/(K+1)) * g_k(t), where g_k is a real,
+# unit-variance Jakes (sum-of-sinusoids) process with normalized Doppler
+# doppler = f_D * T_symbol. g_k runs continuously across all words of a
+# repetition, so the taps change within a word, not just between words.
+JAKES_SINUSOIDS = 16
+FAST_FADING_SEED = 91138233
+
+
+def jakes_process(n_samples: int, n_taps: int, doppler: float, rng: mtrand.RandomState) -> np.ndarray:
+    """[n_samples, n_taps] independent real Jakes fading processes, unit variance."""
+    t = np.arange(n_samples).reshape(-1, 1, 1)
+    alpha = rng.uniform(0, 2 * np.pi, (1, n_taps, JAKES_SINUSOIDS))
+    phi = rng.uniform(0, 2 * np.pi, (1, n_taps, JAKES_SINUSOIDS))
+    return np.sqrt(2 / JAKES_SINUSOIDS) * np.cos(2 * np.pi * doppler * np.cos(alpha) * t + phi).sum(axis=2)
+
 
 class ChannelModelDataset(Dataset):
     """
@@ -47,7 +63,9 @@ class ChannelModelDataset(Dataset):
                  n_symbols: int,
                  fading_in_channel: bool,
                  fading_in_decoder: bool,
-                 phase: str):
+                 phase: str,
+                 doppler: float = 0.0,
+                 rician_k: float = 3.0):
 
         self.block_length = block_length
         self.transmission_length = transmission_length
@@ -63,15 +81,35 @@ class ChannelModelDataset(Dataset):
         self.fading_in_decoder = fading_in_decoder
         self.n_symbols = n_symbols
         self.phase = phase
-        self.use_cache = True  # Enable caching by default
+        self.doppler = doppler
+        self.rician_k = rician_k
+        self.last_taps = None  # [words, T, L] true per-sample taps of the last fast-fading draw
+        # Fast-fading draws are not cached; val draws are instead seeded per rep
+        # (see get_snr_data), which keeps them paired across detectors.
+        self.use_cache = doppler == 0
         if use_ecc:
             self.encoding = lambda b: encode(b, self.n_symbols)
         else:
             self.encoding = lambda b: b
 
-    def get_snr_data(self, snr: float, gamma: float, database: list):
+    def get_snr_data(self, snr: float, gamma: float, database: list, rep: int = None):
         # if database is None:
         #     database = []
+        word_rand_gen, noise_rand_gen = self.word_rand_gen, self.random
+        fast = self.doppler > 0
+        if fast:
+            fading_rng = self.random
+            if self.phase == 'val':
+                # one seed per rep (a fixed one for rep=None, i.e. the training-time
+                # validation set), shared by words, noise and fading: every detector
+                # evaluated at rep r sees exactly the same transmission
+                seed = FAST_FADING_SEED + (0 if rep is None else 1 + rep) * 7919 + int(round(10 * snr))
+                word_rand_gen = noise_rand_gen = fading_rng = np.random.RandomState(seed)
+            T = self.transmission_length
+            fading = jakes_process(self.words * T, self.memory_length, self.doppler, fading_rng)
+            k = self.rician_k
+            fading = np.sqrt(k / (k + 1)) + np.sqrt(1 / (k + 1)) * fading
+            taps = []
         b_full = np.empty((0, self.block_length))
         y_full = np.empty((0, self.transmission_length))
         if self.phase == 'val':
@@ -81,7 +119,7 @@ class ChannelModelDataset(Dataset):
         # accumulate words until reaches desired number
         while y_full.shape[0] < self.words:
             # generate word
-            b = self.word_rand_gen.randint(0, 2, size=(1, self.block_length))
+            b = word_rand_gen.randint(0, 2, size=(1, self.block_length))
             # encoding - errors correction Code
             c = self.encoding(b).reshape(1, -1)
             # add zero bits
@@ -93,20 +131,27 @@ class ChannelModelDataset(Dataset):
                                  fading=self.fading_in_channel if self.phase == 'val' else self.fading_in_decoder,
                                  index=index,
                                  fading_taps_type=self.fading_taps_type)
-            y = self.transmit(padded_c, h, snr)
+            if fast:
+                w = y_full.shape[0]
+                h = h * fading[w * T:(w + 1) * T]  # [T, L] per-sample taps
+                taps.append(h)
+            y = self.transmit(padded_c, h, snr, noise_rand_gen)
             # accumulate
             b_full = np.concatenate((b_full, b), axis=0)
             y_full = np.concatenate((y_full, y), axis=0)
             index += 1
 
         database.append((b_full, y_full))
+        if fast:
+            self.last_taps = np.stack(taps)
 
-    def transmit(self, c: np.ndarray, h: np.ndarray, snr: float):
+    def transmit(self, c: np.ndarray, h: np.ndarray, snr: float, random: mtrand.RandomState = None):
         if self.channel_type == 'ISI_AWGN':
             # modulation
             s = BPSKModulator.modulate(c)
             # transmit through noisy channel
-            y = ISIAWGNChannel.transmit(s=s, random=self.random, h=h, snr=snr, memory_length=self.memory_length)
+            y = ISIAWGNChannel.transmit(s=s, random=random if random is not None else self.random,
+                                        h=h, snr=snr, memory_length=self.memory_length)
         else:
             raise Exception('No such channel defined!!!')
         return y
@@ -168,7 +213,7 @@ class ChannelModelDataset(Dataset):
         
         # Fallback: original behavior for multiple SNRs or cache disabled
         database = []
-        [self.get_snr_data(snr, gamma, database) for snr in snr_list]
+        [self.get_snr_data(snr, gamma, database, rep) for snr in snr_list]
         b, y = (np.concatenate(arrays) for arrays in zip(*database))
         b, y = torch.Tensor(b).to(device=device), torch.Tensor(y).to(device=device)
         return b, y

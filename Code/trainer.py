@@ -1,4 +1,4 @@
-from Code.models import ClassicViterbi, ClassicViterbiLS, ViterbiNet, LSTM, SionnaNeuralReceiver, SionnaSkip, SionnaViterbiPlus, SionnaViterbiAdd, ECC_Transformer, ECC_TransformerV2, ViterbiTransformerV3, ViterbiTransformerV4, ViT1D, ViterbiNetMLP, ADNN
+from Code.models import ClassicViterbi, ClassicViterbiLS, ClassicViterbiGenie, ClassicViterbiPSP, ViterbiNet, LSTM, SionnaNeuralReceiver, SionnaSkip, SionnaViterbiPlus, SionnaViterbiAdd, ECC_Transformer, ECC_TransformerV2, ViterbiTransformerV3, ViterbiTransformerV4, ViT1D, ViterbiNetMLP, ADNN
 from Code.detector import Detector
 from Code.channel.channel_dataset import ChannelModelDataset
 from Code.ecc.rs_main import decode, encode
@@ -56,6 +56,9 @@ class Trainer(object):
         self.fading_in_channel = None
         self.fading_in_decoder = None
         self.fading_taps_type = None
+        self.doppler = None  # normalized f_D*T_symbol; > 0 makes the taps vary within a word
+        self.rician_k = None  # Rician K-factor of that fast fading (default 3)
+        self.psp_step = None  # LMS step of ClassicViterbi_PSP (default 0.05)
         self.subframes_in_frame = None
         self.gamma = None
         self.curr_SNR = None
@@ -150,7 +153,7 @@ class Trainer(object):
             n_classes = self.n_states
         else:
             n_classes = N_CLASSES
-        if self.detector_method == 'Statistical' and self.model_name != 'ClassicViterbi_LS':
+        if self.detector_method == 'Statistical' and self.model_name not in ('ClassicViterbi_LS', 'ClassicViterbi_PSP'):
             self.self_supervised = False
         models = {
             'ClassicViterbi': lambda: ClassicViterbi(n_classes=n_classes,
@@ -173,6 +176,27 @@ class Trainer(object):
                                    fading=self.fading_in_decoder,
                                    fading_taps_type=self.fading_taps_type,
                                    channel_coefficients=self.channel_coefficients),
+            # Fast fading reference: Viterbi given the true per-sample taps.
+            'ClassicViterbi_genie': lambda: ClassicViterbiGenie(n_classes=n_classes,
+                                   memory_length=self.memory_length,
+                                   gamma=self.gamma,
+                                   val_words=self.val_frames * self.subframes_in_frame,
+                                   channel_type=self.channel_type,
+                                   noisy_est_var=self.noisy_est_var,
+                                   fading=self.fading_in_decoder,
+                                   fading_taps_type=self.fading_taps_type,
+                                   channel_coefficients=self.channel_coefficients),
+            # No CSI, per-survivor LMS channel tracking inside the trellis (PSP).
+            'ClassicViterbi_PSP': lambda: ClassicViterbiPSP(n_classes=n_classes,
+                                   memory_length=self.memory_length,
+                                   gamma=self.gamma,
+                                   val_words=self.val_frames * self.subframes_in_frame,
+                                   channel_type=self.channel_type,
+                                   noisy_est_var=self.noisy_est_var,
+                                   fading=self.fading_in_decoder,
+                                   fading_taps_type=self.fading_taps_type,
+                                   channel_coefficients=self.channel_coefficients,
+                                   step=0.05 if self.psp_step is None else self.psp_step),
             'ViterbiNet': lambda: ViterbiNet(input_size=1, n_classes=self.n_states),
             'LSTM': lambda: LSTM(INPUT_SIZE, HIDDEN_SIZE, NUM_LAYERS, n_classes),
             'ADNN': lambda: ADNN(input_size=INPUT_SIZE, dim=N_DIM, n_classes=n_classes),
@@ -256,7 +280,9 @@ class Trainer(object):
                                        fading_taps_type=self.fading_taps_type,
                                        fading_in_channel=self.fading_in_channel,
                                        fading_in_decoder=self.fading_in_decoder,
-                                       phase=phase) for phase in ['train', 'val']}
+                                       phase=phase,
+                                       doppler=self.doppler or 0.0,
+                                       rician_k=self.rician_k or 3.0) for phase in ['train', 'val']}
 
     def run(self, run_over, num_of_rep, device_arg=None, dtype=None, use_amp=False, scaler=None) -> np.ndarray:
         """
@@ -576,6 +602,8 @@ class Trainer(object):
             transmitted_words, received_words = self.channel_dataset['val'].__getitem__(
                 snr_list=[self.curr_SNR], gamma=self.gamma, rep=self._eval_rep_counter)
             self._eval_rep_counter += 1
+            if getattr(self.detector.model, 'needs_true_taps', False):
+                self.detector.model.taps = self.channel_dataset['val'].last_taps
 
             # Ensure data is on the correct device
             transmitted_words = transmitted_words.to(device)

@@ -24,7 +24,11 @@ class ISIAWGNChannel:
         snr_value = 10 ** (snr / 10)        
         blockwise_s = np.concatenate([s[:, i:-memory_length + i] for i in range(memory_length)], axis=0)
 
-        conv = np.dot(h[:, ::-1], blockwise_s)
+        if h.shape[0] > 1:
+            # time-varying taps, one row per output sample: h is [T, L] (fast fading)
+            conv = np.sum(h[:, ::-1].T * blockwise_s, axis=0, keepdims=True)
+        else:
+            conv = np.dot(h[:, ::-1], blockwise_s)
 
         [row, col] = conv.shape
 
