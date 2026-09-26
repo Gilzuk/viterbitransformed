@@ -878,6 +878,49 @@ class ECC_TransformerV2(nn.Module):
         return out.reshape(batch_size, transmission_length, self.n_classes)
 
 
+class ViT1D(nn.Module):
+    """Vision-Transformer-style detector for a 1-D received block: the block is
+    cut into non-overlapping patches of patch_size samples, each patch is
+    linearly embedded (with bias) as one token, a learned positional embedding
+    is added, and a bidirectional pre-norm encoder attends across patches. The
+    head "unpatchifies" each token back into patch_size per-symbol class logits,
+    so the output has the same [batch, transmission_length, n_classes] contract
+    as ViterbiNet and feeds the same Viterbi ACS decoder.
+
+    input_size is 1: Detector hands over the raw samples y[t] and patching is
+    done here, over the whole block, instead of via Detector's rolling window.
+    """
+    def __init__(self, patch_size, n_dim, n_heads, n_layers, n_classes, mlp_ratio=3,
+                 max_tokens=40, dropout=0):
+        super(ViT1D, self).__init__()
+        self.input_size = 1
+        self.n_classes = n_classes
+        self.patch_size = patch_size
+        self.max_tokens = max_tokens
+
+        cpy = copy.deepcopy
+        attn = MultiHeadedAttention(n_heads, n_dim)
+        ff = PositionwiseFeedForward(n_dim, n_dim * mlp_ratio, dropout)
+        self.patch_embed = nn.Linear(patch_size, n_dim)
+        self.pos_embed = nn.Parameter(torch.zeros(1, max_tokens, n_dim))
+        nn.init.trunc_normal_(self.pos_embed, std=0.02)
+        self.transformer_encoder = Encoder(EncoderLayer(n_dim, cpy(attn), cpy(ff), dropout), n_layers)
+        self.head = nn.Linear(n_dim, patch_size * n_classes)
+
+    def forward(self, input_):
+        batch_size, transmission_length = input_.size(0), input_.size(1)
+        y = input_.reshape(batch_size, transmission_length)
+        n_tokens = math.ceil(transmission_length / self.patch_size)
+        assert n_tokens <= self.max_tokens, f'{n_tokens} patches > max_tokens={self.max_tokens}'
+        y = F.pad(y, [0, n_tokens * self.patch_size - transmission_length])
+        patches = y.reshape(batch_size, n_tokens, self.patch_size)
+
+        x = self.patch_embed(patches) + self.pos_embed[:, :n_tokens]
+        x = self.transformer_encoder(x, mask=None)
+        out = self.head(x).reshape(batch_size, n_tokens * self.patch_size, self.n_classes)
+        return out[:, :transmission_length]
+
+
 class TRANSFORMER(nn.Module):
     def __init__(self, input_size, n_dim, n_heads, num_layers, ff_dim, n_classes, dropout=0):
         super(TRANSFORMER, self).__init__()
