@@ -178,6 +178,8 @@ class Trainer(object):
             'TransformerV2_in1': lambda: ECC_TransformerV2(1, N_DIM, N_HEADS_V2, NUM_LAYERS, n_classes),
             # ViT-style: non-overlapping patches of VIT_PATCH samples as tokens (patch = channel memory).
             'ViT': lambda: ViT1D(VIT_PATCH, N_DIM, N_HEADS_V2, NUM_LAYERS, n_classes),
+            # Overlapping (stride-1) patches + fixed sinusoidal PE; same MLP width as TransformerV2.
+            'ViT_overlap': lambda: ViT1D(VIT_PATCH, N_DIM, N_HEADS_V2, NUM_LAYERS, n_classes, mlp_ratio=4, overlapping=True),
             'Mamba': lambda: MambaLM(MambaLMConfig(d_model=4, n_layers=12, vocab_size=n_classes,pad_vocab_size_multiple=n_classes),n_classes,input_size=4)
 
         }

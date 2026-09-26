@@ -891,25 +891,42 @@ class ViT1D(nn.Module):
     done here, over the whole block, instead of via Detector's rolling window.
     """
     def __init__(self, patch_size, n_dim, n_heads, n_layers, n_classes, mlp_ratio=3,
-                 max_tokens=40, dropout=0):
+                 max_tokens=40, dropout=0, overlapping=False):
         super(ViT1D, self).__init__()
         self.input_size = 1
         self.n_classes = n_classes
         self.patch_size = patch_size
         self.max_tokens = max_tokens
+        # overlapping=True: stride-1 patches, one per symbol -- patch t is
+        # y[t-P+1..t], the same window Detector gives TransformerV2 -- with a
+        # fixed sinusoidal position encoding and a per-token head. No patch
+        # edges, nothing position-specific to memorise.
+        self.overlapping = overlapping
 
         cpy = copy.deepcopy
         attn = MultiHeadedAttention(n_heads, n_dim)
         ff = PositionwiseFeedForward(n_dim, n_dim * mlp_ratio, dropout)
         self.patch_embed = nn.Linear(patch_size, n_dim)
-        self.pos_embed = nn.Parameter(torch.zeros(1, max_tokens, n_dim))
-        nn.init.trunc_normal_(self.pos_embed, std=0.02)
+        if overlapping:
+            self.pos_encoding = SinusoidalPositionalEncoding(n_dim)
+            self.head = nn.Linear(n_dim, n_classes)
+        else:
+            self.pos_embed = nn.Parameter(torch.zeros(1, max_tokens, n_dim))
+            nn.init.trunc_normal_(self.pos_embed, std=0.02)
+            self.head = nn.Linear(n_dim, patch_size * n_classes)
         self.transformer_encoder = Encoder(EncoderLayer(n_dim, cpy(attn), cpy(ff), dropout), n_layers)
-        self.head = nn.Linear(n_dim, patch_size * n_classes)
 
     def forward(self, input_):
         batch_size, transmission_length = input_.size(0), input_.size(1)
         y = input_.reshape(batch_size, transmission_length)
+
+        if self.overlapping:
+            y = F.pad(y, [self.patch_size - 1, 0])
+            patches = y.unfold(1, self.patch_size, 1)  # [batch, transmission_length, patch_size]
+            x = self.pos_encoding(self.patch_embed(patches))
+            x = self.transformer_encoder(x, mask=None)
+            return self.head(x)
+
         n_tokens = math.ceil(transmission_length / self.patch_size)
         assert n_tokens <= self.max_tokens, f'{n_tokens} patches > max_tokens={self.max_tokens}'
         y = F.pad(y, [0, n_tokens * self.patch_size - transmission_length])
