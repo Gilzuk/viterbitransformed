@@ -21,6 +21,10 @@ as the repo's ViterbiNet online training: after a data word, a frame adapts
 only if that word's SER <= ser_thresh, i.e. an ECC/CRC would have accepted it,
 and then it uses that word's transmitted symbols):
     classic_csi   exact taps and N0 (the bound)
+    le_oracle     symbol-by-symbol MMSE linear equalizer over the same W-sample
+                  window with the exact taps and N0, QPSK slicer (linear bound)
+    le_ls         the same equalizer fitted by LS to the pilot symbols, then
+                  re-solved by LS on each data word's own decisions
     classic_ls    LS channel estimate from the pilot; re-estimated by LS on each
                   accepted data word (decision-directed tracking)
     affine        per-sample scores W^T [Re y, Im y] + b  (3C parameters) --
@@ -30,6 +34,14 @@ and then it uses that word's transmitted symbols):
                   complex samples around each symbol to the 4 QPSK classes,
                   argmax decision, no trellis ((4L-2)*4+4 parameters)
     sym_mlp       same window, small MLP, argmax, no trellis
+    sym_eq        4-class symbol classifier with the structure of a linear
+                  equalizer: z = w^H window + b (complex), class scores
+                  a * Re(conj(c_m) z), argmax, no trellis (4W+3 parameters).
+                  Pilot: 4-class cross-entropy. Tracking between pilots:
+                  decision-directed LMS, |z - c_dhat|^2 -- cross-entropy on
+                  its own argmax labels has ~zero gradient on confident
+                  correct symbols, so it cannot follow a drifting channel
+                  (sym_affine/sym_mlp SER climbs 0.06 -> 0.28 over a frame)
     tied          'structured affine': the affine scores with their class means
                   tied to L learnable complex taps + a learnable noise scale
                   (2L+1 real parameters), trained by the same gradient steps
@@ -167,6 +179,14 @@ class BatchedNet:
             self.sym = cfg.const[cfg.digits]                   # (C, L) complex
             self.reset_opt()
             return
+        if kind == 'sym_eq':
+            # complex linear equalizer taps (centre tap 1), complex bias, log class-score scale
+            wr = torch.zeros(F_, 1, cfg.W); wr[:, :, (cfg.W - 1) // 2] = 1.0
+            self.params = [wr.requires_grad_(), torch.zeros(F_, 1, cfg.W).requires_grad_(),
+                           torch.zeros(F_, 1, 1).requires_grad_(), torch.zeros(F_, 1, 1).requires_grad_(),
+                           torch.zeros(F_, 1, 1).requires_grad_()]
+            self.reset_opt()
+            return
         if kind.startswith('sym'):
             # 4-class symbol classifier on a window of samples, no trellis
             dims = [2 * cfg.W] + (list(cfg.sym_hidden) if kind == 'sym_mlp' else []) + [cfg.M]
@@ -183,7 +203,17 @@ class BatchedNet:
     def n_params(self):
         return sum(p[0].numel() for p in self.params)   # per frame
 
+    def equalize(self, x):                                    # sym_eq: (F, n, 2W) -> complex (F, n)
+        W = self.cfg.W
+        yw = torch.complex(x[..., :W], x[..., W:])
+        w = torch.complex(self.params[0], self.params[1])
+        return (yw * w).sum(-1) + torch.complex(self.params[2], self.params[3])[..., 0]
+
     def forward(self, x):                                     # x: (F, n, 2)
+        if self.kind == 'sym_eq':
+            z = self.equalize(x)
+            c = self.cfg.const
+            return torch.exp(self.params[4]) * 4 * (z[..., None] * c.conj()).real   # (F, n, M)
         if self.kind == 'tied':
             h = torch.complex(self.params[0], self.params[1])[:, 0]     # (F, L)
             mu = (self.sym[None] * h[:, None, :]).sum(-1)               # (F, C)
@@ -218,8 +248,9 @@ class BatchedNet:
         self.v = [torch.zeros_like(p) for p in self.params]
         self.t = torch.zeros(self.params[0].shape[0])
 
-    def step(self, x, classes, lr, mask=None, iters=1):
-        """iters Adam steps on (inputs x, labels) for the frames in mask."""
+    def step(self, x, classes, lr, mask=None, iters=1, loss_kind='ce'):
+        """iters Adam steps on (inputs x, labels) for the frames in mask.
+        loss_kind='lms' (sym_eq only): |z - c_label|^2 instead of cross-entropy."""
         F_ = x.shape[0]
         mask = torch.ones(F_, dtype=torch.bool) if mask is None else mask
         if iters == 0 or not mask.any():
@@ -227,10 +258,14 @@ class BatchedNet:
         mf = mask.float()
         b1, b2, eps = 0.9, 0.999, 1e-8
         for _ in range(iters):
-            logits = self.forward(x)
-            loss = F.cross_entropy(logits.reshape(-1, logits.shape[-1]), classes.reshape(-1), reduction='none')
+            if loss_kind == 'lms':
+                loss = (self.equalize(x) - self.cfg.const[classes]).abs().reshape(-1) ** 2
+            else:
+                logits = self.forward(x)
+                loss = F.cross_entropy(logits.reshape(-1, logits.shape[-1]), classes.reshape(-1), reduction='none')
             loss = (loss.view(F_, -1).mean(1) * mf).sum()
-            grads = torch.autograd.grad(loss, self.params)
+            grads = torch.autograd.grad(loss, self.params, allow_unused=True)   # lms leaves the scale unused
+            grads = [torch.zeros_like(p) if g is None else g for p, g in zip(self.params, grads)]
             self.t = self.t + mf
             with torch.no_grad():
                 for p, g, m, v in zip(self.params, grads, self.m, self.v):
@@ -278,6 +313,36 @@ def classic_scores(cfg, y, h, N0):
     return -(y[:, :, None] - mu[:, None, :]).abs() ** 2 / N0.view(-1, 1, 1)
 
 
+# ------------------------------------------------- linear equalizers ---
+def eq_windows(cfg, y):
+    """(F, N, W+1) complex windows around each symbol, + a bias column."""
+    x = sym_features(cfg, y)
+    X = torch.complex(x[..., :cfg.W], x[..., cfg.W:])
+    return torch.cat([X, torch.ones_like(X[..., :1])], -1)
+
+
+def le_ls_fit(X, s, lam=1e-3):
+    Xh = X.conj().transpose(1, 2)
+    return torch.linalg.solve(Xh @ X + lam * torch.eye(X.shape[-1], dtype=CDT), Xh @ s[..., None])[..., 0]
+
+
+def le_oracle(cfg, h, N0):
+    """MMSE weights (with a zero bias) for d[i] from y[i-back .. i-back+W-1]."""
+    W, L = cfg.W, cfg.L
+    back = (W - 1) // 2
+    H = torch.zeros(h.shape[0], W, W + L - 1, dtype=CDT)
+    for m in range(W):
+        for k in range(L):
+            H[:, m, m + L - 1 - k] = h[:, k]
+    R = H @ H.conj().transpose(1, 2) + N0 * torch.eye(W, dtype=CDT)
+    w = torch.linalg.solve(R, H[:, :, back + L - 1][..., None])[..., 0].conj()
+    return torch.cat([w, torch.zeros_like(w[:, :1])], -1)
+
+
+def slicer(cfg, z):
+    return (z[..., None] - cfg.const).abs().argmin(-1)
+
+
 # -------------------------------------------------------------- evaluate ---
 def run_snr(cfg, snr_db, frames, receivers, online_iters, seed=0):
     """Returns {receiver: (symbol_errors, symbols)} over the data words."""
@@ -306,6 +371,9 @@ def run_snr(cfg, snr_db, frames, receivers, online_iters, seed=0):
                     if r == 'classic_ls':
                         ls_state[r] = ls_estimate(cfg, torch.cat([p[1] for p in pil], 1),
                                                   torch.cat([p[2] for p in pil], 1))
+                    elif r == 'le_ls':
+                        ls_state[r] = le_ls_fit(torch.cat([eq_windows(cfg, p[1]) for p in pil], 1),
+                                                cfg.const[torch.cat([p[0] for p in pil], 1)])
                     elif r in nets:
                         xs, labs = zip(*[nets[r].prepare(yy, dd, cc) for dd, yy, cc in pil])
                         nets[r].step(torch.cat(xs, 1), torch.cat(labs, 1), cfg.online_lr, iters=cfg.pilot_iters)
@@ -315,9 +383,15 @@ def run_snr(cfg, snr_db, frames, receivers, online_iters, seed=0):
                 sc = classic_scores(cfg, y, h, torch.full((frames,), N0))
             elif r == 'classic_ls':
                 sc = classic_scores(cfg, y, *ls_state[r])
+            elif r.startswith('le_'):
+                w_eq = le_oracle(cfg, h, N0) if r == 'le_oracle' else ls_state[r]
+                X_eq = eq_windows(cfg, y)
             elif not r.startswith('sym'):
                 sc = nets[r].scores(y)
-            dhat = nets[r].decide(y) if r.startswith('sym') else viterbi(cfg, sc)
+            if r.startswith('le_'):
+                dhat = slicer(cfg, (X_eq * w_eq[:, None, :]).sum(-1))
+            else:
+                dhat = nets[r].decide(y) if r.startswith('sym') else viterbi(cfg, sc)
             err = (dhat != d).float().mean(1)                 # per-frame word SER
             stats[r][0] += int((dhat != d).sum())
             stats[r][1] += d.numel()
@@ -328,12 +402,16 @@ def run_snr(cfg, snr_db, frames, receivers, online_iters, seed=0):
                 cls = (full.unfold(1, cfg.L, 1).flip(-1) * (cfg.M ** torch.arange(cfg.L))).sum(-1)
             else:
                 ok = err <= cfg.ser_thresh
-            if r == 'classic_ls':
+            if r == 'le_ls':
+                lab_s = cfg.const[dhat if cfg.adapt == 'dd' else d]
+                ls_state[r] = torch.where(ok[:, None], le_ls_fit(X_eq, lab_s), ls_state[r])
+            elif r == 'classic_ls':
                 h_new, n_new = ls_estimate(cfg, y, cls)
                 h_old, n_old = ls_state[r]
                 ls_state[r] = (torch.where(ok[:, None], h_new, h_old), torch.where(ok, n_new, n_old))
             elif r in nets:
                 lab_d = dhat if cfg.adapt == 'dd' else d
                 x, lab = nets[r].prepare(y, lab_d, cls)
-                nets[r].step(x, lab, cfg.dd_lr or cfg.online_lr, mask=ok, iters=online_iters[r])
+                nets[r].step(x, lab, cfg.dd_lr or cfg.online_lr, mask=ok, iters=online_iters[r],
+                             loss_kind='lms' if nets[r].kind == 'sym_eq' else 'ce')
     return {r: tuple(v) for r, v in stats.items()}, {r: nets[r].n_params() for r in nets}
