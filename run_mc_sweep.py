@@ -390,27 +390,29 @@ def push_with_retry(context):
     for attempt, delay in enumerate(delays, 1):
         if delay:
             time.sleep(delay)
+            # The expected cause of a failed push when multiple sweep processes
+            # push to the same branch concurrently: a sibling committed and
+            # pushed its own point first, making this push non-fast-forward.
+            # Every commit here is a pure append (one new CSV row, one model's
+            # own weights file), so rebasing onto the new tip essentially never
+            # conflicts. Rebase right before the retry, AFTER the backoff sleep:
+            # rebasing before the sleep left the tip stale by the time of the
+            # push, and with several workers pushing every couple of minutes
+            # that lost all 10 attempts and stopped a worker (2026-09-27).
+            subprocess.run(['git', 'fetch', '-q', 'origin', BRANCH], cwd=repo_dir())
+            rebase = subprocess.run(['git', 'rebase', f'origin/{BRANCH}'],
+                                     cwd=repo_dir(), capture_output=True, text=True)
+            if rebase.returncode != 0:
+                subprocess.run(['git', 'rebase', '--abort'], cwd=repo_dir())
+                raise RuntimeError(
+                    f'git rebase onto origin/{BRANCH} failed for {context} (not a '
+                    f'plain non-fast-forward push failure) -- aborted the rebase '
+                    f'rather than risk a broken tree; needs manual resolution. '
+                    f'{rebase.stdout.strip()} {rebase.stderr.strip()}')
         r = subprocess.run(['git', 'push', '-q', 'origin', f'HEAD:{BRANCH}'], cwd=repo_dir())
         if r.returncode == 0:
             return
         print(f'[git] push attempt {attempt}/{len(delays)} failed for {context}', flush=True)
-
-        # The expected cause when multiple sweep processes push to the same
-        # branch concurrently: a sibling committed and pushed its own point
-        # first, making this push non-fast-forward. Every commit here is a
-        # pure append (one new CSV row, one model's own weights file), so
-        # rebasing onto the new tip essentially never conflicts -- do that
-        # and let the next loop iteration retry the push.
-        subprocess.run(['git', 'fetch', '-q', 'origin', BRANCH], cwd=repo_dir())
-        rebase = subprocess.run(['git', 'rebase', f'origin/{BRANCH}'],
-                                 cwd=repo_dir(), capture_output=True, text=True)
-        if rebase.returncode != 0:
-            subprocess.run(['git', 'rebase', '--abort'], cwd=repo_dir())
-            raise RuntimeError(
-                f'git rebase onto origin/{BRANCH} failed for {context} (not a '
-                f'plain non-fast-forward push failure) -- aborted the rebase '
-                f'rather than risk a broken tree; needs manual resolution. '
-                f'{rebase.stdout.strip()} {rebase.stderr.strip()}')
 
     raise RuntimeError(
         f'git push failed after {len(delays)} attempts for {context} -- '
