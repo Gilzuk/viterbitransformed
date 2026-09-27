@@ -1,4 +1,4 @@
-"""Adds the tracking 4-class detector and the linear-equalizer references to
+"""Adds receivers to
 Results/metrics/qpsk_sweep.csv (same channel, frames and SNR grid as
 run_qpsk_sweep.py):
     sym_eq@30   4-class classifier with equalizer structure, 9-sample window,
@@ -6,7 +6,11 @@ run_qpsk_sweep.py):
     le_ls       classical LS linear equalizer (pilot, then re-solved on own decisions)
     le_oracle   MMSE linear equalizer with the true taps (linear bound)
 The original sym_affine/sym_mlp rows stay: they show a 4-class classifier that
-does not track (cross-entropy on its own decisions has ~zero gradient)."""
+does not track (cross-entropy on its own decisions has ~zero gradient).
+
+    python run_qpsk_sym_sweep.py tied   ->  tied_mlp@5, the structured 64-class
+    MLP (tied Gaussian branch score + shared residual MLP), same settings as
+    tied@5 in run_qpsk_sweep.py (dd_lr 0.01, 5 steps/word)."""
 import csv, os, sys, time
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from Code.qpsk_sim import Config, run_snr
@@ -14,9 +18,10 @@ from Code.qpsk_sim import Config, run_snr
 OUT = 'Results/metrics/qpsk_sweep.csv'
 SNRS = list(range(0, 26, 2))
 FRAMES = 64
-RECEIVERS = ['le_oracle', 'le_ls', 'sym_eq@30']
-ITERS = {'sym_eq@30': 30}
-cfg = Config(dd_lr=0.03, sym_window=9)
+if sys.argv[1:] == ['tied']:
+    RECEIVERS, ITERS, cfg = ['tied_mlp@5'], {'tied_mlp@5': 5}, Config(dd_lr=0.01)
+else:
+    RECEIVERS, ITERS, cfg = ['le_oracle', 'le_ls', 'sym_eq@30'], {'sym_eq@30': 30}, Config(dd_lr=0.03, sym_window=9)
 done = {(r['receiver'], int(r['es_n0_db'])) for r in csv.DictReader(open(OUT))}
 with open(OUT, 'a', newline='') as f:
     w = csv.writer(f, lineterminator='\n')

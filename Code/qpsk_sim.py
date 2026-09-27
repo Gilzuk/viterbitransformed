@@ -45,6 +45,13 @@ and then it uses that word's transmitted symbols):
     tied          'structured affine': the affine scores with their class means
                   tied to L learnable complex taps + a learnable noise scale
                   (2L+1 real parameters), trained by the same gradient steps
+    tied_mlp      'structured MLP': the tied Gaussian branch score plus a small
+                  MLP g([Re r, Im r, |r|^2]) of the residual r = y - mu_c, shared
+                  by all C branches (output layer zero-initialised, so it starts
+                  as `tied` and learns only a non-Gaussian correction).
+    The free per-branch models (affine, mlp) need samples of all C = 64 branch
+    classes; one 120-symbol pilot leaves ~10 unseen, so they stay at 0.15-0.5
+    SER even on a static channel. Tying the classes to L taps fixes that.
 Learned receivers: offline training on random channels at the operating SNR,
 then per frame: `pilot_iters` Adam steps on the pilot and `online_iters` steps
 on each data word (its decisions, or its true symbols if gated), starting from
@@ -78,6 +85,7 @@ class Config:
     mlp_hidden = (100, 58)
     sym_hidden = (32, 16)  # 4-class symbol-classifier MLP
     sym_window = None      # samples per symbol classifier window; default 2L-1
+    tied_hidden = 16       # hidden units of the tied_mlp residual MLP
 
     @property
     def W(self):
@@ -170,12 +178,20 @@ class BatchedNet:
     def __init__(self, cfg, kind, F_):
         self.cfg, self.kind = cfg, kind
         self.params = []
-        if kind == 'tied':
+        if kind in ('tied', 'tied_mlp'):
             # class means tied to L learnable complex taps + one learnable
             # inverse-noise scale: 2L+1 real parameters
             self.params = [(0.01 * torch.randn(F_, 1, cfg.L)).requires_grad_(),
                            (0.01 * torch.randn(F_, 1, cfg.L)).requires_grad_(),
                            torch.zeros(F_, 1, 1).requires_grad_()]
+            if kind == 'tied_mlp':
+                # shared residual MLP 3 -> H -> 1; zero output layer: starts as `tied`
+                H = cfg.tied_hidden
+                W1 = torch.empty(F_, 3, H)
+                for f in range(F_):
+                    torch.nn.init.kaiming_uniform_(W1[f].T, a=math.sqrt(5))
+                self.params += [W1.requires_grad_(), torch.empty(F_, 1, H).uniform_(-1 / math.sqrt(3), 1 / math.sqrt(3)).requires_grad_(),
+                                torch.zeros(F_, H, 1).requires_grad_(), torch.zeros(F_, 1, 1).requires_grad_()]
             self.sym = cfg.const[cfg.digits]                   # (C, L) complex
             self.reset_opt()
             return
@@ -220,6 +236,18 @@ class BatchedNet:
             a = torch.exp(self.params[2])                              # (F, 1, 1)
             corr = x[..., :1] * mu.real[:, None, :] + x[..., 1:] * mu.imag[:, None, :]
             return a * (2 * corr - (mu.abs() ** 2)[:, None, :])
+        if self.kind == 'tied_mlp':
+            h = torch.complex(self.params[0], self.params[1])[:, 0]
+            mu = (self.sym[None] * h[:, None, :]).sum(-1)               # (F, C)
+            a = torch.exp(self.params[2])                              # (F, 1, 1)
+            y = torch.complex(x[..., 0], x[..., 1])                    # (F, n)
+            r = y[:, :, None] - mu[:, None, :]                         # (F, n, C)
+            feat = torch.stack([r.real, r.imag, r.abs() ** 2], -1)     # (F, n, C, 3)
+            Fn, n, C, _ = feat.shape
+            W1, b1, W2, b2 = self.params[3:]
+            hid = torch.relu(torch.baddbmm(b1, feat.reshape(Fn, n * C, 3), W1))
+            g = torch.baddbmm(b2, hid, W2).reshape(Fn, n, C)
+            return -a[..., 0:1] * (r.abs() ** 2) + g
         n_layers = len(self.params) // 2
         for i in range(n_layers):
             W, b = self.params[2 * i], self.params[2 * i + 1]
