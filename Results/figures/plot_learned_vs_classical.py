@@ -32,7 +32,11 @@ for key, label, c, mk, ls in S:
         continue
     xs = [p[0] for p in pts]
     ys = [3.0 / p[3] if p[2] else p[1] for p in pts]
-    ax.plot(xs, ys, ls, color=c, lw=1.8, zorder=2)
+    # line only through measured points: a 0-error point is an upper bound, and joining it
+    # to the curve would draw a fake error floor
+    meas = [(x, y) for x, y, p in zip(xs, ys, pts) if not p[2]]
+    if meas:
+        ax.plot(*zip(*meas), ls, color=c, lw=1.8, zorder=2)
     m = [(x, y) for x, y, p in zip(xs, ys, pts) if not p[2]]
     if m:
         ax.plot(*zip(*m), mk, color=c, ms=6.5, mec=SURF, mew=1, lw=0, label=label, zorder=3)

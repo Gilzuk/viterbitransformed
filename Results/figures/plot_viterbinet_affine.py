@@ -29,7 +29,11 @@ for key, label, c, mk, ls in S:
         continue
     xs = [p[0] for p in pts]
     ys = [3.0 / p[3] if p[2] else p[1] for p in pts]
-    ax.plot(xs, ys, ls, color=c, lw=1.8, zorder=2)
+    # line only through measured points: a 0-error point is an upper bound, and joining it
+    # to the curve would draw a fake error floor
+    meas = [(x, y) for x, y, p in zip(xs, ys, pts) if not p[2]]
+    if meas:
+        ax.plot(*zip(*meas), ls, color=c, lw=1.8, zorder=2)
     m = [(x, y) for x, y, p in zip(xs, ys, pts) if not p[2]]
     if m:
         ax.plot(*zip(*m), mk, color=c, ms=6.5, mec=SURF, mew=1, lw=0, label=label, zorder=3)
@@ -47,7 +51,7 @@ for s in ('left', 'bottom'): ax.spines[s].set_color(GRID)
 ax.tick_params(colors=INK2)
 leg = ax.legend(frameon=False, fontsize=9, loc='lower left')
 for t in leg.get_texts(): t.set_color(INK)
-fig.text(0.01, 0.005, 'Monte Carlo: >=20 reps x 2,000 bits per point (ClassicViterbi >=100 reps). ViterbiNet 200-step rows from the Colab-GPU run; affine SNR 15-17 still running.',
+fig.text(0.01, 0.005, 'Monte Carlo: >=20 reps x 2,000 bits per point (ClassicViterbi >=100 reps). ViterbiNet 200-step rows from the Colab-GPU run.',
          color=MUTED, fontsize=8)
 fig.savefig('Results/figures/ser_vs_snr_viterbinet_affine.png', dpi=150, facecolor=SURF, bbox_inches='tight')
 print('saved')
