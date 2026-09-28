@@ -7,7 +7,10 @@ import matplotlib.pyplot as plt
 from matplotlib.ticker import FixedLocator, FixedFormatter, NullLocator
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-rows = [r for r in csv.DictReader(open(os.path.join(HERE, '..', 'metrics', 'qpsk_fast_fading.csv')))
+FIELDS = ['receiver', 'params', 'doppler', 'es_n0_db', 'ser', 'symbol_errors', 'symbols', 'frames',
+          'words', 'pilot_words', 'online_iters', 'dd_lr', 'sym_window']
+# fixed field names: tolerate a header row that is missing or not on the first line
+rows = [r for r in csv.DictReader(open(os.path.join(HERE, '..', 'metrics', 'qpsk_fast_fading.csv')), fieldnames=FIELDS)
         if r['receiver'] != 'receiver']
 OUT = os.path.join(HERE, 'qpsk_fast_fading.png')
 INK, INK2, MUTED, GRID, SURF = '#0b0b0b', '#52514e', '#8a8983', '#e4e3dd', '#fcfcfb'
