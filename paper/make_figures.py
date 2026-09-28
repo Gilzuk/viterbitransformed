@@ -229,7 +229,7 @@ def qcurve(key):
     return [(s, e / n) for s, e, n in p if e > 0], [(s, 3 / n) for s, e, n in p if e == 0]
 
 
-fig, ax = plt.subplots(figsize=(COL, 2.9))
+fig, ax = plt.subplots(figsize=(COL, 2.3))
 for key, lab, col, mk, ls in (('classic_csi', 'Viterbi, perfect CSI', K, 'o', '--'),
                               ('classic_ls', 'LS-Viterbi, no CSI', VERM, 's', '-'),
                               ('tied@5', 'Tied-tap affine + trellis (7)', GREEN, 'D', '-'),
@@ -247,7 +247,7 @@ for key, lab, col, mk, ls in (('classic_csi', 'Viterbi, perfect CSI', K, 'o', '-
 ax.set_yscale('log'); ax.set_ylim(3e-3, 1); ax.set_xlim(-0.5, SNR_MAX_PLOT + 0.5)
 ax.xaxis.set_major_locator(FixedLocator(range(0, SNR_MAX_PLOT + 1, 2)))
 ax.set_xlabel('$E_s/N_0$ (dB)'); ax.set_ylabel('SER')
-ax.legend(loc='lower left', fontsize=5.8, ncol=1)
+ax.legend(loc='upper center', bbox_to_anchor=(0.45, -0.18), fontsize=5.8, ncol=2)
 fig.savefig(os.path.join(OUT, 'qpsk.pdf')); plt.close(fig)
 
 # -------------------------------------------------------------- fast fading ---
@@ -414,7 +414,7 @@ if pl:
     ax.set_xscale('log'); ax.set_yscale('log'); ax.xaxis.set_major_locator(FixedLocator([1, 2, 5, 10]))
     ax.xaxis.set_major_formatter(FixedFormatter(['1', '2', '5', '10'])); ax.xaxis.set_minor_locator(NullLocator())
     ax.set_xlabel('Pilot words (120 symbols each)'); ax.set_ylabel('SER, static channel, 14 dB')
-    ax.legend(loc='center right', fontsize=5.8)
+    ax.legend(loc='upper center', bbox_to_anchor=(0.45, -0.2), fontsize=5.8, ncol=2)
     fig.savefig(os.path.join(OUT, 'qpsk_pilot.pdf')); plt.close(fig)
 
 wd = maybe('qpsk_diag_window.csv')

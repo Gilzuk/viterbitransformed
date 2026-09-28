@@ -319,8 +319,7 @@ Linear MMSE, true taps & -- & 0.21 & 0.12 & $3.2\e{-2}$ & $2.4\e{-2}$\\
 \end{tabular}}
 \end{table}
 
-\emph{Why the free metric fails: data, not tracking.} Fig.~\ref{fig:pilot} removes the drift (static channel, 14~dB) and varies the pilot. %PILOTRESULTS
-A 120-symbol pilot visits each of the 64 branches about twice on average, and about 10 branches not at all, so a metric that learns each branch mean separately cannot be trained from one pilot. The tied metric estimates 3 taps from the same 120 symbols and generalizes to every branch, which is why it matches LS-Viterbi with a single pilot.
+\emph{Why the free metric fails: data, not tracking.} Fig.~\ref{fig:pilot} removes the drift (static channel, 14~dB) and varies the pilot. LS-Viterbi and the tied metric reach $4.5$--$8.4\e{-4}$ with a single 120-symbol pilot word and gain nothing from longer pilots. The free per-branch affine metric stays at 0.24 with one pilot word (0.13 with ten times more training steps); it needs 5 pilot words and 2,000 steps to reach $1.2\e{-3}$, within 2 times of the tied metric, at five times the pilot overhead. The free MLP never goes below 0.10, even with 10 pilot words. The failure is therefore one of data: a 120-symbol pilot visits each of the 64 branches about twice on average, and about 10 branches not at all, so a metric that learns each branch mean separately cannot be trained from one pilot. The tied metric estimates 3 taps from the same 120 symbols and generalizes to every branch, which is why it matches LS-Viterbi with a single pilot.
 
 \begin{figure}[t]
 \centering
@@ -384,7 +383,7 @@ RLS ($\lambda{=}0.8$) $-$ VNet-affine & $+.000\pm.001$ & $+.001\pm.001$ & $-.001
 \label{fig:tuning}
 \end{figure}
 
-The complex QPSK channel is harsher (Fig.~\ref{fig:ffq}), because tap phases rotate. %FFQRESULTS
+The complex QPSK channel is harsher (Fig.~\ref{fig:ffq}), because tap phases rotate. At $f_DT_s=2\times10^{-4}$ (0.02 Doppler cycles per word) the trellis receivers are already 6--8 times worse than the genie at 10~dB and 13--15 times worse at 14~dB, where LS-Viterbi and the tied metric reach 0.099 and 0.101 against $7.7\e{-3}$. At $f_DT_s\ge5\times10^{-4}$ every receiver that estimates one channel per word, learned or classical, trellis or equalizer, falls to 0.56--0.75, near chance (0.75), while the genie stays at $5$--$8\e{-3}$ at 14~dB. The learned and classical receivers fail together and by the same amount, so the limitation is the per-word channel model shared by all of them, not the choice between learning and estimation.
 Handling such channels requires tracking within the word, which none of the learned receivers studied here provides.
 
 \begin{figure}[t]
