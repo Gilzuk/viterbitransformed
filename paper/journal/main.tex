@@ -1,0 +1,287 @@
+\documentclass[journal]{IEEEtran}
+\usepackage{cite}
+\usepackage{amsmath,amssymb}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{multirow}
+\usepackage{amsthm}
+\usepackage[hidelinks]{hyperref}
+\newtheorem{proposition}{Proposition}
+\graphicspath{{../figures/}}
+\input{../figures/numbers.tex}
+\newcommand{\e}[1]{\times10^{#1}}
+
+\begin{document}
+
+\title{When Does Learning Help Trellis Detection?\\ Matched Baselines, Structure, and Complexity of\\ Model-Based Deep Viterbi Receivers}
+
+\author{Author~Name,~\IEEEmembership{Member,~IEEE,} and Author~Name%
+\thanks{Manuscript received Month DD, 2026. (Corresponding author: Author Name.)}%
+\thanks{The authors are with the Department, Institution, City, Country (e-mail: author@institution.edu).}}
+
+\markboth{IEEE Transactions on Machine Learning in Communications and Networking}{When Does Learning Help Trellis Detection?}
+
+\maketitle
+
+\begin{abstract}
+Model-based deep receivers such as ViterbiNet keep the Viterbi trellis and learn the channel-dependent branch metric from pilots, adapting it online on decoded words. They are usually evaluated against a Viterbi detector with perfect or deliberately corrupted channel state information (CSI), neither of which receives the information the learned receiver uses. We re-evaluate this design space with matched-information baselines, identical Monte Carlo draws, and controlled ablations. On a coded BPSK intersymbol-interference channel with COST~2100 taps, a Viterbi detector that estimates its four taps by least squares from the same pilot and the same code-gated decisions matches or outperforms every learned receiver from 0 to 17~dB and stays within 3--30\% of the perfect-CSI bound. ViterbiNet's default of 200 online steps per word overfits; 5 steps are better at every SNR and 40 times cheaper. A 32-parameter affine metric, the exact form of the Gaussian log-likelihood, matches the 7,002-parameter network; Transformer and Vision-Transformer metrics of the same size are worse at every training budget and 5--7 times costlier to adapt, and the trellis, not the network, dominates detection latency. For complex QPSK the free per-branch metric needs $M^L$ classes and fails with a realistic pilot, while tying the classes to the channel taps restores classical performance. Under fast fading, the learned receivers' edge over a last-word least-squares estimate comes from memory of the channel statistics, which an exponentially weighted least-squares estimate reproduces; no receiver without CSI tracks the channel within a word. We release all code and data and derive design guidance for when learning can help.
+\end{abstract}
+
+\begin{IEEEkeywords}
+Deep learning, model-based deep learning, symbol detection, Viterbi algorithm, channel estimation, online learning, Transformers, intersymbol interference, fast fading.
+\end{IEEEkeywords}
+
+\section{Introduction}
+\IEEEPARstart{D}{eep} learning has been applied to nearly every block of the physical layer~\cite{oshea2017intro}, including channel estimation and detection in OFDM~\cite{ye2018power}, MIMO detection~\cite{samuel2019learning}, and sequence detection for channels without tractable models~\cite{farsad2018neural}. Model-based deep learning takes a middle path: it keeps the structure of a classical algorithm and learns only its model-dependent parts~\cite{shlezinger2023mbdl}. ViterbiNet~\cite{shlezinger2020viterbinet} applies this idea to channels with memory. The Viterbi recursion~\cite{forney1973viterbi,forney1972mlse} is kept, and a small neural network maps each received sample to the likelihoods of the channel states. The network is trained on pilots and adapted online on words accepted by an error-correcting code, so the receiver follows a slowly varying channel without new pilots. Meta-learning was later added to accelerate that adaptation~\cite{raviv2021metaviterbinet,raviv2023online}.
+
+The evidence for this family rests on two comparisons: the learned receiver approaches the Viterbi algorithm with perfect CSI, and it outperforms the Viterbi algorithm given CSI with a fixed amount of uncertainty~\cite{shlezinger2020viterbinet}. Neither baseline receives the same information as the learned receiver. The first is given the channel; the second is given a corrupted channel and no way to correct it. A classical receiver that estimates the channel from the same pilots and the same accepted decisions, the adaptive maximum-likelihood sequence estimator~\cite{magee1973adaptive,raheli1995psp}, is the comparison that isolates what learning contributes. It is absent from the evaluations of learned trellis detectors that we are aware of.
+
+This paper re-examines the design space with matched information, identical Monte Carlo draws, and ablations of each design choice. Our contributions are:
+\begin{enumerate}
+\item \emph{A matched-information baseline.} A least-squares (LS) Viterbi receiver that uses the same pilot and code-gated decisions as ViterbiNet matches or outperforms all learned receivers at every SNR and tracks the perfect-CSI bound (Section~\ref{sec:bpsk}).
+\item \emph{Adaptation budget.} The default of 200 online steps per accepted word overfits; 5 steps are better at every SNR and 40 times cheaper (Section~\ref{sec:adapt}).
+\item \emph{Structure over size.} A 32-parameter affine metric matches the 7,002-parameter network, and larger networks are not better (Section~\ref{sec:topology}).
+\item \emph{Sequence architectures.} Transformer~\cite{vaswani2017attention} and Vision-Transformer~\cite{dosovitskiy2021vit} metrics of the same size are worse at every offline training budget and costlier to run and adapt (Sections~\ref{sec:arch}--\ref{sec:latency}).
+\item \emph{Scaling to higher-order modulation.} For QPSK the per-branch metric needs $M^L$ classes and fails with a realistic pilot; tying the classes to the channel taps restores classical performance, while symbol-by-symbol classifiers need an equalizer structure to track (Section~\ref{sec:qpsk}).
+\item \emph{Fast fading.} The learned receivers' advantage over a last-word LS estimate comes from memory of the channel statistics, which exponentially weighted LS reproduces; no receiver without CSI tracks the channel within a word (Section~\ref{sec:ff}).
+\end{enumerate}
+All code, raw results, and figure scripts are released so that every number can be regenerated.
+
+\section{Related Work}
+\emph{Learned detectors.} Early data-driven detectors replaced the receiver with a generic network~\cite{oshea2017intro,ye2018power} or unfolded an iterative algorithm into layers~\cite{samuel2019learning}. Sliding bidirectional recurrent networks detect sequences without a channel model~\cite{farsad2018neural}. Model-based designs such as ViterbiNet keep an inference algorithm and learn a factor of it~\cite{shlezinger2023mbdl,shlezinger2020viterbinet}; online meta-learning reduces the data and iterations needed to adapt~\cite{raviv2021metaviterbinet,raviv2023online}.
+
+\emph{Classical adaptive sequence estimation.} Adaptive MLSE with a decision-directed channel estimator dates to Magee and Proakis~\cite{magee1973adaptive}. Per-survivor processing (PSP) embeds the estimator in the trellis so that each survivor path carries its own channel estimate~\cite{raheli1995psp}. Least-mean-squares and recursive least-squares estimators, including exponential forgetting, are standard tools for tracking~\cite{haykin2014adaptive}. These methods use exactly the side information ViterbiNet uses: pilots and past decisions.
+
+\emph{Sequence models.} Transformers~\cite{vaswani2017attention} and their patch-based variants~\cite{dosovitskiy2021vit} have been proposed for many receiver tasks. We test whether attention over a window of samples improves the branch metric when it is embedded in the same trellis and trained under the same budget.
+
+\section{System Model}\label{sec:model}
+\subsection{BPSK channel with memory}
+Information words of 120 bits are encoded with a Reed--Solomon (RS) code over GF($2^8$) with two parity symbols~\cite{reed1960polynomial}, giving 136 coded bits, and BPSK-modulated. The received sequence is
+\begin{equation}\label{eq:channel}
+y_t=\sum_{k=0}^{L-1} h_k^{(w)}\, s_{t+L-1-k}+n_t,\qquad n_t\sim\mathcal{N}(0,\sigma^2),
+\end{equation}
+with memory $L=4$, $\mathrm{SNR}=1/\sigma^2$, and state $x_t=(s_t,\dots,s_{t+L-1})\in\{\pm1\}^4$ (16 states). The taps of word $w$ are the magnitudes of a fixed COST~2100 channel trace~\cite{liu2012cost2100} of 300 blocks, which varies slowly from word to word. A frame has 125 words; every 25th word is a pilot, so each frame carries 5 pilots and 120 data words.
+
+\subsection{Fast-fading extension}
+To test tracking within a word, the taps of Section~\ref{sec:ff} vary sample by sample:
+\begin{equation}
+h_k(t)=\bar h_k^{(w)}\Big(\sqrt{\tfrac{\kappa}{\kappa+1}}+\sqrt{\tfrac{1}{\kappa+1}}\,g_k(t)\Big),
+\end{equation}
+where $\bar h^{(w)}$ is the COST~2100 trace, $\kappa=3$ is a Rician factor, and $g_k(t)$ are independent real, unit-variance Jakes processes (sums of 16 sinusoids)~\cite{clarke1968statistical} with normalized Doppler $f_DT_s\in\{0.001,0.005,0.01,0.03\}$, continuous across word boundaries. At $f_DT_s=0.01$ the taps change appreciably over about 40 symbols.
+
+\subsection{Complex QPSK channel}
+For Section~\ref{sec:qpsk}, QPSK symbols pass through $L=3$ complex Rayleigh taps with an exponential power-delay profile (power ratio 0.5 per tap, unit total power). The taps evolve from word to word as a first-order autoregressive process with correlation 0.99, or, in the fast-fading variant, as complex Jakes processes. Words carry 120 symbols between known start and end symbols; a frame has one pilot word and 24 data words. The trellis has $M^{L-1}=16$ states and $M^L=64$ branches.
+
+\section{Receivers}\label{sec:receivers}
+All receivers share one Viterbi recursion over the 16-state trellis and differ only in the branch metric $\ell_t(x)$.
+
+\subsection{Classical receivers}
+\emph{Perfect CSI:} $\ell_t(x)=-(y_t-\mathbf h^{\mathsf T}\mathbf s(x))^2/2$ with the true taps (the bound).
+
+\emph{Noisy CSI:} the same metric with taps $1,\dots,L-1$ perturbed by Gaussian noise of standard deviation $\rho$ times the RMS tap magnitude, $\rho\in\{0.25,0.5,0.75,1\}$. This is the CSI-uncertainty baseline of~\cite{shlezinger2020viterbinet}.
+
+\emph{LS-Viterbi (matched information):} the metric uses $\hat{\mathbf h}=\arg\min_{\mathbf h}\sum_t\big(y_t-\mathbf h^{\mathsf T}\mathbf s(x_t)\big)^2$, recomputed on each pilot and on each data word whose RS-decoded SER is at most 0.02; data-word states come from the RS re-encoded decisions. These are the words and labels the learned receivers adapt on.
+
+\emph{LS with forgetting (RLS):} $\hat{\mathbf h}=\mathbf R^{-1}\mathbf r$ with $\mathbf R\leftarrow\lambda\mathbf R+\mathbf X^{\mathsf T}\mathbf X$ and $\mathbf r\leftarrow\lambda\mathbf r+\mathbf X^{\mathsf T}\mathbf y$ over accepted words ($\lambda=0.8$), i.e., exponentially weighted LS~\cite{haykin2014adaptive}.
+
+\emph{PSP-LMS:} each survivor carries its own tap estimate, updated by least mean squares along its own path at every trellis step~\cite{raheli1995psp} (step size 0.01).
+
+\subsection{Learned receivers}
+\emph{ViterbiNet:} a fully connected network $1\to100\to58\to16$ (sigmoid, then ReLU; 7,002 parameters) maps $y_t$ to 16 state scores, trained with cross-entropy against the true state~\cite{shlezinger2020viterbinet}. Offline training uses 25 minibatches of 300 words with Adam~\cite{kingma2015adam} (learning rate $10^{-3}$); online, $K$ Adam steps are taken on each pilot and each accepted data word ($K=200$ by default).
+
+\emph{VNet topologies:} the same pipeline with hidden widths from 4 to 64, two-layer variants, and no hidden layer. The last, VNet-affine, computes $\mathbf a y_t+\mathbf b\in\mathbb R^{16}$ (32 parameters). Up to a state-independent term the Gaussian log-likelihood is $(\mu_x/\sigma^2)y_t-\mu_x^2/(2\sigma^2)$, so VNet-affine is the smallest learned metric that contains the true one.
+
+\begin{proposition}\label{prop:affine}
+For channel \eqref{eq:channel} with known taps and equiprobable states, the posterior logits of the state given one sample are affine in $y_t$: $\log p(x\,|\,y_t)=(\mu_x/\sigma^2)\,y_t-\mu_x^2/(2\sigma^2)+c(y_t)$ with $\mu_x=\mathbf h^{\mathsf T}\mathbf s(x)$. Hence (i) the Bayes-optimal cross-entropy classifier of $x_t$ from $y_t$ lies in the affine family, and (ii) using its logits as branch metrics yields exactly the maximum-likelihood Viterbi decisions.
+\end{proposition}
+\begin{proof}
+$\log p(y_t|x)=-(y_t-\mu_x)^2/(2\sigma^2)+\text{const}$ and $\log p(x)$ is constant, so Bayes' rule gives the stated form with $c(y_t)=-y_t^2/(2\sigma^2)-\log\sum_{x'}p(y_t|x')+\text{const}$. The minimizer of the expected cross-entropy is the true posterior, which (i) shows is affine up to $c(y_t)$; since softmax is invariant to the state-independent $c(y_t)$, an affine layer attains it. For (ii), $c(y_t)$ adds the same amount to every branch at time $t$, so it changes no comparison in the add-compare-select recursion, and the remaining terms are the Gaussian branch metric up to scale.
+\end{proof}
+Proposition~\ref{prop:affine} explains why VNet-affine can match a much larger network on this channel: the extra capacity has nothing to represent. It does not imply that 32 parameters suffice when the noise is non-Gaussian or the channel is nonlinear.
+
+\emph{Transformer metrics} (all about 7,000 parameters, window of 4 samples, model width 16): the original encoder with 8 heads; V2 with 2 heads (head width 8) and sinusoidal positions; V3, which replaces the linear embedding with an MLP; V4, an MLP feature extractor, one attention layer, and an MLP head; and ViT variants that treat non-overlapping or overlapping 4-sample patches as tokens~\cite{vaswani2017attention,dosovitskiy2021vit}. All output 16 state scores for the same trellis.
+
+\subsection{QPSK receivers}
+\emph{Free per-branch metrics} extend ViterbiNet directly: an affine map (192 parameters) or MLP (9,934 parameters) from $(\Re y_t,\Im y_t)$ to the 64 branch scores. \emph{Tied metrics} constrain the 64 branch means to $\mu_c=\sum_k h_k s_k(c)$ with $L$ learnable complex taps and a learnable scale (7 parameters), optionally adding a shared residual MLP applied to $y_t-\mu_c$ (88 parameters, initialized to zero). \emph{Symbol classifiers} skip the trellis and map a window of received samples to 4 classes: a free linear map (44 parameters), an MLP (948), or an equalizer-structured classifier $z=\mathbf w^{\mathsf H}\mathbf y+b$ with scores $a\,\Re(c_m^* z)$ (21 parameters, 9-sample window). Classical references are LS-Viterbi and a linear MMSE equalizer with true taps or with LS-fitted weights.
+
+\section{Evaluation Protocol}\label{sec:protocol}
+\emph{Matched information.} Every receiver sees the same pilot words, and every adaptive receiver adapts on the same set of accepted words: pilots and data words whose RS-decoded SER is at most 0.02.
+
+\emph{Monte Carlo.} A repetition draws fresh bits and noise for one frame; the SER is computed on the RS-decoded information bits of the 120 data words (14,400 bits per repetition). Learned receivers use at least 20 repetitions; the perfect-CSI and LS receivers use at least 100 (up to $10^4$ and $10^3$), with the count set from a predicted SER to target about 100 errors. Zero-error points are reported as the one-sided 95\% bound $3/N$ for $N$ evaluated bits. Architecture and topology studies at 7~dB use 20 repetitions each and report 95\% confidence intervals. In the fast-fading study, evaluation data are seeded per repetition, so all receivers see identical transmissions and differences are paired. QPSK points average 64 frames of 24 data words (184,320 symbols).
+
+\emph{Training data.} Offline training of the learned receivers uses words drawn from the same COST~2100 tap sequence used for evaluation. This favors the learned receivers and makes the comparison conservative.
+
+\emph{Hardware.} Latency is measured on a single CPU thread as the median of repeated runs on one 136-sample word. The $K=200$ ViterbiNet and Transformer SNR sweeps were run with the same code on separate GPU machines.
+
+\section{Results}
+\subsection{BPSK: matched-information baseline}\label{sec:bpsk}
+Fig.~\ref{fig:snr} and Table~\ref{tab:bpsk} report SER versus SNR. The LS-Viterbi receiver is never worse than any learned receiver. Wherever errors were observed it stays within 3--30\% of the perfect-CSI SER: \serlsseven\ versus \sercsiseven\ at 7~dB, \serlstwelve\ versus \sercsitwelve\ at 12~dB, and \serlsfourteen\ versus \sercsifourteen\ at 14~dB. Relative to ViterbiNet with its default adaptation, LS-Viterbi has 1.3 times lower SER at 7~dB, 9.9 times at 12~dB, and 45 times at 14~dB. With $K=5$ the ratios are 1.07, 1.7, and 20. The learned receivers level off near $5\e{-6}$ at 14--15~dB while the classical receivers continue down; above 14~dB neither the perfect-CSI nor the LS receiver produced an error in $1.4\e{8}$ and $1.4\e{7}$ bits, respectively.
+
+The noisy-CSI curves explain the original comparison. With 25\% tap error, the Viterbi detector improves only slowly with SNR ($1.3\e{-3}$ at 14~dB, $6\e{-4}$ at 16~dB), and at 50--100\% error it is flat at 0.04--0.2. Nothing in that receiver corrects its model. ViterbiNet corrects its model from data, and so does LS-Viterbi, with four unknowns and one least-squares solve per accepted word.
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=\columnwidth]{ser_snr_journal.pdf}
+\caption{BPSK SER vs.\ SNR. LS-Viterbi receives the same pilots and accepted decisions as the learned receivers; noisy-CSI curves perturb the taps by a fixed fraction. Hollow triangles: no errors observed (95\% upper bound).}
+\label{fig:snr}
+\end{figure}
+
+\begin{table}[t]
+\centering
+\caption{BPSK SER of the RS-decoded bits.}
+\label{tab:bpsk}
+\setlength{\tabcolsep}{2.5pt}
+\footnotesize
+\begin{tabular}{@{}lrccccc@{}}
+\toprule
+Receiver & Param. & 0 dB & 7 dB & 10 dB & 12 dB & 14 dB\\
+\midrule
+Viterbi, perfect CSI & -- & \sercsizero & \sercsiseven & \sercsiten & \sercsitwelve & \sercsifourteen\\
+Viterbi, 25\% CSI error & -- & \sercsitwentyfivezero & \sercsitwentyfiveseven & \sercsitwentyfiveten & \sercsitwentyfivetwelve & \sercsitwentyfivefourteen\\
+LS-Viterbi (no CSI) & 4 & \serlszero & \serlsseven & \serlsten & \serlstwelve & \serlsfourteen\\
+ViterbiNet, $K{=}200$ & 7,002 & \servnetzero & \servnetseven & \servnetten & \servnettwelve & \servnetfourteen\\
+ViterbiNet, $K{=}5$ & 7,002 & \servnetfivezero & \servnetfiveseven & \servnetfiveten & \servnetfivetwelve & \servnetfivefourteen\\
+VNet-affine, $K{=}200$ & 32 & \seraffinezero & \seraffineseven & \seraffineten & \seraffinetwelve & \seraffinefourteen\\
+Transformer, $K{=}200$ & 6,960 & \sertransformerzero & \sertransformerseven & \sertransformerten & \sertransformertwelve & \sertransformerfourteen\\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Online adaptation budget}\label{sec:adapt}
+Fig.~\ref{fig:steps} sweeps the number of online steps $K$ at 7~dB. For the 7,002-parameter network the SER is lowest at $K=5$ (0.0249) and rises monotonically to 0.0315 at $K=200$. Without adaptation it is 0.0340, so a few steps help and many steps overfit: each step fits the same 136-sample word, and after a handful of steps the network starts fitting that word's noise. Over the whole SNR sweep, $K=5$ is better than $K=200$ at every SNR (Table~\ref{tab:bpsk}) while using 40 times less adaptation compute.
+
+The affine metric responds oppositely: it needs 50--200 steps to move from the generic offline solution to the frame's channel and reaches 0.0254 at $K=100$--200, statistically tied with the tuned network. A model with 32 parameters has too little capacity to overfit one word, but also moves more slowly per step.
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=\columnwidth]{online_steps.pdf}
+\caption{SER at 7~dB vs.\ online steps per accepted word (25 offline minibatches; bars: 95\% confidence intervals over 20 repetitions).}
+\label{fig:steps}
+\end{figure}
+
+\subsection{Topology: structure over size}\label{sec:topology}
+Fig.~\ref{fig:topology}(a) shows SER against parameter count at the default budget. SER increases with size, from 0.0254 (affine) to 0.0275--0.0290 (4 to 64 hidden units), 0.0299--0.0307 (two hidden layers) and 0.0315 (7,002 parameters). Only the confidence intervals of the smallest networks overlap the affine one. Fig.~\ref{fig:topology}(b) varies the offline budget: from 2 to 25 minibatches the large network stays near 0.031--0.033, whereas the affine metric improves with more offline training. More capacity does not buy accuracy, because the metric the network must represent is quadratic in $y_t$ with four unknowns.
+
+\begin{figure*}[t]
+\centering
+\includegraphics[width=\textwidth]{topology.pdf}
+\caption{ViterbiNet topology study at 7~dB. (a) SER vs.\ trainable parameters at 25 offline minibatches and 200 online steps (green: 5 online steps). (b) SER vs.\ offline minibatches. (c) Per-word latency of the network forward pass and one online step; the 16-state trellis costs about 10.6~ms per word for every topology.}
+\label{fig:topology}
+\end{figure*}
+
+\subsection{Sequence architectures and training budget}\label{sec:arch}
+Fig.~\ref{fig:arch} compares metrics of about 7,000 parameters at 7~dB under a training-budget search: starting at 25 offline minibatches, the budget grows by 25 while the SER improves and is then refined by a binary search around the best value, with fixed-budget runs up to 1,000 minibatches. The MLP is best at every budget (0.031--0.033). The best attention-based metric, a ViT with overlapping patches, reaches 0.033 after 250 minibatches; Transformer V2, V3, and V4 stay between 0.037 and 0.041; the original 8-head encoder reaches 0.040; and a ViT with non-overlapping patches fails (0.107), because a 4-sample patch splits the channel memory across tokens. Attention over a 4-sample window adds no information the trellis does not already use, and the extra parameters are spent on mixing that the channel structure makes unnecessary.
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=\columnwidth]{architectures.pdf}
+\caption{SER at 7~dB vs.\ offline training budget for metrics of about 7,000 parameters (200 online steps; bars: 95\% confidence intervals).}
+\label{fig:arch}
+\end{figure}
+
+\subsection{Latency}\label{sec:latency}
+Fig.~\ref{fig:latency} breaks detection latency down on one CPU thread. The 136-step, 16-state trellis costs 11--12~ms per word (81--90~$\mu$s per symbol) for every receiver. The network forward pass adds 0.05~ms (affine), 0.14~ms (ViterbiNet), and 1.4--2.4~ms (attention-based). The difference that matters is adaptation: one online step takes 0.53~ms (affine), 1.0~ms (ViterbiNet), and 4.9--7.3~ms (attention-based). At their best settings, ViterbiNet with $K=5$ spends 5.2~ms per accepted word adapting, VNet-affine with $K=200$ spends 105~ms, and the default ViterbiNet 209~ms, against one $4\times4$ least-squares solve for LS-Viterbi. A smaller network is therefore not automatically a cheaper receiver: the number of adaptation steps it needs matters as much as its size.
+
+In operation counts, the trellis costs $O(T\,2^{L+1})$ add-compare-select operations per word of $T$ samples for every receiver. A per-sample metric with $P$ parameters adds $O(TP)$ for the forward pass and $O(KTP)$ for $K$ adaptation steps, while LS re-estimation costs $O(TL^2+L^3)$, i.e., about $2{,}200$ multiply-accumulates for $T=136$ and $L=4$, fewer than the 7,002-parameter network spends on a single sample.
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=\columnwidth]{latency.pdf}
+\caption{Per-word latency on one CPU thread: detection (trellis plus network forward pass) and one online adaptation step.}
+\label{fig:latency}
+\end{figure}
+
+\subsection{QPSK: tying the branch classes}\label{sec:qpsk}
+Fig.~\ref{fig:qpsk} and Table~\ref{tab:qpsk} show the complex QPSK channel. The free per-branch metrics, the direct extension of ViterbiNet, fail: 0.37 (affine) and 0.50 (MLP) at 16~dB. The cause is data, not tracking. On a static channel with one pilot word they reach only 0.34 and 0.33 at 20~dB, because a 120-symbol pilot leaves about 10 of the 64 branch classes unseen. With 5 pilot words and ten times more training steps, the affine metric reaches $10^{-4}$ but the MLP still sits at 0.22.
+
+Tying the 64 branch means to $L$ learnable taps fixes both problems. The tied metric (7 parameters) reaches $7.6\e{-3}$ at 16~dB, and the tied metric with a residual MLP (88 parameters) $1.7\e{-2}$, against $3.6\e{-3}$ for LS-Viterbi and $3.1\e{-4}$ for perfect CSI. The residual MLP does not help, as expected for Gaussian noise.
+
+Symbol classifiers without a trellis reveal a second failure. A free linear or MLP 4-class classifier trained on the pilot and adapted by cross-entropy on its own decisions stays near 0.18--0.22 at every SNR above 12~dB. Its per-word SER climbs from 0.06 to 0.28 across a frame: confident decisions produce almost no cross-entropy gradient, so self-training never follows the drifting channel, and a code gate at SER 0.02 never opens. Giving the classifier an equalizer structure and a decision-directed LMS update brings it to 0.031 at 16~dB, matching an LS-fitted linear equalizer (0.029), with the true-tap MMSE equalizer at $6.6\e{-3}$. All trellis receivers remain better than all symbol classifiers.
+
+Neighboring SNR points in Fig.~\ref{fig:qpsk} use independent channel draws, and the tracking receivers propagate decision errors, so their curves are not monotone above 16~dB (e.g., LS-Viterbi rises from $3.6\e{-3}$ to $1.6\e{-2}$ between 16 and 24~dB). Comparisons are meaningful within an SNR point, where all receivers share the channel draws.
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=\columnwidth]{qpsk.pdf}
+\caption{QPSK, 3 complex taps drifting between words, one 120-symbol pilot per 25 words. Parentheses: trainable parameters.}
+\label{fig:qpsk}
+\end{figure}
+
+\begin{table}[t]
+\centering
+\caption{QPSK SER (64 frames $\times$ 24 data words per point).}
+\label{tab:qpsk}
+\setlength{\tabcolsep}{3pt}
+\footnotesize
+\resizebox{\columnwidth}{!}{%
+\begin{tabular}{@{}lrccc@{}}
+\toprule
+Receiver & Param. & 12 dB & 16 dB & 20 dB\\
+\midrule
+Viterbi, perfect CSI & -- & $1.1\e{-2}$ & $3.1\e{-4}$ & $1.3\e{-4}$\\
+LS-Viterbi & -- & $2.7\e{-2}$ & $3.6\e{-3}$ & $1.1\e{-2}$\\
+Tied affine + trellis & 7 & $4.8\e{-2}$ & $7.6\e{-3}$ & $2.1\e{-2}$\\
+Tied + residual MLP + trellis & 88 & $7.9\e{-2}$ & $1.7\e{-2}$ & $1.5\e{-2}$\\
+Free per-branch affine & 192 & $0.43$ & $0.37$ & $0.35$\\
+Free per-branch MLP & 9,934 & $0.59$ & $0.50$ & $0.46$\\
+4-class linear, CE tracking & 44 & $0.21$ & $0.19$ & $0.18$\\
+4-class, equalizer structure & 21 & $9.2\e{-2}$ & $3.1\e{-2}$ & $4.5\e{-2}$\\
+Linear MMSE, true taps & -- & $3.2\e{-2}$ & $6.6\e{-3}$ & $4.5\e{-3}$\\
+\bottomrule
+\end{tabular}}
+\end{table}
+
+\subsection{Fast fading}\label{sec:ff}
+Fig.~\ref{fig:ffb} and Table~\ref{tab:ff} show BPSK at 7~dB when the taps vary within the word. Because all receivers see the same transmissions, we report paired differences. At $f_DT_s=0.001$ the learned receivers beat LS-Viterbi on the last accepted word by 0.039 SER and PSP-LMS by 0.017. The source of that advantage is memory rather than tracking: exponentially weighted LS with forgetting factor 0.8 ties VNet-affine up to $f_DT_s=0.01$ and beats it at 0.03, and it is slightly better than ViterbiNet with $K=5$ at $f_DT_s=0.001$ and 0.03. After a deep fade, the last accepted word is a poor estimate of the next one; an estimator that averages over past words, whether by offline training on the channel statistics or by exponential forgetting, is not misled by it. No receiver without CSI tracks the channel within a word: all sit near 0.14, against 0.07 for a genie that knows the per-sample taps.
+
+The complex QPSK channel is harsher (Fig.~\ref{fig:ffq}), because tap phases rotate. At $f_DT_s=2\times10^{-4}$ (0.02 Doppler cycles per word) the trellis receivers are already 16--21 times worse than the genie at 16~dB, and at $f_DT_s\ge5\times10^{-4}$ every receiver that estimates one channel per word, learned or classical, falls to 0.46--0.75, near chance. Only the genie remains at $2\e{-3}$. Handling such channels requires tracking within the word, which none of the learned receivers studied here provides.
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=\columnwidth]{fast_fading_bpsk.pdf}
+\caption{BPSK SER at 7~dB vs.\ normalized Doppler (Rician $\kappa=3$ Jakes fading within the word; 50 paired repetitions; bars: 95\% confidence intervals).}
+\label{fig:ffb}
+\end{figure}
+
+\begin{table}[t]
+\centering
+\caption{Paired SER differences under BPSK fast fading at 7~dB (mean $\pm$ 95\% CI over 50 repetitions; positive: first receiver worse).}
+\label{tab:ff}
+\setlength{\tabcolsep}{3pt}
+\footnotesize
+\resizebox{\columnwidth}{!}{%
+\begin{tabular}{@{}lcccc@{}}
+\toprule
+$f_DT_s$ & 0.001 & 0.005 & 0.01 & 0.03\\
+\midrule
+LS (last word) $-$ ViterbiNet $K{=}5$ & $+.039\pm.011$ & $+.024\pm.006$ & $+.009\pm.003$ & $+.001\pm.002$\\
+RLS ($\lambda{=}0.8$) $-$ ViterbiNet $K{=}5$ & $-.002\pm.001$ & $-.001\pm.001$ & $-.001\pm.001$ & $-.002\pm.002$\\
+RLS ($\lambda{=}0.8$) $-$ VNet-affine & $+.000\pm.001$ & $+.001\pm.001$ & $-.001\pm.001$ & $-.003\pm.001$\\
+\bottomrule
+\end{tabular}}
+\end{table}
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=\columnwidth]{fast_fading_qpsk.pdf}
+\caption{QPSK SER vs.\ normalized Doppler with complex Jakes taps varying within the word (64 frames per point, identical draws for all receivers).}
+\label{fig:ffq}
+\end{figure}
+
+\section{Discussion}
+\emph{When does learning help?} In every setting studied, the branch metric that the learned receivers must represent is fixed by a linear channel and Gaussian noise: quadratic in the received sample, with $L$ unknown taps. A classical receiver that estimates those taps from the same data reaches the bound, and a learned metric can at best match it. Learning can add value where that model is wrong: nonlinear front ends, impulsive or non-Gaussian noise, or channels without a finite-tap description~\cite{farsad2018neural}. Our results argue that such claims should be tested against a matched-information classical receiver rather than against a Viterbi detector with corrupted CSI.
+
+\emph{Design guidance.} (i) Compare against a classical receiver that receives the same pilots and decisions. (ii) Tune the online adaptation budget; the right number of steps depends on model size and can differ by two orders of magnitude. (iii) Build the channel structure into the metric: for $M$-ary signalling, tie the $M^L$ branch classes to $L$ taps. (iv) Measure latency end to end; the trellis and the adaptation loop, not the network forward pass, set the cost. (v) Under fast fading, evaluate tracking within the word against PSP or exponentially weighted estimators before attributing gains to learning.
+
+\emph{Limitations.} Our BPSK results use one COST~2100 tap trace, a linear Gaussian channel, and our own implementation of ViterbiNet; the QPSK and fast-fading channels are synthetic. The meta-learning variants of~\cite{raviv2021metaviterbinet,raviv2023online} change how the learned receivers adapt and should be compared against the same baselines. The fast-fading PSP step size and forgetting factor were selected on short pilot runs; better-tuned classical trackers would only strengthen the conclusions. Points above 14~dB rely on upper bounds with different numbers of evaluated bits for different receivers.
+
+\section{Conclusion}
+Given the same pilots and decisions, a least-squares Viterbi receiver matched or outperformed every learned trellis detector we tested, stayed within 3--30\% of the perfect-CSI bound, and needed a single least-squares solve per accepted word to adapt. ViterbiNet's gains are gains over a receiver denied the chance to estimate its channel. Within the learned family, fewer adaptation steps, fewer parameters, and structure tied to the channel model all helped, and attention-based metrics did not. The open problem these experiments expose is tracking within a word under fast fading, where every receiver without CSI, learned or classical, remains far from the bound.
+
+\section*{Data Availability and AI-Use Statement}
+Simulation code, raw results, and the scripts that generate every figure and table (\texttt{paper/make\_figures.py}) are available at [repository URL]. An AI coding assistant (Claude, Anthropic) was used to write simulation, analysis, and plotting code and to draft the manuscript; the authors checked all code, results, and text.
+
+\bibliographystyle{IEEEtran}
+\bibliography{../refs}
+
+\end{document}
