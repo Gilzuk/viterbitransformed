@@ -72,7 +72,11 @@ class Config:
     words = 25           # per frame, the first pilot_words words are pilots
     pilot_words = 1
     pdp_decay = 0.5      # tap power ~ decay^k
-    rho = 0.99           # AR(1) tap correlation word to word
+    rho = 0.99           # AR(1) tap correlation word to word (used when doppler == 0)
+    doppler = 0.0        # > 0: fast fading instead -- every tap is a complex Jakes
+                         # (Rayleigh) process with normalized Doppler f_D*T_symbol,
+                         # varying sample by sample and continuous across words
+    jakes_sinusoids = 16
     ser_thresh = 0.02
     adapt = 'dd'         # 'dd': adapt on the receiver's own decisions after every data word;
                          # 'gated': adapt on true symbols only if word SER <= ser_thresh (repo-style ECC gate)
@@ -113,21 +117,35 @@ def evolve_taps(cfg, h):
     return (cfg.rho * h + math.sqrt(1 - cfg.rho ** 2) * random_taps(cfg, h.shape[0])).to(CDT)
 
 
+def jakes_taps(cfg, B, n):
+    """(B, n, L) complex taps: independent unit-power Jakes processes (sum of
+    sinusoids with random arrival angles and phases), scaled by the PDP."""
+    Ms = cfg.jakes_sinusoids
+    t = torch.arange(n, dtype=torch.float64).view(1, n, 1, 1)
+    alpha = torch.rand(B, 1, cfg.L, Ms, dtype=torch.float64) * 2 * math.pi
+    phi = torch.rand(B, 1, cfg.L, Ms, dtype=torch.float64) * 2 * math.pi
+    g = torch.exp(1j * (2 * math.pi * cfg.doppler * torch.cos(alpha) * t + phi)).sum(-1) / math.sqrt(Ms)
+    return (g * cfg.tap_std.double()).to(CDT)
+
+
 def transmit(cfg, h, N0):
-    """h: (B, L). Returns data symbol indices (B, N), y (B, T), classes (B, T)."""
-    B, L = h.shape
+    """h: (B, L) block taps, or (B, T, L) per-sample taps (fast fading).
+    Returns data symbol indices (B, N), y (B, T), classes (B, T)."""
+    B, L = h.shape[0], h.shape[-1]
     d = torch.randint(0, cfg.M, (B, cfg.N))
     pad = torch.zeros(B, L - 1, dtype=torch.long)
     full = torch.cat([pad, d, pad], 1)                        # (B, N + 2(L-1))
     win = full.unfold(1, L, 1).flip(-1)                       # (B, T, L): [s[t], s[t-1], ...]
     s = cfg.const[win]
-    y = (s * h[:, None, :]).sum(-1)
+    y = (s * (h[:, None, :] if h.dim() == 2 else h)).sum(-1)
     y = y + math.sqrt(N0 / 2) * torch.complex(torch.randn_like(y.real), torch.randn_like(y.real))
     classes = (win * (cfg.M ** torch.arange(L))).sum(-1)
     return d, y.to(CDT), classes
 
 
 def class_means(cfg, h):
+    if h.dim() == 3:                                                  # per-sample taps
+        return (cfg.const[cfg.digits][None, None] * h[:, :, None, :]).sum(-1)   # (B, T, C)
     return (cfg.const[cfg.digits][None] * h[:, None, :]).sum(-1)    # (B, C)
 
 
@@ -337,8 +355,9 @@ def ls_estimate(cfg, y, classes):
 
 
 def classic_scores(cfg, y, h, N0):
-    mu = class_means(cfg, h)                                  # (F, C)
-    return -(y[:, :, None] - mu[:, None, :]).abs() ** 2 / N0.view(-1, 1, 1)
+    mu = class_means(cfg, h)                                  # (F, C) or (F, T, C)
+    mu = mu[:, None, :] if mu.dim() == 2 else mu
+    return -(y[:, :, None] - mu).abs() ** 2 / N0.view(-1, 1, 1)
 
 
 # ------------------------------------------------- linear equalizers ---
@@ -384,12 +403,22 @@ def run_snr(cfg, snr_db, frames, receivers, online_iters, seed=0):
             net = BatchedNet(cfg, kind, frames)
             net.broadcast_from(off, frames)
             nets[r] = net
-    h = random_taps(cfg, frames)
+    if cfg.doppler > 0:
+        # reseed after offline training so every receiver set sees the same
+        # channel and data (paired comparison across separate run_snr calls)
+        torch.manual_seed(seed + 7919)
+        T = cfg.N + cfg.L - 1
+        taps_all = jakes_taps(cfg, frames, cfg.words * T)
+        h = taps_all[:, :T]
+    else:
+        h = random_taps(cfg, frames)
     stats = {r: [0, 0] for r in receivers}
     ls_state = {}
     pil = []
     for w in range(cfg.words):
-        if w > 0:
+        if cfg.doppler > 0:
+            h = taps_all[:, w * T:(w + 1) * T]                # (F, T, L), varies within the word
+        elif w > 0:
             h = evolve_taps(cfg, h)
         d, y, cls = transmit(cfg, h, N0)
         if w < cfg.pilot_words:                               # pilot words
@@ -412,7 +441,7 @@ def run_snr(cfg, snr_db, frames, receivers, online_iters, seed=0):
             elif r == 'classic_ls':
                 sc = classic_scores(cfg, y, *ls_state[r])
             elif r.startswith('le_'):
-                w_eq = le_oracle(cfg, h, N0) if r == 'le_oracle' else ls_state[r]
+                w_eq = le_oracle(cfg, h if h.dim() == 2 else h[:, h.shape[1] // 2], N0) if r == 'le_oracle' else ls_state[r]
                 X_eq = eq_windows(cfg, y)
             elif not r.startswith('sym'):
                 sc = nets[r].scores(y)
