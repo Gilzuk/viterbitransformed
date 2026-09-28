@@ -21,7 +21,7 @@
 \maketitle
 
 \begin{abstract}
-ViterbiNet replaces the channel-dependent branch metric of the Viterbi algorithm with a small neural network trained from pilots and adapted online on decoded words. Its reported advantage is measured against a Viterbi detector given perfect or deliberately corrupted channel state information (CSI). We add the missing baseline: a Viterbi detector that receives exactly the information ViterbiNet receives (one pilot word per frame and the same error-correction-gated decisions) and estimates its four taps by least squares. On a coded BPSK intersymbol-interference channel with COST~2100 taps, this LS-Viterbi receiver matches or outperforms ViterbiNet at every SNR from 0 to 17~dB and stays within 3--30\% of the perfect-CSI bound wherever errors were observed; at 14~dB its SER is $2.8\times10^{-7}$, against $5.6\times10^{-6}$ for the best ViterbiNet configuration. We further show that ViterbiNet's default of 200 online gradient steps per word overfits (5 steps is better at every SNR and 40 times cheaper), and that a 32-parameter affine metric, the exact form of the Gaussian log-likelihood, matches the 7,002-parameter network.
+ViterbiNet replaces the channel-dependent branch metric of the Viterbi algorithm with a small neural network trained from pilots and adapted online on decoded words. Its reported advantage is measured against a Viterbi detector given perfect or deliberately corrupted channel state information (CSI). We add the missing baseline: a Viterbi detector that receives exactly the information ViterbiNet receives (one pilot word per frame and the same error-correction-gated decisions) and estimates its four taps by least squares. On a coded BPSK intersymbol-interference channel with COST~2100 taps, this LS-Viterbi receiver matches or outperforms ViterbiNet at every SNR from 0 to 14~dB and stays within 3--30\% of the perfect-CSI bound; at 14~dB its SER is $2.8\times10^{-7}$, against $5.6\times10^{-6}$ for the best ViterbiNet configuration. We further show that ViterbiNet's default of 200 online gradient steps per word overfits (5 steps is better at every SNR and 40 times cheaper), and that a 32-parameter affine metric, the exact form of the Gaussian log-likelihood, matches the 7,002-parameter network.
 \end{abstract}
 
 \begin{IEEEkeywords}
@@ -68,14 +68,14 @@ Each repetition draws fresh bits and noise for one 125-word frame. The SER is co
 
 \section{Results}\label{sec:results}
 \subsection{Matched-information baseline}
-Fig.~\ref{fig:snr} and Table~\ref{tab:main} compare the receivers from 0 to 17~dB. LS-Viterbi is never worse than any learned receiver, and at every SNR with observed errors it stays within 3--30\% of the perfect-CSI SER (e.g., \serlsseven\ vs.\ \sercsiseven\ at 7~dB and \serlsfourteen\ vs.\ \sercsifourteen\ at 14~dB). ViterbiNet with its default adaptation is 1.3 times worse at 7~dB and 45 times worse at 14~dB. With 5 adaptation steps the gap narrows but remains: 1.07 times at 7~dB, 1.7 times at 12~dB, and 20 times at 14~dB, where ViterbiNet and VNet-affine level off near $5\times10^{-6}$ while LS-Viterbi continues down with the bound. Above 14~dB the perfect-CSI, LS-Viterbi, and VNet-affine receivers produced no errors (the classical bounds are tighter only because they were simulated longer), while ViterbiNet still erred at 15~dB with $K=5$ and at 15--17~dB with $K=200$.
+Fig.~\ref{fig:snr} and Table~\ref{tab:main} compare the receivers from 0 to 14~dB. LS-Viterbi is never worse than any learned receiver, and at every SNR it stays within 3--30\% of the perfect-CSI SER (e.g., \serlsseven\ vs.\ \sercsiseven\ at 7~dB and \serlsfourteen\ vs.\ \sercsifourteen\ at 14~dB). ViterbiNet with its default adaptation is 1.3 times worse at 7~dB and 45 times worse at 14~dB. With 5 adaptation steps the gap narrows but remains: 1.07 times at 7~dB, 1.7 times at 12~dB, and 20 times at 14~dB, where ViterbiNet and VNet-affine flatten near $5\times10^{-6}$ while LS-Viterbi continues down with the bound. We report results up to 14~dB, the last SNR at which every receiver still produced errors within its simulation budget.
 
-The noisy-CSI baseline explains why ViterbiNet appears strong in the original comparison: with 25\% tap error, the Viterbi detector improves only slowly with SNR, from $1.3\times10^{-3}$ at 14~dB to $6\times10^{-4}$ at 16~dB (Table~\ref{tab:main}), because nothing in it corrects the error. ViterbiNet corrects its model from data, and so does LS-Viterbi, with four parameters and one least-squares solve per accepted word.
+The noisy-CSI baseline explains why ViterbiNet appears strong in the original comparison: with 25\% tap error, the Viterbi detector improves only slowly with SNR, from $3.4\times10^{-3}$ at 12~dB to only $1.3\times10^{-3}$ at 14~dB (Table~\ref{tab:main}), because nothing in it corrects the error. ViterbiNet corrects its model from data, and so does LS-Viterbi, with four parameters and one least-squares solve per accepted word.
 
 \begin{figure}[t]
 \centering
 \includegraphics[width=\columnwidth]{ser_snr_letter.pdf}
-\caption{SER vs.\ SNR. LS-Viterbi receives the same pilots and accepted decisions as the learned receivers. Hollow triangles: no errors observed (95\% upper bound).}
+\caption{SER vs.\ SNR. LS-Viterbi receives the same pilots and accepted decisions as the learned receivers. Results are reported up to 14~dB; hollow triangles at 15~dB mark receivers with no errors (95\% upper bound).}
 \label{fig:snr}
 \end{figure}
 
@@ -100,7 +100,7 @@ VNet-affine, $K{=}200$ & 32 & \seraffineseven & \seraffineten & \seraffinetwelve
 \end{table}
 
 \subsection{Online adaptation overfits}
-Fig.~\ref{fig:steps} sweeps the number of adaptation steps $K$ at 7~dB with 25 offline minibatches. For the 7,002-parameter network the SER is lowest at $K=5$ ($0.0249$) and rises steadily to $0.0315$ at $K=200$: repeated steps on a single 136-sample word fit its noise. Without adaptation ($K=0$) the SER is $0.0340$, so adaptation is useful, but a few steps suffice. Across the full SNR range, $K=5$ is better than $K=200$ at every point (Fig.~\ref{fig:snr}) and costs 40 times less computation per accepted word (Table~\ref{tab:main}).
+Fig.~\ref{fig:steps} sweeps the number of adaptation steps $K$ at 7~dB with 25 offline minibatches. For the 7,002-parameter network the SER is lowest at $K=5$ ($0.0249$) and rises steadily to $0.0315$ at $K=200$: repeated steps on a single 136-sample word fit its noise. Without adaptation ($K=0$) the SER is $0.0340$, so adaptation is useful, but a few steps suffice. From 0 to 14~dB, $K=5$ is better than $K=200$ at every point (Fig.~\ref{fig:snr}) and costs 40 times less computation per accepted word (Table~\ref{tab:main}).
 
 \begin{figure}[t]
 \centering

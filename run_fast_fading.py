@@ -55,7 +55,7 @@ def main(snr, fd, specs):
         row = sweep.run_point(point, method, snr, REPS, REPS * 2000, 1,
                               trainer_model_name=trainer_model, trainer_kwargs=kwargs)
         row.update(model=label, doppler=fd, rician_k=RICIAN_K,
-                   psp_step=PSP_STEP if trainer_model == 'ClassicViterbi_PSP' else '')
+                   psp_step=kwargs['psp_step'] if trainer_model == 'ClassicViterbi_PSP' else '')
         fcntl.flock(lock, fcntl.LOCK_EX)
         new = not os.path.isfile(CSV_PATH)
         with open(CSV_PATH, 'a', newline='') as f:

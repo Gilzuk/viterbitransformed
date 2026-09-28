@@ -1,0 +1,27 @@
+% Receiver block diagram: every receiver shares the trellis, decoder and gate;
+% only the branch-metric block and its update rule differ.
+\begin{tikzpicture}[
+  font=\footnotesize, >=Stealth, node distance=4mm and 4.5mm,
+  blk/.style={draw, rounded corners=1.5pt, minimum height=7mm, align=center, inner sep=2.5pt, fill=white},
+  metric/.style={blk, fill=black!6, minimum width=21mm},
+  lbl/.style={font=\scriptsize, align=center, inner sep=1pt}]
+\node[blk] (ch) {Channel\\$h^{(w)}$, noise};
+\node[metric, right=of ch] (met) {Branch metric\\$\ell_t(x)$};
+\node[blk, right=of met] (vit) {Viterbi\\16 states};
+\node[blk, right=of vit] (rs) {RS\\decoder};
+\node[blk, below=6mm of rs] (gate) {Gate\\SER$\le$0.02};
+\node[blk, below=6mm of met] (upd) {Update rule};
+\draw[->] ([xshift=-7mm]ch.west) node[lbl, above right=0pt and -1pt] {$s_t$} -- (ch);
+\draw[->] (ch) -- node[lbl, above] {$y_t$} (met);
+\draw[->] (met) -- (vit);
+\draw[->] (vit) -- node[lbl, above] {$\hat s_t$} (rs);
+\draw[->] (rs) -- ++(9mm,0) node[lbl, right] {bits};
+\draw[->] (rs) -- (gate);
+\draw[->] (gate) -- node[lbl, below] {accepted words} (upd);
+\draw[->] (upd) -- (met);
+\node[lbl, anchor=north west, align=left] at ([yshift=-3mm]ch.south west |- upd.south) {
+  \textbf{Metric / update rule:}\\
+  perfect CSI: true $\mathbf h$ / none\quad noisy CSI: $\mathbf h+\boldsymbol\epsilon$ / none\\
+  LS-Viterbi: $\hat{\mathbf h}$ / least squares\quad RLS: $\hat{\mathbf h}$ / weighted LS\\
+  ViterbiNet, VNet-affine, Transformer: network / $K$ Adam steps};
+\end{tikzpicture}

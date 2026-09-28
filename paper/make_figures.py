@@ -50,10 +50,13 @@ def read(name):
 sweep = read('mc_sweep_validation.csv')
 
 
-def bpsk_curve(model):
+SNR_MAX_PLOT = 15   # SNR plots stop at 15 dB; reported results stop at 14 dB
+
+
+def bpsk_curve(model, snr_max=17):
     """[(snr, ser, is_bound)] with the corrections above."""
     out = []
-    for r in sorted((r for r in sweep if r['model'] == model), key=lambda r: int(r['snr'])):
+    for r in sorted((r for r in sweep if r['model'] == model and int(r['snr']) <= snr_max), key=lambda r: int(r['snr'])):
         if r['censored'] == '1' or float(r['ser_mean']) == 0:
             out.append((int(r['snr']), 3 / (int(r['n_reps']) * BITS_PER_REP), True))
         else:
@@ -62,7 +65,7 @@ def bpsk_curve(model):
 
 
 def plot_curve(ax, model, label, color, marker, ls='-', bounds=True, **kw):
-    pts = bpsk_curve(model)
+    pts = bpsk_curve(model, SNR_MAX_PLOT)
     meas = [(s, v) for s, v, b in pts if not b]
     if meas:
         ax.plot(*zip(*meas), ls, color=color, marker=marker, label=label, **kw)
@@ -72,9 +75,10 @@ def plot_curve(ax, model, label, color, marker, ls='-', bounds=True, **kw):
 
 
 def snr_axes(ax, ylim=(1e-8, 0.4)):
-    ax.set_yscale('log'); ax.set_ylim(*ylim); ax.set_xlim(-0.5, 17.5)
+    ax.set_yscale('log'); ax.set_ylim(*ylim); ax.set_xlim(-0.5, SNR_MAX_PLOT + 0.5)
     ax.set_xlabel('SNR (dB)'); ax.set_ylabel('SER')
-    ax.xaxis.set_major_locator(FixedLocator(range(0, 18, 2)))
+    ax.xaxis.set_major_locator(FixedLocator(range(0, SNR_MAX_PLOT + 1, 1 if SNR_MAX_PLOT <= 15 else 2)))
+    ax.xaxis.set_major_formatter(FixedFormatter([str(v) if v % 2 == 0 else '' for v in range(0, SNR_MAX_PLOT + 1)]))
     ax.yaxis.set_major_locator(LogLocator(base=10, numticks=12))
 
 
@@ -220,7 +224,8 @@ q = [r for r in read('qpsk_sweep.csv') if r['receiver'] != 'receiver']
 
 
 def qcurve(key):
-    p = sorted((int(r['es_n0_db']), int(r['symbol_errors']), int(r['symbols'])) for r in q if r['receiver'] == key)
+    p = sorted((int(r['es_n0_db']), int(r['symbol_errors']), int(r['symbols'])) for r in q
+               if r['receiver'] == key and int(r['es_n0_db']) <= SNR_MAX_PLOT)
     return [(s, e / n) for s, e, n in p if e > 0], [(s, 3 / n) for s, e, n in p if e == 0]
 
 
@@ -239,7 +244,9 @@ for key, lab, col, mk, ls in (('classic_csi', 'Viterbi, perfect CSI', K, 'o', '-
         ax.plot(*zip(*m), ls, color=col, marker=mk, label=lab)
     if c_:
         ax.plot(*zip(*c_), 'v', color=col, mfc='none', ms=4, mew=0.8)
-ax.set_yscale('log'); ax.set_ylim(1e-5, 1); ax.set_xlabel('$E_s/N_0$ (dB)'); ax.set_ylabel('SER')
+ax.set_yscale('log'); ax.set_ylim(3e-3, 1); ax.set_xlim(-0.5, SNR_MAX_PLOT + 0.5)
+ax.xaxis.set_major_locator(FixedLocator(range(0, SNR_MAX_PLOT + 1, 2)))
+ax.set_xlabel('$E_s/N_0$ (dB)'); ax.set_ylabel('SER')
 ax.legend(loc='lower left', fontsize=5.8, ncol=1)
 fig.savefig(os.path.join(OUT, 'qpsk.pdf')); plt.close(fig)
 
@@ -270,20 +277,246 @@ FIELDS = ['receiver', 'params', 'doppler', 'es_n0_db', 'ser', 'symbol_errors', '
 qf = [r for r in csv.DictReader(open(os.path.join(MET, 'qpsk_fast_fading.csv')), fieldnames=FIELDS)
       if r['receiver'] != 'receiver']
 fig, axs = plt.subplots(1, 2, figsize=(COL, 2.0), sharey=True, gridspec_kw={'wspace': 0.08})
-for ax, snr in zip(axs, (10, 16)):
+for ax, snr in zip(axs, (10, 14)):
     for key, lab, col, mk, ls in (('classic_csi', 'genie (true per-sample taps)', K, 'o', '--'),
                                   ('classic_ls', 'LS-Viterbi', VERM, 's', '-'),
                                   ('tied@5', 'tied affine + trellis', GREEN, 'D', '-'),
                                   ('tied_mlp@5', 'tied + MLP + trellis', SKY, 'P', '-'),
                                   ('sym_eq@30', '4-class classifier', PURPLE, 'x', '-')):
         p = sorted((float(r['doppler']), float(r['ser'])) for r in qf if r['receiver'] == key and int(r['es_n0_db']) == snr)
-        ax.plot(*zip(*p), ls, color=col, marker=mk, label=lab)
+        ax.plot(*(zip(*p) if p else ([], [])), ls, color=col, marker=mk, label=lab)
     ax.axhline(0.75, color='grey', lw=0.6, ls=':')
-    ax.set_xscale('log'); ax.set_yscale('log'); ax.set_ylim(1e-3, 1.2)
+    ax.set_xscale('log'); ax.set_yscale('log'); ax.set_ylim(1e-3, 1.2); ax.set_xlim(1.4e-4, 1.4e-2)
     ax.set_title(f'$E_s/N_0$ = {snr} dB', fontsize=8); ax.set_xlabel('$f_D T_s$')
 axs[0].set_ylabel('SER'); axs[0].text(2.1e-4, 0.8, 'chance (0.75)', fontsize=6, color='grey')
 fig.legend(*axs[0].get_legend_handles_labels(), loc='upper center', bbox_to_anchor=(0.5, -0.06), ncol=3, fontsize=6)
 fig.savefig(os.path.join(OUT, 'fast_fading_qpsk.pdf')); plt.close(fig)
+
+# ------------------------------------------------ noisy-CSI baseline (journal) ---
+fig, ax = plt.subplots(figsize=(COL, 2.5))
+for pct, c in ((25, '#c6dbef'), (50, '#9ecae1'), (75, '#6baed6'), (100, '#2171b5')):
+    plot_curve(ax, f'ClassicViterbi_csi{pct}', f'Viterbi, {pct}% tap error', c, 'd', ':', lw=0.9)
+plot_curve(ax, 'ClassicViterbi', 'Viterbi, perfect CSI', K, 'o', '--', zorder=5)
+plot_curve(ax, 'ClassicViterbi_LS', 'LS-Viterbi (estimates taps)', VERM, 's', zorder=6)
+plot_curve(ax, 'ViterbiNet', 'ViterbiNet, 200 steps', ORANGE, '^')
+snr_axes(ax, (1e-7, 0.5))
+ax.legend(loc='lower left', fontsize=6)
+fig.savefig(os.path.join(OUT, 'csi_uncertainty.pdf')); plt.close(fig)
+
+# ---------------------------------------- SER relative to the perfect-CSI bound ---
+fig, ax = plt.subplots(figsize=(COL, 2.3))
+csi = {s: v for s, v, b in bpsk_curve('ClassicViterbi', 14) if not b}
+for model, lab, col, mk in (('ClassicViterbi_LS', 'LS-Viterbi, no CSI', VERM, 's'),
+                            ('ViterbiNet_on5', 'ViterbiNet, 5 steps', BLUE, 'o'),
+                            ('VNet_affine', 'VNet-affine, 200 steps', GREEN, 'D'),
+                            ('ViterbiNet', 'ViterbiNet, 200 steps', ORANGE, '^'),
+                            ('Transformer', 'Transformer, 200 steps', PURPLE, 'x'),
+                            ('ClassicViterbi_csi25', 'Viterbi, 25% tap error', '#6baed6', 'd')):
+    p = [(s, v / csi[s]) for s, v, b in bpsk_curve(model, 14) if not b and s in csi]
+    ax.plot(*zip(*p), color=col, marker=mk, label=lab, ls=':' if 'csi' in model else '-')
+# LS estimation loss (Section V): an LS tap estimate from T samples costs
+# 10 log10(1 + L/T) dB of SNR; shift the perfect-CSI curve by that much.
+import math
+LS_LOSS_DB = 10 * math.log10(1 + 4 / 136)
+cs = sorted(csi.items())
+def csi_at(snr):
+    for (s0, v0), (s1, v1) in zip(cs, cs[1:]):
+        if s0 <= snr <= s1:
+            return 10 ** (math.log10(v0) + (snr - s0) / (s1 - s0) * (math.log10(v1) - math.log10(v0)))
+pred = [(s, csi_at(s - LS_LOSS_DB) / v) for s, v in cs if s >= 1]
+ax.plot(*zip(*pred), color=VERM, ls='--', lw=0.8, label=f'LS, predicted ({LS_LOSS_DB:.3f} dB loss)')
+ax.axhline(1, color=K, lw=0.8, ls='--')
+ax.set_yscale('log'); ax.set_xlim(-0.5, 14.5); ax.xaxis.set_major_locator(FixedLocator(range(0, 15, 2)))
+ax.set_xlabel('SNR (dB)'); ax.set_ylabel('SER / SER(perfect CSI)')
+ax.legend(loc='upper left', fontsize=6)
+fig.savefig(os.path.join(OUT, 'gap_ratio.pdf')); plt.close(fig)
+
+# ------------------------------------------- real-time budget per 136-symbol word ---
+LS_SOLVE_MS = 0.02   # median numpy lstsq on a 136x4 system, one thread
+dlm = {r['model']: r for r in read('detector_latency_symbol_budget.csv')}
+rt = [('LS-Viterbi', float(dlm['ViterbiNet_100-58']['trellis_ms_per_word']), LS_SOLVE_MS),
+      ('ViterbiNet, K=5', float(dlm['ViterbiNet_100-58']['detect_ms_per_word']), 5 * float(dlm['ViterbiNet_100-58']['online_iter_ms_per_word'])),
+      ('VNet-affine, K=200', float(dlm['VNet_affine']['detect_ms_per_word']), 200 * float(dlm['VNet_affine']['online_iter_ms_per_word'])),
+      ('ViterbiNet, K=200', float(dlm['ViterbiNet_100-58']['detect_ms_per_word']), 200 * float(dlm['ViterbiNet_100-58']['online_iter_ms_per_word'])),
+      ('Transformer V4, K=200', float(dlm['ViterbiTransformerV4']['detect_ms_per_word']), 200 * float(dlm['ViterbiTransformerV4']['online_iter_ms_per_word'])),
+      ('Transformer V2, K=200', float(dlm['TransformerV2']['detect_ms_per_word']), 200 * float(dlm['TransformerV2']['online_iter_ms_per_word']))]
+fig, ax = plt.subplots(figsize=(COL, 1.9))
+y = range(len(rt))
+ax.barh(y, [d for _, d, _ in rt], color='#bbbbbb', label='detection')
+ax.barh(y, [a for _, _, a in rt], left=[d for _, d, _ in rt], color=ORANGE, label='adaptation (per accepted word)')
+word_ms = 136 * 0.125
+ax.axvline(word_ms, color=VERM, ls='--', lw=0.9, label=f'word duration, 0.125 ms/symbol ({word_ms:.0f} ms)')
+for i, (_, d, a) in enumerate(rt):
+    ax.text((d + a) * 1.12, i, f'{d + a:.1f} ms' if d + a < 100 else f'{d + a:.0f} ms', va='center', fontsize=6)
+ax.set_xscale('log'); ax.set_xlim(5, 3e3)
+ax.set_yticks(list(y)); ax.set_yticklabels([n for n, _, _ in rt], fontsize=6.5); ax.grid(axis='y', visible=False)
+ax.set_xlabel('Time per 136-symbol word (ms, one CPU thread)'); ax.set_ylim(-0.8, len(rt) - 0.4)
+ax.legend(loc='upper center', bbox_to_anchor=(0.45, 1.3), ncol=2, fontsize=6)
+fig.savefig(os.path.join(OUT, 'realtime.pdf')); plt.close(fig)
+
+# ------------------------------------ accuracy vs adaptation cost at 7 dB (Pareto) ---
+tl = {int(r['params']): float(r['online_iter_us_per_word']) / 1000 for r in read('vnet_topology_latency.csv')}
+fig, ax = plt.subplots(figsize=(COL, 2.4))
+pts = [(r['on'] * tl[r['params']], r['ser'], r['topology'], r['params'], r['on']) for r in topo
+       if r['mb'] == 25 and r['on'] in (5, 25, 200) and r['params'] in tl]
+for on, col, mk in ((200, ORANGE, 'o'), (25, SKY, 's'), (5, BLUE, 'D')):
+    q_ = [p for p in pts if p[4] == on]
+    ax.scatter([p[0] for p in q_], [p[1] for p in q_], color=col, marker=mk, s=12, label=f'ViterbiNet topologies, K={on}', zorder=3)
+    for p in q_:
+        if p[2] in ('affine', '100-58'):
+            ax.annotate('affine' if p[2] == 'affine' else '7,002', (p[0], p[1]), xytext=(3, 2), textcoords='offset points', fontsize=5.5)
+for m, lab, col in (('TransformerV2', 'Transformer V2', PURPLE), ('ViterbiTransformerV4', 'Transformer V4', GREEN)):
+    ax.scatter([200 * float(dlm[m]['online_iter_ms_per_word'])], [min(v[0] for v in curves[m].values())], color=col, marker='x',
+               s=18, label=f'{lab}, K=200 (best budget)', zorder=3)
+ax.scatter([LS_SOLVE_MS], [ref7['ClassicViterbi_LS']], color=VERM, marker='*', s=40, label='LS-Viterbi', zorder=4)
+ax.axhline(ref7['ClassicViterbi'], color=K, ls='--', lw=0.8)
+ax.text(0.012, ref7['ClassicViterbi'] * 0.99, 'perfect CSI', va='top', fontsize=6)
+ax.set_xscale('log'); ax.set_xlim(0.008, 3e3)
+ax.set_xlabel('Adaptation compute per accepted word (ms)'); ax.set_ylabel('SER at 7 dB')
+ax.legend(loc='upper center', bbox_to_anchor=(0.45, -0.22), fontsize=5.8, ncol=2)
+fig.savefig(os.path.join(OUT, 'pareto.pdf')); plt.close(fig)
+
+# ------------------------------------------------- QPSK diagnostics (if present) ---
+def maybe(name):
+    path = os.path.join(MET, name)
+    return list(csv.DictReader(open(path))) if os.path.exists(path) else None
+
+
+wt = maybe('qpsk_diag_word_trace.csv')
+if wt:
+    fig, axs = plt.subplots(1, 2, figsize=(COL, 2.0), sharey=True, gridspec_kw={'wspace': 0.08})
+    for ax, snr in zip(axs, (12, 14)):
+        for key, lab, col, mk in (('classic_csi', 'perfect CSI', K, 'o'), ('classic_ls', 'LS-Viterbi', VERM, 's'),
+                                  ('tied@5', 'tied affine + trellis', GREEN, 'D'),
+                                  ('sym_affine@10', '4-class linear, CE tracking', BLUE, '+'),
+                                  ('sym_eq@30', '4-class, equalizer + LMS', PURPLE, 'x'),
+                                  ('le_ls', 'LS linear equalizer', '#999999', '.')):
+            p = sorted((int(r['word']), float(r['ser'])) for r in wt if r['receiver'] == key and int(r['es_n0_db']) == snr)
+            p = [(w, v) for w, v in p if v > 0]   # words with no errors are not drawn
+            ax.plot(*(zip(*p) if p else ([], [])), color=col, marker=mk, ms=2.5, lw=0.9, label=lab)
+        ax.set_yscale('log'); ax.set_ylim(1e-5, 1); ax.set_title(f'$E_s/N_0$ = {snr} dB', fontsize=8)
+        ax.set_xlabel('Data word in frame')
+    axs[0].set_ylabel('SER per word')
+    fig.legend(*axs[0].get_legend_handles_labels(), loc='upper center', bbox_to_anchor=(0.5, -0.1), ncol=3, fontsize=6)
+    fig.savefig(os.path.join(OUT, 'qpsk_trace.pdf')); plt.close(fig)
+
+pl = maybe('qpsk_diag_pilot.csv')
+if pl:
+    fig, ax = plt.subplots(figsize=(COL, 2.2))
+    for key, lab, col, mk in (('classic_ls', 'LS-Viterbi', VERM, 's'), ('tied@5', 'tied affine (7)', GREEN, 'D'),
+                              ('affine@10', 'free per-branch affine (192)', YELLOW, 'v'),
+                              ('mlp@10', 'free per-branch MLP (9,934)', ORANGE, '^')):
+        for iters, ls in ((200, '-'), (2000, ':')):
+            p = sorted((int(r['pilot_words']), max(float(r['ser']), 3 / int(r['symbols']))) for r in pl
+                       if r['receiver'] == key and int(r['pilot_iters']) == iters)
+            ax.plot(*zip(*p), color=col, marker=mk, ls=ls, label=f'{lab}' if iters == 200 else None)
+    ax.plot([], [], 'k-', label='200 pilot steps'); ax.plot([], [], 'k:', label='2000 pilot steps')
+    ax.set_xscale('log'); ax.set_yscale('log'); ax.xaxis.set_major_locator(FixedLocator([1, 2, 5, 10]))
+    ax.xaxis.set_major_formatter(FixedFormatter(['1', '2', '5', '10'])); ax.xaxis.set_minor_locator(NullLocator())
+    ax.set_xlabel('Pilot words (120 symbols each)'); ax.set_ylabel('SER, static channel, 14 dB')
+    ax.legend(loc='center right', fontsize=5.8)
+    fig.savefig(os.path.join(OUT, 'qpsk_pilot.pdf')); plt.close(fig)
+
+wd = maybe('qpsk_diag_window.csv')
+if wd:
+    fig, ax = plt.subplots(figsize=(COL, 1.9))
+    for key, lab, ls in (('le_oracle', 'MMSE, true taps', '--'), ('le_ls', 'LS, own decisions', '-')):
+        for snr, col in ((12, BLUE), (14, VERM)):
+            p = sorted((int(r['window']), float(r['ser'])) for r in wd if r['receiver'] == key and int(r['es_n0_db']) == snr)
+            ax.plot(*zip(*p), color=col, ls=ls, marker='o', label=f'{lab}, {snr} dB')
+    ax.set_yscale('log'); ax.set_xlabel('Equalizer window (samples)'); ax.set_ylabel('SER')
+    ax.xaxis.set_major_locator(FixedLocator([3, 5, 7, 9, 11, 15]))
+    ax.legend(loc='upper center', bbox_to_anchor=(0.5, -0.25), ncol=2, fontsize=6)
+    fig.savefig(os.path.join(OUT, 'qpsk_window.pdf')); plt.close(fig)
+
+CKPT = os.path.join(MET, '.mc_sweep_checkpoints')
+
+
+def ff_reps(name, fd):
+    path = os.path.join(CKPT, f'FF_{name}_fd{fd:g}_K3_snr7.json')
+    return json.load(open(path))['per_rep_means'] if os.path.exists(path) else None
+
+
+def paired(name, ref, fd):
+    """Mean and 95% CI of SER(name) - SER(ref) over the repetitions both ran (same draws)."""
+    a, b = ff_reps(name, fd), ff_reps(ref, fd)
+    if not a or not b:
+        return None
+    d = [(x - y) * DATA_SCALE for x, y in zip(a, b)]
+    m = sum(d) / len(d)
+    sd = (sum((x - m) ** 2 for x in d) / (len(d) - 1)) ** 0.5
+    return m, 1.96 * sd / len(d) ** 0.5
+
+
+import json
+if any(r['model'].startswith('tune_') for r in ff):
+    fig, (a, b) = plt.subplots(1, 2, figsize=(COL, 2.1), sharey=True, gridspec_kw={'wspace': 0.08})
+    for k, (fd, col, mk) in enumerate(((0.001, BLUE, 'o'), (0.01, ORANGE, 's'), (0.03, VERM, 'D'))):
+        off = 1 + (k - 1) * 0.06
+        pp = [(mu * off,) + paired(f'tune_PSP_mu{mu:g}', 'VNet_affine', fd) for mu in (0.003, 0.01, 0.02, 0.05)
+              if paired(f'tune_PSP_mu{mu:g}', 'VNet_affine', fd)]
+        if pp:
+            a.errorbar([p[0] for p in pp], [p[1] for p in pp], yerr=[p[2] for p in pp], color=col, marker=mk,
+                       capsize=1.5, elinewidth=0.6, label=f'$f_DT_s$={fd:g}')
+        xs = [(0.0, 'tune_LS_last')] + [(lam, f'tune_RLS_lam{lam:g}') for lam in (0.5, 0.8, 0.9, 0.95, 0.99)]
+        rl = [(off / (1 - x),) + paired(n, 'VNet_affine', fd) for x, n in xs if paired(n, 'VNet_affine', fd)]
+        if rl:
+            b.errorbar([p[0] for p in rl], [p[1] for p in rl], yerr=[p[2] for p in rl], color=col, marker=mk,
+                       capsize=1.5, elinewidth=0.6)
+    for ax_ in (a, b):
+        ax_.axhline(0, color=K, lw=0.8, ls='--')
+    a.set_xscale('log'); a.xaxis.set_major_locator(FixedLocator([0.003, 0.01, 0.02, 0.05]))
+    a.xaxis.set_major_formatter(FixedFormatter(['0.003', '0.01', '0.02', '0.05'])); a.xaxis.set_minor_locator(NullLocator())
+    a.set_xlabel('PSP-LMS step size $\\mu$'); a.set_ylabel('SER $-$ SER(VNet-affine), 7 dB')
+    b.set_xscale('log'); b.set_xlabel('LS memory $1/(1-\\lambda)$ (words)')
+    b.xaxis.set_major_locator(FixedLocator([1, 2, 5, 10, 20, 100]))
+    b.xaxis.set_major_formatter(FixedFormatter(['1', '2', '5', '10', '20', '100'])); b.xaxis.set_minor_locator(NullLocator())
+    a.set_ylim(-0.012, 0.06)
+    a.text(0.0125, 0.058, '$\\mu$=0.05:\n+0.09 to +0.19 (off scale)', fontsize=5.5, ha='center', va='top')
+    a.legend(loc='upper left', fontsize=6)
+    fig.savefig(os.path.join(OUT, 'tracker_tuning.pdf')); plt.close(fig)
+
+# ------------------------------------------- channel illustration (journal) ---
+import sys, numpy as np
+sys.path.insert(0, ROOT)
+from Code.channel.channel_estimation import _load_cost2100_taps
+from Code.channel.channel_dataset import jakes_process
+fig, (a, b) = plt.subplots(1, 2, figsize=(COL, 1.9), gridspec_kw={'wspace': 0.42, 'width_ratios': [1.2, 1]})
+taps = _load_cost2100_taps(4)
+for i, col in enumerate((BLUE, ORANGE, GREEN, VERM)):
+    a.plot(np.arange(1, taps.shape[0] + 1), taps[:, i], color=col, lw=0.9, label=f'$h_{i}$')
+a.axvspan(1, 125, color='#eeeeee', zorder=0, label='one frame')
+a.set_xlabel('Word index $w$'); a.set_ylabel('Tap magnitude'); a.set_xlim(1, taps.shape[0])
+a.legend(loc='upper left', bbox_to_anchor=(0.0, 0.86), fontsize=5.5, ncol=2, handlelength=1.2)
+T_WORD, kappa = 136, 3
+for fd, col in ((0.001, BLUE), (0.01, ORANGE), (0.03, VERM)):
+    g = jakes_process(3 * T_WORD, 1, fd, np.random.RandomState(7))[:, 0]
+    b.plot(np.arange(3 * T_WORD) / T_WORD, np.sqrt(kappa / (kappa + 1)) + np.sqrt(1 / (kappa + 1)) * g,
+           color=col, lw=0.9, label=f'$f_DT_s$={fd:g}')
+for w in (1, 2):
+    b.axvline(w, color='#999999', lw=0.6, ls=':')
+b.set_xlabel('Time (words of 136 symbols)'); b.set_ylabel('Tap gain $h_k(t)/\\bar h_k^{(w)}$', labelpad=1); b.set_xlim(0, 3)
+b.legend(loc='lower center', bbox_to_anchor=(0.5, 1.0), ncol=3, fontsize=5.3, handlelength=1.0, columnspacing=0.6)
+fig.savefig(os.path.join(OUT, 'channel.pdf')); plt.close(fig)
+
+# --------------------------------------- operation counts vs channel memory ---
+Ls = np.arange(2, 9); T = 136
+def mlp_params(L):   # ViterbiNet 1->100->58->2^L
+    return 100 + 100 + 100 * 58 + 58 + 58 * 2 ** L + 2 ** L
+ops = {'trellis (add-compare-select)': (T * 2 ** (Ls + 1), K, '-', 'o'),
+       'LS re-estimation': (T * Ls ** 2 + Ls ** 3, VERM, '-', 's'),
+       'ViterbiNet forward': (T * np.array([mlp_params(L) for L in Ls]), BLUE, '-', 'D'),
+       'ViterbiNet, K=5 steps': (5 * 3 * T * np.array([mlp_params(L) for L in Ls]), SKY, '--', 'D'),
+       'ViterbiNet, K=200 steps': (200 * 3 * T * np.array([mlp_params(L) for L in Ls]), ORANGE, '--', '^'),
+       'VNet-affine, K=200 steps': (200 * 3 * T * 2 * 2 ** Ls, GREEN, '--', 'v')}
+fig, ax = plt.subplots(figsize=(COL, 2.3))
+for lab, (y, col, ls, mk) in ops.items():
+    ax.plot(Ls, y, color=col, ls=ls, marker=mk, label=lab)
+ax.axvline(4, color='#999999', lw=0.6, ls=':')
+ax.set_yscale('log'); ax.set_xlabel('Channel memory $L$ (BPSK, $2^L$ states)')
+ax.set_ylabel('Operations per word ($T$=136)')
+ax.legend(loc='upper center', bbox_to_anchor=(0.5, -0.22), ncol=2, fontsize=5.8)
+fig.savefig(os.path.join(OUT, 'complexity.pdf')); plt.close(fig)
 
 # ------------------------------------------------------------- numbers.tex ---
 def v(model, snr):

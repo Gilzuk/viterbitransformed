@@ -391,8 +391,9 @@ def slicer(cfg, z):
 
 
 # -------------------------------------------------------------- evaluate ---
-def run_snr(cfg, snr_db, frames, receivers, online_iters, seed=0):
-    """Returns {receiver: (symbol_errors, symbols)} over the data words."""
+def run_snr(cfg, snr_db, frames, receivers, online_iters, seed=0, trace=None):
+    """Returns {receiver: (symbol_errors, symbols)} over the data words. If `trace` is a
+    dict, trace[receiver][word] accumulates [errors, symbols] per word position."""
     torch.manual_seed(seed)
     N0 = 10 ** (-snr_db / 10)
     nets = {}
@@ -451,6 +452,9 @@ def run_snr(cfg, snr_db, frames, receivers, online_iters, seed=0):
                 dhat = nets[r].decide(y) if r.startswith('sym') else viterbi(cfg, sc)
             err = (dhat != d).float().mean(1)                 # per-frame word SER
             stats[r][0] += int((dhat != d).sum())
+            if trace is not None:
+                tw = trace.setdefault(r, {}).setdefault(w, [0, 0])
+                tw[0] += int((dhat != d).sum()); tw[1] += d.numel()
             stats[r][1] += d.numel()
             if cfg.adapt == 'dd':
                 ok = torch.ones(frames, dtype=torch.bool)
