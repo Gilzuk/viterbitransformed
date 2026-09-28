@@ -7,7 +7,7 @@ training when doppler > 0). Writes Results/metrics/qpsk_fast_fading.csv.
 
     python run_qpsk_fast_fading.py [es_n0_db]
 """
-import csv, os, sys, time
+import csv, fcntl, os, sys, time
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from Code.qpsk_sim import Config, run_snr
 
@@ -22,12 +22,16 @@ GROUPS = [  # (config overrides, receivers, online iters) -- same settings as th
 done = set()
 if os.path.exists(OUT):
     done = {(r['receiver'], float(r['doppler']), int(r['es_n0_db'])) for r in csv.DictReader(open(OUT))}
-new = not os.path.exists(OUT)
 with open(OUT, 'a', newline='') as f:
     w = csv.writer(f, lineterminator='\n')
-    if new:
+    # several SNRs may run in parallel: write the header under a lock, and only
+    # into an empty file (an unlocked exists() check put it on line 7 once)
+    fcntl.flock(f, fcntl.LOCK_EX)
+    if f.tell() == 0 and os.path.getsize(OUT) == 0:
         w.writerow(['receiver', 'params', 'doppler', 'es_n0_db', 'ser', 'symbol_errors', 'symbols', 'frames',
                     'words', 'pilot_words', 'online_iters', 'dd_lr', 'sym_window'])
+        f.flush()
+    fcntl.flock(f, fcntl.LOCK_UN)
     for fd in DOPPLERS:
         for kw, recv, iters in GROUPS:
             if all((r, fd, SNR) in done for r in recv):
