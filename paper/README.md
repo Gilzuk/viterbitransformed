@@ -2,7 +2,7 @@
 
 | Paper | Target | Source | PDF |
 |---|---|---|---|
-| ViterbiNet Revisited: A Matched-Information Classical Baseline for Learned Trellis Detection | IEEE Communications Letters (3 pages) | `letter/main.tex` | `letter/main.pdf` |
+| ViterbiNet Revisited: A Matched-Information Classical Baseline for Learned Trellis Detection | IEEE Communications Letters (4 pages incl. references, 3 figures, 1 table) | `letter/main.tex` | `letter/main.pdf` |
 | When Does Learning Help Trellis Detection? Matched Baselines, Structure, and Complexity of Model-Based Deep Viterbi Receivers | IEEE Transactions on Machine Learning in Communications and Networking (10 pages, 19 figures, 4 tables) | `journal/main.tex` | `journal/main.pdf` |
 
 Both use `refs.bib` (every entry checked against a publisher or index record)
