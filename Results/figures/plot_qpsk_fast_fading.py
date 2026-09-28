@@ -44,7 +44,7 @@ for ax, snr in zip(axes, snrs):
     ax.grid(True, color=GRID, lw=0.6); ax.set_axisbelow(True)
     for s in ('top', 'right'):
         ax.spines[s].set_visible(False)
-    ax.tick_params(colors=INK2, labelsize=8.5)
+    ax.tick_params(colors=INK2, labelsize=7)
 axes[0].set_ylabel('Symbol error rate (log)', color=INK2)
 leg = fig.legend(*axes[0].get_legend_handles_labels(), frameon=False, fontsize=9, loc='upper center',
                  bbox_to_anchor=(0.5, 0.02), ncol=3)

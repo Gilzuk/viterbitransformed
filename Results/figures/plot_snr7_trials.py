@@ -4,7 +4,7 @@ matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 from matplotlib.ticker import FixedLocator, FixedFormatter, NullLocator
 
-REPO = '/home/user/viterbitransformed'
+REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 OUT = os.path.join(REPO, 'Results/figures/snr7_all_trials.png')
 
 INK, INK2, MUTED, GRID, SURF = '#0b0b0b', '#52514e', '#8a8983', '#e4e3dd', '#fcfcfb'
@@ -123,7 +123,8 @@ for t in leg2.get_texts():
     t.set_color(INK)
 
 fig.text(0.01, 0.01, 'All trials: 20 reps x 2,000 bits = 40k bits per point; COST2100 fading channel, memory 4; '
-         'online adaptation on during evaluation unless noted. Searches for ViT overlap / V4 / MLP sizes still running.',
+         'online adaptation on during evaluation unless noted. ViT overlap / V4 searches stopped early at the user\'s request. '
+         'Scripts: experiments/mb_search.py, experiments/vnet_study.py.',
          color=MUTED, fontsize=8.5)
 os.makedirs(os.path.dirname(OUT), exist_ok=True)
 fig.savefig(OUT, dpi=150, facecolor=SURF, bbox_inches='tight')

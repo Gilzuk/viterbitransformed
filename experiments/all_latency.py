@@ -1,6 +1,10 @@
+"""Per-detector latency on one word (136 samples, 16 states), single CPU thread:
+NN forward, Viterbi trellis, full detection, one online-adaptation step (ms).
+Feeds Results/metrics/detector_latency_symbol_budget.csv (Mamba2 was timed the
+same way in its own branch)."""
 import os, sys, time, statistics
 os.environ['OMP_NUM_THREADS']='1'; os.environ['MKL_NUM_THREADS']='1'
-sys.path.insert(0,'/home/user/viterbitransformed')
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import torch; torch.set_num_threads(1)
 from Code.models import ViterbiNetMLP, ECC_TransformerV2, ViterbiTransformerV3, ViterbiTransformerV4, ViT1D
 from Code.detector import Detector
