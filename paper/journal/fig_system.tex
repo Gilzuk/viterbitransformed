@@ -9,7 +9,7 @@
 \node[metric, right=of ch] (met) {Branch metric\\$\ell_t(x)$};
 \node[blk, right=of met] (vit) {Viterbi\\16 states};
 \node[blk, right=of vit] (rs) {RS\\decoder};
-\node[blk, below=6mm of rs] (gate) {Gate\\SER$\le$0.02};
+\node[blk, below=6mm of rs] (gate) {Gate\\oracle or RS};
 \node[blk, below=6mm of met] (upd) {Update rule};
 \draw[->] ([xshift=-7mm]ch.west) node[lbl, above right=0pt and -1pt] {$s_t$} -- (ch);
 \draw[->] (ch) -- node[lbl, above] {$y_t$} (met);

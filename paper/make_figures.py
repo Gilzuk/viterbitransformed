@@ -16,6 +16,7 @@ BPSK bookkeeping corrections (applied here, uniformly to every BPSK receiver):
 QPSK results (Code/qpsk_sim.py) count data symbols directly and need no correction.
 """
 import csv, os
+import numpy as np
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
@@ -554,6 +555,57 @@ ax.set_yscale('log'); ax.set_xlabel('Channel memory $L$ (BPSK, $2^L$ states)')
 ax.set_ylabel('Operations per word ($T$=136)')
 ax.legend(loc='upper center', bbox_to_anchor=(0.5, -0.22), ncol=2, fontsize=5.8)
 fig.savefig(os.path.join(OUT, 'complexity.pdf')); plt.close(fig)
+
+# --------------------------- paired LS vs learned table (experiments/paired_stats.py) ---
+pr = maybe('paired_ls_vs_learned.csv')
+if pr:
+    def sci(x):
+        if x == 0:
+            return '0'
+        e = int(np.floor(np.log10(abs(x)))); m = x / 10 ** e
+        return f'{m:+.1f}\\e{{{e}}}'
+    by = {}
+    for r in pr:
+        by.setdefault(int(r['snr']), {})[r['receiver_b']] = r
+    lines = []
+    for snr in sorted(by):
+        cells = []
+        for other in ('ViterbiNet_on5', 'VNet_affine'):
+            r = by[snr].get(other)
+            if r is None:
+                cells.append('--')
+                continue
+            mark = {'LS better': '$^{*}$', 'LS worse': '$^{\\dagger}$'}.get(r['verdict'], '')
+            cells.append(f"${sci(float(r['mean_diff']))}\\pm{sci(float(r['ci95']))[1:]}${mark}")
+        n = next(int(r['n_shared_reps']) for r in by[snr].values())
+        cells.append(str(n))
+        lines.append(f'{snr} & ' + ' & '.join(cells) + r' \\')
+    open(os.path.join(OUT, 'paired_table.tex'), 'w').write('\n'.join(lines) + '\n\\bottomrule\n')   # rule here: booktabs breaks after \\input
+
+# ------------------------------- oracle vs RS gate table (experiments/gate_check.py) ---
+gc = maybe('gate_check.csv')
+if gc:
+    def s2(x):
+        x = float(x)
+        if x == 0:
+            return '0'
+        e = int(np.floor(np.log10(abs(x))))
+        return f'{x:.2f}' if e >= -1 else f'${x / 10 ** e:.1f}\\e{{{e}}}$'
+    order = ['LS-Viterbi', 'ViterbiNet K=5', 'VNet-affine K=200', 'ViterbiNet K=200']
+    g = {(r['receiver'], int(r['snr']), r['gate']): r for r in gc}
+    lines = []
+    for snr in sorted({int(r['snr']) for r in gc}):
+        first = True
+        for rec in order:
+            o, q = g.get((rec, snr, 'oracle')), g.get((rec, snr, 'rs'))
+            if not (o and q):
+                continue
+            name = rec.replace('K=', '$K{=}').replace('200', '200$').replace('K{=}5', 'K{=}5$')
+            lines.append(f"{snr if first else ''} & {name} & {s2(o['ser'])} & {s2(q['ser'])} & "
+                         f"{float(o['accept_rate']):.2f} & {float(q['accept_rate']):.2f} & "
+                         f"{float(o['wrong_label_rate']):.2f} & {float(q['wrong_label_rate']):.3f} \\\\")
+            first = False
+    open(os.path.join(OUT, 'gate_table.tex'), 'w').write('\n'.join(lines) + '\n\\bottomrule\n')   # rule here: booktabs breaks after \\input
 
 # ------------------------------------------------------------- numbers.tex ---
 def v(model, snr):

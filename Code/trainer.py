@@ -81,6 +81,14 @@ class Trainer(object):
         self.self_supervised = None
         self.self_supervised_iterations = None
         self.ser_thresh = None
+        # Which words the online update may use. 'oracle' (default; the reference
+        # implementation's rule): decoded-word SER vs the TRANSMITTED bits <= ser_thresh,
+        # labels = re-encoded word if SER == 0 else the raw hard decisions. Not
+        # implementable at a receiver. 'rs': bounded-distance RS acceptance -- the
+        # re-encoded decoded word differs from the detector's hard decisions in at most
+        # n_symbols // 2 RS symbols (8-bit) -- and labels are always the re-encoded word.
+        # Uses no ground truth.
+        self.gate_mode = 'oracle'
 
         # seed
         self.noise_seed = None
@@ -656,10 +664,26 @@ class Trainer(object):
                 # unusably slow exactly where almost every word passes the
                 # threshold, i.e. at high SNR: measured ~2h per repetition at
                 # snr=7 against ~20s at snr=6. Same values, no accumulation.
-                if ser <= self.ser_thresh:
+                if count in self.data_indices:   # bookkeeping only: never used for a decision
+                    st = self.__dict__.setdefault('gate_stats', {'data_words': 0, 'accepted': 0, 'wrong_labels': 0})
+                    st['data_words'] += 1
+                if self.gate_mode == 'rs':
+                    if count in self.data_indices:
+                        diff = (encoded_word.reshape(-1) != detected_word.reshape(-1)).reshape(-1, 8)
+                        accept = int(diff.any(dim=1).sum().item()) <= self.n_symbols // 2
+                    else:
+                        accept = True   # pilot: known word
+                    label = encoded_word.reshape(1, -1)
+                else:
+                    accept = ser <= self.ser_thresh
+                    label = detected_word.reshape(1, -1) if ser > 0 else encoded_word.reshape(1, -1)
+                if accept and count in self.data_indices:
+                    true_label = torch.Tensor(encode(transmitted_word.int().cpu().numpy(), self.n_symbols).reshape(1, -1)).to(device)
+                    st['accepted'] += 1
+                    st['wrong_labels'] += int(not torch.equal(label.reshape(-1), true_label.reshape(-1)))
+                if accept:
                     last_rx = received_word
-                    last_tx = (detected_word.reshape(1, -1) if ser > 0
-                               else encoded_word.reshape(1, -1))
+                    last_tx = label
 
                     if self.self_supervised:
                         # use last word inserted in the buffer for training

@@ -26,7 +26,7 @@
 \maketitle
 
 \begin{abstract}
-Model-based deep receivers such as ViterbiNet keep the Viterbi trellis and learn the channel-dependent branch metric from pilots, adapting it online on decoded words. They are usually evaluated against a Viterbi detector with perfect or deliberately corrupted channel state information (CSI), neither of which receives the information the learned receiver uses. We re-evaluate this design space with matched-information baselines, identical Monte Carlo draws, controlled ablations, and a short analysis. On a coded BPSK intersymbol-interference channel with COST~2100 taps, a Viterbi detector that estimates its four taps by least squares (LS) from the same pilot and the same code-gated decisions matches or outperforms every learned receiver from 0 to 14~dB and stays within 3--30\% of the perfect-CSI bound, in line with the 0.13~dB estimation loss we predict for LS from 136 samples. ViterbiNet's default of 200 online steps per word overfits; 5 steps are better at every SNR and 40 times cheaper. A 32-parameter affine metric, which we show contains the maximum-likelihood metric, matches the 7,002-parameter network; Transformer and Vision-Transformer metrics of the same size are worse at every training budget and 5--7 times costlier to adapt. Only LS-Viterbi and ViterbiNet with 5 steps come close to a real-time budget on one CPU thread. For complex QPSK the free per-branch metric needs $M^L$ classes and fails with a realistic pilot, while tying the classes to the channel taps restores classical performance. Under fast fading, the learned receivers' edge over a last-word LS estimate comes from memory of the channel statistics, which exponentially weighted LS reproduces; no receiver without CSI tracks the channel within a word. We release all code and data and derive design guidance for when learning can help.
+Model-based deep receivers such as ViterbiNet keep the Viterbi trellis and learn the channel-dependent branch metric from pilots, adapting it online on decoded words. They are usually evaluated against a Viterbi detector with perfect or deliberately corrupted channel state information (CSI), neither of which receives the information the learned receiver uses. We re-evaluate this design space with matched-information baselines, paired Monte Carlo comparisons, controlled ablations, and a short analysis. On a coded BPSK intersymbol-interference channel with COST~2100 taps, a Viterbi detector that estimates its four taps by least squares (LS) from the same pilots and the same code-gated decisions has the lowest point-estimate SER of all no-CSI receivers from 0 to 14~dB, is significantly better than the best learned receiver at most SNRs from 6 to 12~dB on shared draws, and is never significantly worse; it stays within 3--30\% of the perfect-CSI bound, in line with the 0.13~dB estimation loss we predict for LS from 136 samples. These conclusions hold when the reference implementation's oracle adaptation gate is replaced by an implementable one. ViterbiNet's default of 200 online steps per word overfits; 5 steps give a lower SER at every SNR and are 40 times cheaper. A 32-parameter affine metric, which we show contains the maximum-likelihood metric, matches the 7,002-parameter network; Transformer and Vision-Transformer metrics of the same size are worse at every training budget and 5--7 times costlier to adapt. Only LS-Viterbi and ViterbiNet with 5 steps come close to a real-time budget on one CPU thread. For complex QPSK the free per-branch metric needs $M^L$ classes and fails with a realistic pilot, while tying the classes to the channel taps restores classical performance. Under fast fading, the learned receivers' edge over a last-word LS estimate comes from memory of the channel statistics, which exponentially weighted LS reproduces; no receiver without CSI tracks the channel within a word. We release all code and data and derive design guidance for when learning can help.
 \end{abstract}
 
 \begin{IEEEkeywords}
@@ -38,11 +38,11 @@ Deep learning, model-based deep learning, symbol detection, Viterbi algorithm, c
 
 The evidence for this family rests on two comparisons: the learned receiver approaches the Viterbi algorithm with perfect CSI, and it outperforms the Viterbi algorithm given CSI with a fixed amount of uncertainty~\cite{shlezinger2020viterbinet}. Neither baseline receives the same information as the learned receiver. The first is given the channel; the second is given a corrupted channel and no way to correct it. A classical receiver that estimates the channel from the same pilots and the same accepted decisions, the adaptive maximum-likelihood sequence estimator~\cite{magee1973adaptive,raheli1995psp}, is the comparison that isolates what learning contributes. It is absent from the evaluations of learned trellis detectors that we are aware of.
 
-This paper re-examines the design space with matched information, identical Monte Carlo draws, and ablations of each design choice. Our contributions are:
+This paper re-examines the design space with matched information, paired Monte Carlo comparisons where draws are shared, and ablations of each design choice. Our contributions are:
 \begin{enumerate}
-\item \emph{A matched-information baseline.} An LS Viterbi receiver that uses the same pilot and code-gated decisions as ViterbiNet matches or outperforms all learned receivers at every SNR from 0 to 14~dB and tracks the perfect-CSI bound (Section~\ref{sec:bpsk}).
+\item \emph{A matched-information baseline.} An LS Viterbi receiver that uses the same pilot and code-gated decisions as ViterbiNet has the lowest point-estimate SER of all no-CSI receivers from 0 to 14~dB, is never significantly worse on paired draws, and tracks the perfect-CSI bound (Section~\ref{sec:bpsk}).
 \item \emph{Analysis.} We show that the affine metric contains the maximum-likelihood branch metric, predict the SNR loss of LS estimation, and count operations per word as a function of the channel memory (Section~\ref{sec:analysis}).
-\item \emph{Adaptation budget.} The default of 200 online steps per accepted word overfits; 5 steps are better at every SNR and 40 times cheaper (Section~\ref{sec:adapt}).
+\item \emph{Adaptation budget.} The default of 200 online steps per accepted word overfits; 5 steps give a lower SER at every SNR and are 40 times cheaper (Section~\ref{sec:adapt}).
 \item \emph{Structure over size.} A 32-parameter affine metric matches the 7,002-parameter network, and larger networks are not better (Section~\ref{sec:topology}).
 \item \emph{Sequence architectures and cost.} Transformer~\cite{vaswani2017attention} and Vision-Transformer~\cite{dosovitskiy2021vit} metrics of the same size are worse at every offline training budget and costlier to run and adapt; we map every receiver on an accuracy--compute plane and against a real-time budget (Sections~\ref{sec:arch}--\ref{sec:latency}).
 \item \emph{Scaling to higher-order modulation.} For QPSK the per-branch metric needs $M^L$ classes and fails with a realistic pilot; tying the classes to the channel taps restores classical performance, while symbol-by-symbol classifiers need an equalizer structure to track (Section~\ref{sec:qpsk}).
@@ -83,7 +83,7 @@ where $\bar h^{(w)}$ is the COST~2100 trace, $\kappa=3$ is a Rician factor, and 
 For Section~\ref{sec:qpsk}, QPSK symbols pass through $L=3$ complex Rayleigh taps with an exponential power-delay profile (power ratio 0.5 per tap, unit total power). The taps evolve from word to word as a first-order autoregressive process with correlation 0.99, or, in the fast-fading variant, as complex Jakes processes. Words carry 120 symbols between known start and end symbols; a frame has one pilot word and 24 data words. The trellis has $M^{L-1}=16$ states and $M^L=64$ branches.
 
 \section{Receivers}\label{sec:receivers}
-All receivers share the structure of Fig.~\ref{fig:system}: one Viterbi recursion over the 16-state trellis, an RS decoder, and a gate that accepts a word for adaptation when its RS-decoded symbol error rate (SER) is at most 0.02. They differ only in the branch metric $\ell_t(x)$ and in the rule that updates it from pilots and accepted words. Table~\ref{tab:receivers} summarizes them.
+All receivers share the structure of Fig.~\ref{fig:system}: one Viterbi recursion over the 16-state trellis, an RS decoder, and a gate that decides which decoded words are used for adaptation (Section~\ref{sec:protocol}). They differ only in the branch metric $\ell_t(x)$ and in the rule that updates it from pilots and accepted words. Table~\ref{tab:receivers} summarizes them.
 
 \begin{figure}[t]
 \centering
@@ -120,7 +120,7 @@ Transformer V2--V4, ViT & attention, 4-sample window & $\approx$7,000 & pilots, 
 
 \emph{Noisy CSI:} the same metric with taps $1,\dots,L-1$ perturbed by Gaussian noise of standard deviation $\rho$ times the RMS tap magnitude, $\rho\in\{0.25,0.5,0.75,1\}$. This is the CSI-uncertainty baseline of~\cite{shlezinger2020viterbinet}.
 
-\emph{LS-Viterbi (matched information):} the metric uses $\hat{\mathbf h}=\arg\min_{\mathbf h}\sum_t\big(y_t-\mathbf h^{\mathsf T}\mathbf s(x_t)\big)^2$, recomputed on each pilot and on each accepted data word; data-word states come from the RS re-encoded decisions. These are the words and labels the learned receivers adapt on.
+\emph{LS-Viterbi (matched information):} the metric uses $\hat{\mathbf h}=\arg\min_{\mathbf h}\sum_t\big(y_t-\mathbf h^{\mathsf T}\mathbf s(x_t)\big)^2$, recomputed on each pilot and on each data word accepted by the gate, with that word's labels. These are the words and labels the learned receivers adapt on.
 
 \emph{LS with forgetting (RLS):} $\hat{\mathbf h}=\mathbf R^{-1}\mathbf r$ with $\mathbf R\leftarrow\lambda\mathbf R+\mathbf X^{\mathsf T}\mathbf X$ and $\mathbf r\leftarrow\lambda\mathbf r+\mathbf X^{\mathsf T}\mathbf y$ over accepted words ($\lambda=0.8$ unless stated), i.e., exponentially weighted LS~\cite{haykin2014adaptive} with an effective memory of $1/(1-\lambda)$ words.
 
@@ -147,11 +147,11 @@ $\log p(y_t|x)=-(y_t-\mu_x)^2/(2\sigma^2)+\text{const}$ and $\log p(x)$ is const
 Proposition~\ref{prop:affine} explains why VNet-affine can match a much larger network on this channel: the extra capacity has nothing to represent. It also shows how over-parameterized the affine metric still is: its 32 parameters describe 16 means $\mu_x$ that are fixed by 4 taps. It does not imply that 32 parameters suffice when the noise is non-Gaussian or the channel is nonlinear.
 
 \subsection{Estimation loss of LS-Viterbi}
-Let $\hat{\mathbf h}$ be the LS estimate from one word of $T$ samples with correct labels and white regressors. Its error has covariance $\sigma^2(\mathbf X^{\mathsf T}\mathbf X)^{-1}\approx(\sigma^2/T)\mathbf I_L$, so the residual $y_t-\hat{\mathbf h}^{\mathsf T}\mathbf s$ seen by the metric has variance about $\sigma^2(1+L/T)$. To first order LS-Viterbi therefore behaves like the perfect-CSI receiver at an SNR lower by
+Let $\hat{\mathbf h}$ be the LS estimate from one word of $T$ samples with correct labels. Its error has covariance $\sigma^2(\mathbf X^{\mathsf T}\mathbf X)^{-1}$, so the residual $y_t-\hat{\mathbf h}^{\mathsf T}\mathbf s(x)$ seen by the metric of state $x$ has variance $\sigma^2\big(1+\mathbf s(x)^{\mathsf T}(\mathbf X^{\mathsf T}\mathbf X)^{-1}\mathbf s(x)\big)$. If the shifted-symbol columns of $\mathbf X$ are nearly orthogonal, $\mathbf X^{\mathsf T}\mathbf X\approx T\mathbf I_L$ and the excess is $L/T$. This is an assumption about the training words, not a general LS result, so we checked it for our RS-coded words: averaged over 2,000 random words and the 16 states, $\mathbf s^{\mathsf T}(\mathbf X^{\mathsf T}\mathbf X)^{-1}\mathbf s=0.0301$ against $L/T=0.0294$, and the median condition number of $\mathbf X^{\mathsf T}\mathbf X/T$ is 1.39. To first order LS-Viterbi therefore behaves like the perfect-CSI receiver at an SNR lower by
 \begin{equation}\label{eq:loss}
-\Delta=10\log_{10}\!\left(1+\frac{L}{T}\right)\ \text{dB}=0.126\ \text{dB}\quad(L=4,\ T=136).
+\Delta\approx10\log_{10}\!\left(1+\frac{L}{T}\right)\ \text{dB}=0.126\ \text{dB}\quad(L=4,\ T=136),
 \end{equation}
-Shifting the measured perfect-CSI curve by $\Delta$ predicts SER ratios of 1.03, 1.07, 1.16, and 1.27 at 4, 7, 10, and 12~dB; we measure 1.04, 1.06, 1.13, and 1.30 (Fig.~\ref{fig:gap}). At 13--14~dB the prediction (1.31--1.49) slightly exceeds the measurement (1.22--1.25); there the 14~dB point rests on 4 LS error events, and the prediction interpolates a perfect-CSI curve that falls by an order of magnitude per dB. The prediction ignores decision errors in the labels and the jumps of Fig.~\ref{fig:channel}a; that it fits this closely suggests that the gate removes nearly all mislabeled words and that the remaining gap to the bound is the estimation noise of four unknowns.
+or 0.129~dB with the exact average for the coded words. Shifting the measured perfect-CSI curve by $\Delta$ predicts SER ratios of 1.03, 1.07, 1.16, and 1.27 at 4, 7, 10, and 12~dB; we measure 1.04, 1.06, 1.13, and 1.30 (Fig.~\ref{fig:gap}). At 13--14~dB the prediction (1.31--1.49) slightly exceeds the measurement (1.22--1.25); there the 14~dB point rests on 4 LS error events, and the prediction interpolates a perfect-CSI curve that falls by an order of magnitude per dB. The prediction ignores label errors in accepted words and the jumps of Fig.~\ref{fig:channel}a; that it fits this closely suggests that both have little effect and that the remaining gap to the bound is the estimation noise of four unknowns.
 
 \subsection{Complexity}
 For a word of $T$ samples, the trellis costs $O(T\,2^{L+1})$ add-compare-select operations for every receiver. A per-sample metric with $P$ parameters adds about $TP$ multiply-accumulates for the forward pass and $3KTP$ for $K$ adaptation steps (forward and backward), while LS re-estimation costs $O(TL^2+L^3)$, i.e., about $2{,}200$ multiply-accumulates for $T=136$ and $L=4$, fewer than the 7,002-parameter network spends on a single sample. Fig.~\ref{fig:complexity} extends these counts to other memories: the ViterbiNet output layer grows as $2^L$ like the trellis, so learned adaptation stays three to five orders of magnitude above the trellis, while LS re-estimation stays below the trellis for every $L$. Operation counts are the platform-independent measure; measured latency (Section~\ref{sec:latency}) is instead dominated by the trellis, because our trellis is a sequential loop of 136 interpreted steps while the network runs as vectorized kernels.
@@ -164,9 +164,13 @@ For a word of $T$ samples, the trellis costs $O(T\,2^{L+1})$ add-compare-select 
 \end{figure}
 
 \section{Evaluation Protocol}\label{sec:protocol}
-\emph{Matched information.} Every receiver sees the same pilot words, and every adaptive receiver adapts on the same set of accepted words: pilots and data words whose RS-decoded SER is at most 0.02.
+\emph{Matched information and the adaptation gate.} Every receiver sees the same pilot words (one in every 25 words), and every adaptive receiver uses the same gate. We follow the reference implementation of ViterbiNet: a data word is used for adaptation if the SER of its RS-decoded bits is at most 0.02, with the RS re-encoded word as labels when that SER is zero and the detector's hard decisions otherwise. Computing that SER requires the transmitted bits, so this gate is an oracle, not a receiver function; it is applied identically to every adaptive receiver. We also evaluate an implementable gate that uses no ground truth: accept a word when the re-encoded decoded word differs from the hard decisions in at most one RS symbol (bounded-distance decoding with two parity symbols) and adapt on the re-encoded word (Section~\ref{sec:gate}).
 
-\emph{Monte Carlo.} A repetition draws fresh bits and noise for one frame; the SER is computed on the RS-decoded information bits of the 120 data words (14,400 bits per repetition). Learned receivers use at least 20 repetitions (50 for the SNR sweeps); the perfect-CSI and LS receivers use at least 100 (up to $10^4$ and $10^3$), with the count set from a predicted SER to target about 100 errors. Results are reported from 0 to 14~dB; figures extend to 15~dB, where zero-error points are drawn as the one-sided 95\% bound $3/N$ for $N$ evaluated bits. At 14~dB the SER of ViterbiNet and VNet-affine rests on 4--9 error events and that of LS-Viterbi on 4, so ratios there carry a factor-of-two uncertainty. Architecture and topology studies at 7~dB use 20 repetitions each and report 95\% confidence intervals. In the fast-fading study, evaluation data are seeded per repetition, so all receivers see identical transmissions and differences are paired. QPSK points average 64 frames of 24 data words (184,320 symbols).
+\emph{Monte Carlo.} A repetition draws fresh bits and noise for one frame; the SER is computed on the RS-decoded information bits of the 120 data words (14,400 bits per repetition). Learned receivers use at least 20 repetitions (50 for the SNR sweeps); the perfect-CSI and LS receivers use at least 100 (up to $10^4$ and $10^3$), with the count set from a predicted SER to target about 100 errors. Results are reported from 0 to 14~dB; figures extend to 15~dB, where zero-error points are drawn as the one-sided 95\% bound $3/N$ for $N$ evaluated bits. At 14~dB the SER of ViterbiNet and VNet-affine rests on 4--9 error events and that of LS-Viterbi on 4 (95\% Poisson interval for 4 events: 0.3--2.6 times the estimate), so ratios there are indicative only.
+
+\emph{Shared draws and paired comparisons.} The perfect-CSI, LS-Viterbi, ViterbiNet ($K=5$), and VNet-affine receivers read repetition $r<200$ from a shared cache of generated (bits, noise) draws, so their first repetitions are paired; their per-repetition SERs are positively correlated (median $\rho\approx0.5$), as shared draws imply. We report paired differences over the shared repetitions. The $K=200$ ViterbiNet and Transformer sweeps ran with the same code on separate GPU machines with independent draws, and the noisy-CSI sweeps used a separate cache; comparisons against them are unpaired.
+
+\emph{Provenance.} All reported points were generated after we corrected a data-cache defect that had replayed one draw across all repetitions of a point; results collected before the fix were discarded. Every reported point shows repetition-to-repetition variance (standard deviation at least 1.9\% of the mean), which the defect would have made zero. Architecture and topology studies at 7~dB use 20 repetitions each and report 95\% confidence intervals. In the fast-fading study, evaluation data are seeded per repetition, so all receivers see identical transmissions and differences are paired. QPSK points average 64 frames of 24 data words (184,320 symbols).
 
 \emph{Training data.} Offline training of the learned receivers uses words drawn from the same COST~2100 tap sequence used for evaluation. This favors the learned receivers and makes the comparison conservative.
 
@@ -174,7 +178,7 @@ For a word of $T$ samples, the trellis costs $O(T\,2^{L+1})$ add-compare-select 
 
 \section{Results}
 \subsection{BPSK: matched-information baseline}\label{sec:bpsk}
-Fig.~\ref{fig:snr} and Table~\ref{tab:bpsk} report SER versus SNR. The LS-Viterbi receiver is never worse than any learned receiver. At every SNR from 0 to 14~dB it stays within 3--30\% of the perfect-CSI SER: \serlsseven\ versus \sercsiseven\ at 7~dB, \serlstwelve\ versus \sercsitwelve\ at 12~dB, and \serlsfourteen\ versus \sercsifourteen\ at 14~dB. Relative to ViterbiNet with its default adaptation, LS-Viterbi has 1.3 times lower SER at 7~dB, 9.8 times at 12~dB, and 45 times at 14~dB. With $K=5$ the ratios are 1.07, 1.7, and 20.
+Fig.~\ref{fig:snr} and Table~\ref{tab:bpsk} report SER versus SNR. In point estimate, LS-Viterbi has the lowest SER of all no-CSI receivers at every SNR from 0 to 14~dB, and it stays within 3--30\% of the perfect-CSI SER: \serlsseven\ versus \sercsiseven\ at 7~dB, \serlstwelve\ versus \sercsitwelve\ at 12~dB, and \serlsfourteen\ versus \sercsifourteen\ at 14~dB. Relative to ViterbiNet with its default adaptation, LS-Viterbi has 1.3 times lower SER at 7~dB, 9.8 times at 12~dB, and 45 times at 14~dB. With $K=5$ the ratios are 1.07, 1.7, and 20. On the shared draws (Table~\ref{tab:paired}), LS-Viterbi is significantly better than ViterbiNet with $K=5$ at 1, 6, 7, and 9--12~dB and than VNet-affine at 0, 2--7, and 11~dB, and never significantly worse; at 13--14~dB the paired differences are within noise, so the high-SNR ranking is a point-estimate ranking only.
 
 Fig.~\ref{fig:gap} divides every curve by the perfect-CSI SER. Up to 6~dB every receiver is within 1.5 times the bound, and the choice of receiver matters little. The curves separate as the SNR grows: the gap of LS-Viterbi stays flat at 1.0--1.3, as~\eqref{eq:loss} predicts, whereas ViterbiNet with $K=5$ and VNet-affine grow to 1.9--4 times at 12--13~dB and about 25 times at 14~dB, the default ViterbiNet to 13--56 times at 12--14~dB, and the Transformer to 270 times at 14~dB. A learned metric fitted by stochastic gradient steps carries an error floor that is invisible at low SNR and dominant at high SNR; one LS solve does not.
 
@@ -206,12 +210,47 @@ Transformer, $K{=}200$ & 6,960 & \sertransformerzero & \sertransformerseven & \s
 \end{tabular}
 \end{table}
 
+\begin{table}[t]
+\centering
+\caption{Paired SER differences, LS-Viterbi minus learned receiver, over the Monte Carlo repetitions both evaluated on the same draws (mean $\pm$ 95\% CI; $^{*}$: CI excludes zero; negative: LS-Viterbi better).}
+\label{tab:paired}
+\setlength{\tabcolsep}{3pt}
+\footnotesize
+\resizebox{\columnwidth}{!}{%
+\begin{tabular}{@{}rccr@{}}
+\toprule
+SNR (dB) & vs.\ ViterbiNet, $K{=}5$ & vs.\ VNet-affine & Reps\\
+\midrule
+\input{../figures/paired_table.tex}
+\end{tabular}}
+\end{table}
+
 \begin{figure}[t]
 \centering
 \includegraphics[width=\columnwidth]{gap_ratio.pdf}
 \caption{SER relative to the perfect-CSI Viterbi detector, 0--14~dB. Dashed red: LS-Viterbi predicted from~\eqref{eq:loss}. At 14~dB the ViterbiNet and VNet-affine points rest on 4--9 error events.}
 \label{fig:gap}
 \end{figure}
+
+\subsection{An implementable adaptation gate}\label{sec:gate}
+The results above use the oracle gate of the reference implementation (Section~\ref{sec:protocol}). Table~\ref{tab:gate} repeats four adaptive receivers with the implementable RS gate, starting from the same offline weights and evaluating the same repetitions, so each receiver's two rows are paired. The implementable gate is stricter at low SNR: at 7~dB it accepts 21--33\% of data words against 30--44\% for the oracle gate. It is also cleaner, because it always adapts on a codeword: 15--22\% of the accepted words carry any label error, against 37--46\% for the oracle gate, whose labels are raw hard decisions whenever the decoded SER is nonzero. At 10 and 12~dB both gates accept almost every word. The two effects cancel: no receiver's SER changes by more than the 95\% confidence interval of either run, and LS-Viterbi keeps the lowest SER under both gates. The conclusions of this section therefore do not depend on the oracle gate.
+
+\begin{table}[t]
+\centering
+\caption{Oracle vs.\ implementable (RS) adaptation gate on the same draws: SER, fraction of data words accepted, and fraction of accepted words with wrong labels.}
+\label{tab:gate}
+\setlength{\tabcolsep}{2.5pt}
+\footnotesize
+\resizebox{\columnwidth}{!}{%
+\begin{tabular}{@{}rlcccccc@{}}
+\toprule
+& & \multicolumn{2}{c}{SER} & \multicolumn{2}{c}{Accepted} & \multicolumn{2}{c}{Wrong labels}\\
+\cmidrule(lr){3-4}\cmidrule(lr){5-6}\cmidrule(l){7-8}
+SNR & Receiver & oracle & RS & oracle & RS & oracle & RS\\
+\midrule
+\input{../figures/gate_table.tex}
+\end{tabular}}
+\end{table}
 
 \subsection{The noisy-CSI baseline}\label{sec:csi}
 Fig.~\ref{fig:csi} explains the original comparison. With 25\% tap error the Viterbi detector improves only slowly with SNR and reaches $1.3\e{-3}$ at 14~dB, 5,800 times the bound (Fig.~\ref{fig:gap}); at 50--100\% error it is flat at 0.04--0.2. ViterbiNet beats every one of these curves from 6~dB on, which is the comparison reported in~\cite{shlezinger2020viterbinet}. Nothing in the noisy-CSI receiver corrects its model. ViterbiNet corrects its model from data, and so does LS-Viterbi, with four unknowns and one least-squares solve per accepted word; on that footing the learned receiver's advantage disappears.
@@ -224,7 +263,7 @@ Fig.~\ref{fig:csi} explains the original comparison. With 25\% tap error the Vit
 \end{figure}
 
 \subsection{Online adaptation budget}\label{sec:adapt}
-Fig.~\ref{fig:steps} sweeps the number of online steps $K$ at 7~dB. For the 7,002-parameter network the SER is lowest at $K=5$ (0.0249) and rises monotonically to 0.0315 at $K=200$. Without adaptation it is 0.0340, so a few steps help and many steps overfit: each step fits the same 136-sample word, and after a handful of steps the network starts fitting that word's noise. Over the whole SNR range, $K=5$ is better than $K=200$ at every SNR (Table~\ref{tab:bpsk}, Fig.~\ref{fig:gap}) while using 40 times less adaptation compute.
+Fig.~\ref{fig:steps} sweeps the number of online steps $K$ at 7~dB. For the 7,002-parameter network the SER is lowest at $K=5$ (0.0249) and rises monotonically to 0.0315 at $K=200$. Without adaptation it is 0.0340, so a few steps help and many steps overfit: each step fits the same 136-sample word, and after a handful of steps the network starts fitting that word's noise. Over the whole SNR range, $K=5$ has a lower point-estimate SER than $K=200$ at every SNR (Table~\ref{tab:bpsk}, Fig.~\ref{fig:gap}; unpaired, since the $K=200$ sweep used independent draws) while using 40 times less adaptation compute.
 
 The affine metric responds oppositely: it needs 50--200 steps to move from the generic offline solution to the frame's channel and reaches 0.0254 at $K=100$--200, statistically tied with the tuned network. A model with 32 parameters has too little capacity to overfit one word, but also moves more slowly per step.
 
