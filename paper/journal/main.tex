@@ -212,7 +212,7 @@ Transformer, $K{=}200$ & 6,960 & \sertransformerzero & \sertransformerseven & \s
 
 \begin{table}[t]
 \centering
-\caption{Paired SER differences, LS-Viterbi minus learned receiver, over the Monte Carlo repetitions both evaluated on the same draws (mean $\pm$ 95\% CI; $^{*}$: CI excludes zero; negative: LS-Viterbi better).}
+\caption{Paired SER differences, LS-Viterbi minus learned receiver, over the Monte Carlo repetitions both evaluated on the same draws (mean $\pm$ 95\% CI; $^{*}$: CI excludes zero; negative: LS-Viterbi better; --: per-repetition values not saved for that point).}
 \label{tab:paired}
 \setlength{\tabcolsep}{3pt}
 \footnotesize
@@ -233,7 +233,7 @@ SNR (dB) & vs.\ ViterbiNet, $K{=}5$ & vs.\ VNet-affine & Reps\\
 \end{figure}
 
 \subsection{An implementable adaptation gate}\label{sec:gate}
-The results above use the oracle gate of the reference implementation (Section~\ref{sec:protocol}). Table~\ref{tab:gate} repeats four adaptive receivers with the implementable RS gate, starting from the same offline weights and evaluating the same repetitions, so each receiver's two rows are paired. The implementable gate is stricter at low SNR: at 7~dB it accepts 21--33\% of data words against 30--44\% for the oracle gate. It is also cleaner, because it always adapts on a codeword: 15--22\% of the accepted words carry any label error, against 37--46\% for the oracle gate, whose labels are raw hard decisions whenever the decoded SER is nonzero. At 10 and 12~dB both gates accept almost every word. The two effects cancel: no receiver's SER changes by more than the 95\% confidence interval of either run, and LS-Viterbi keeps the lowest SER under both gates. The conclusions of this section therefore do not depend on the oracle gate.
+The results above use the oracle gate of the reference implementation (Section~\ref{sec:protocol}). Table~\ref{tab:gate} repeats four adaptive receivers with the implementable RS gate, starting from the same offline weights and evaluating the same repetitions, so each receiver's two rows are paired. The implementable gate is stricter at low SNR: at 7~dB it accepts 21--33\% of data words against 30--44\% for the oracle gate. It is also cleaner, because it always adapts on a codeword: 15--22\% of the accepted words carry any label error, against 37--46\% for the oracle gate, whose labels are raw hard decisions whenever the decoded SER is nonzero. At 10 and 12~dB both gates accept most words (83--100\%), and both label errors and differences shrink. The two effects cancel: no receiver's SER changes by more than the 95\% confidence interval of either run, and LS-Viterbi keeps the lowest SER under both gates. The conclusions of this section therefore do not depend on the oracle gate.
 
 \begin{table}[t]
 \centering

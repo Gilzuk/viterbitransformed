@@ -562,8 +562,8 @@ if pr:
     def sci(x):
         if x == 0:
             return '0'
-        e = int(np.floor(np.log10(abs(x)))); m = x / 10 ** e
-        return f'{m:+.1f}\\e{{{e}}}'
+        m, e = f'{x:+.1e}'.split('e')   # round first, so 9.96e-5 prints as 1.0e-4
+        return f'{m}\\e{{{int(e)}}}'
     by = {}
     for r in pr:
         by.setdefault(int(r['snr']), {})[r['receiver_b']] = r
@@ -589,8 +589,8 @@ if gc:
         x = float(x)
         if x == 0:
             return '0'
-        e = int(np.floor(np.log10(abs(x))))
-        return f'{x:.2f}' if e >= -1 else f'${x / 10 ** e:.1f}\\e{{{e}}}$'
+        m, e = f'{x:.1e}'.split('e')
+        return f'{x:.2f}' if int(e) >= -1 else f'${m}\\e{{{int(e)}}}$'
     order = ['LS-Viterbi', 'ViterbiNet K=5', 'VNet-affine K=200', 'ViterbiNet K=200']
     g = {(r['receiver'], int(r['snr']), r['gate']): r for r in gc}
     lines = []
