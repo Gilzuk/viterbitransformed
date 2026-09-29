@@ -476,6 +476,43 @@ if any(r['model'].startswith('tune_') for r in ff):
     a.legend(loc='upper left', fontsize=6)
     fig.savefig(os.path.join(OUT, 'tracker_tuning.pdf')); plt.close(fig)
 
+# ------------------------- Mamba2 comparison (standalone; not in either paper) ---
+import io, subprocess
+try:
+    mb = subprocess.check_output(['git', '-C', ROOT, 'show', 'origin/claude/mamba2-vs-viterbinet:Results/metrics/mc_sweep_validation.csv'],
+                                 stderr=subprocess.DEVNULL).decode()
+    mamba = sorted((int(r['snr']), float(r['ser_mean']) * DATA_SCALE, float(r['ser_ci95']) * DATA_SCALE)
+                   for r in csv.DictReader(io.StringIO(mb)) if r['model'] == 'Mamba2')
+except Exception:
+    mamba = []
+if mamba:
+    fig, (a, b) = plt.subplots(1, 2, figsize=(DCOL, 2.6), gridspec_kw={'wspace': 0.25})
+    for model, lab, col, mk, ls in (('ClassicViterbi', 'Viterbi, perfect CSI', K, 'o', '--'),
+                                    ('ClassicViterbi_LS', 'LS-Viterbi, no CSI', VERM, 's', '-'),
+                                    ('ViterbiNet_on5', 'ViterbiNet (7,002), 5 steps', BLUE, 'o', '-'),
+                                    ('VNet_affine', 'VNet-affine (32), 200 steps', GREEN, 'D', '-'),
+                                    ('ViterbiNet', 'ViterbiNet (7,002), 200 steps', ORANGE, '^', '-'),
+                                    ('Transformer', 'Transformer (6,960), 200 steps', PURPLE, 'x', '-')):
+        plot_curve(a, model, lab, col, mk, ls)
+    a.errorbar([m[0] for m in mamba], [m[1] for m in mamba], yerr=[m[2] for m in mamba], color=SKY, marker='X',
+               ms=4, capsize=1.5, elinewidth=0.6, label='Mamba2 (6,996), 200 steps', zorder=7)
+    snr_axes(a, (1e-7, 0.4)); a.legend(loc='lower left', fontsize=6)
+    a.set_title('(a) SER vs SNR', fontsize=8)
+    csi_all = {s_: v_ for s_, v_, b_ in bpsk_curve('ClassicViterbi', 14) if not b_}
+    for model, lab, col, mk in (('ClassicViterbi_LS', 'LS-Viterbi', VERM, 's'), ('ViterbiNet_on5', 'ViterbiNet, 5 steps', BLUE, 'o'),
+                                ('VNet_affine', 'VNet-affine', GREEN, 'D'), ('ViterbiNet', 'ViterbiNet, 200 steps', ORANGE, '^'),
+                                ('Transformer', 'Transformer', PURPLE, 'x')):
+        pts = [(s_, v_ / csi_all[s_]) for s_, v_, b_ in bpsk_curve(model, 14) if not b_ and s_ in csi_all]
+        b.plot(*zip(*pts), color=col, marker=mk, label=lab)
+    b.plot([m[0] for m in mamba if m[0] in csi_all], [m[1] / csi_all[m[0]] for m in mamba if m[0] in csi_all],
+           color=SKY, marker='X', ms=4, label='Mamba2', zorder=7)
+    b.axhline(1, color=K, lw=0.8, ls='--'); b.set_yscale('log'); b.set_xlim(-0.5, 14.5)
+    b.xaxis.set_major_locator(FixedLocator(range(0, 15, 2)))
+    b.set_xlabel('SNR (dB)'); b.set_ylabel('SER / SER(perfect CSI)'); b.legend(loc='upper left', fontsize=6)
+    b.set_title('(b) Gap to the perfect-CSI bound', fontsize=8)
+    fig.savefig(os.path.join(OUT, 'ser_snr_mamba2.pdf')); fig.savefig(os.path.join(OUT, 'ser_snr_mamba2.png'), dpi=200)
+    plt.close(fig)
+
 # ------------------------------------------- channel illustration (journal) ---
 import sys, numpy as np
 sys.path.insert(0, ROOT)
