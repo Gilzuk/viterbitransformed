@@ -49,5 +49,5 @@ Results are reported from 0 to 14 dB (BPSK SNR and QPSK Es/N0); SNR axes stop at
 | QPSK fast fading (10, 14 dB) | `fast_fading_qpsk.pdf` | `qpsk_fast_fading.csv` | `run_qpsk_fast_fading.py 10`, `... 14` |
 
 ## Before submission
-- Replace the author block, affiliations and `[repository URL]`.
+- Author block, affiliation and repository URL are filled in; the "Manuscript received" date is left for the editor.
 - Mamba2 is deliberately excluded (sweep incomplete).

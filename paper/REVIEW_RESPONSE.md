@@ -65,9 +65,6 @@ all can be regenerated.
 
 ## Wording and blockers
 - "smallest learned metric" is now "smallest free per-state affine metric", noting that a tap-parameterized metric (as in LS-Viterbi) is smaller.
-- **Still placeholders; they need your input:**
-  - author names;
-  - affiliation;
-  - corresponding-author e-mail;
-  - "Manuscript received" date;
-  - `[repository URL]`.
+- **Author block:** now filled in: Gil Zukerman, School of Electrical Engineering, Tel Aviv University (gilzukerman@mail.tau.ac.il).
+- **Code availability:** now points to https://github.com/Gilzuk/viterbitransformed, which is public.
+- **"Manuscript received" date:** removed, because the editor assigns it.
