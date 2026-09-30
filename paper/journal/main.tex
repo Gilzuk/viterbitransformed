@@ -444,7 +444,7 @@ Handling such channels requires tracking within the word, which none of the lear
 Given the same pilots and decisions, a least-squares Viterbi receiver matched or outperformed every learned trellis detector we tested from 0 to 14~dB, stayed within 3--30\% of the perfect-CSI bound as a simple estimation-loss argument predicts, and needed a single least-squares solve per accepted word to adapt. ViterbiNet's gains are gains over a receiver denied the chance to estimate its channel. Within the learned family, fewer adaptation steps, fewer parameters, and structure tied to the channel model all helped, and attention-based metrics did not. The open problem these experiments expose is tracking within a word under fast fading, where every receiver without CSI, learned or classical, remains far from the bound.
 
 \section*{Data Availability and AI-Use Statement}
-Simulation code, raw results, and the scripts that generate every figure and table (\texttt{paper/make\_figures.py}) are available at \url{https://github.com/Gilzuk/viterbitransformed}. An AI coding assistant (Claude, Anthropic) was used to write simulation, analysis, and plotting code and to draft the manuscript; the author checked all code, results, and text.
+Simulation code, raw results, and the scripts that generate every figure and table (\texttt{paper/make\_figures.py}) are available at \url{https://github.com/Gilzuk/viterbinet-revisited}. An AI coding assistant (Claude, Anthropic) was used to write simulation, analysis, and plotting code and to draft the manuscript; the author checked all code, results, and text.
 
 \bibliographystyle{IEEEtran}
 \bibliography{../refs}
