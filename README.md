@@ -1,7 +1,82 @@
 # Gigantic MU-MIMO: Toward Channel Statistics Independence in ML Receivers
 Deep Neural Networks receivers based Viterbi algorithm for Maximum Likelihood priors-learning in digital communication 
 
+## Papers from this repository  <a name="papers"></a>
+Two papers were written from the experiments in this repository:
+- *ViterbiNet Revisited: A Matched-Information Classical Baseline for Learned Trellis Detection* (to be submitted to IEEE Communications Letters).
+- *When Does Learning Help Trellis Detection?* (to be submitted to IEEE TMLCN).
+
+Their sources are in `paper/`. The curated code and data needed to reproduce them are in https://github.com/Gilzuk/viterbinet-revisited.
+
+### What these papers add to prior work
+
+ViterbiNet [Shlezinger et al., 2020] keeps the Viterbi trellis and learns the branch metric with a small network, adapted online on code-accepted words. Meta-learning was later added to speed up that adaptation [Raviv et al., 2021, 2023]. Those works compare the learned receiver against Viterbi with perfect CSI or with corrupted CSI, or against other learned receivers. No baseline in those comparisons receives the same information as the learned receiver.
+
+| Prior claim or design choice | What these papers find |
+|---|---|
+| The learned metric approaches Viterbi with perfect CSI and beats Viterbi with CSI uncertainty. | **Matched-information baseline.** LS-Viterbi gets exactly ViterbiNet's pilots and accepted decisions. It has the lowest point-estimate SER of all no-CSI receivers from 0 to 14 dB. On shared draws it is never significantly worse and is significantly better at most SNRs from 6 to 12 dB. It stays within a 0.13 dB estimation loss of the perfect-CSI bound, which we predict in closed form. |
+| Online adaptation on code-accepted words; meta-learning to adapt faster. | **Adaptation budget.** The default 200 gradient steps per word overfit. 5 plain steps give a lower SER at every SNR and cost 40 times less. The reference gate uses the transmitted bits; an implementable RS gate gives the same SER within its CI. |
+| A fully connected network (7,002 parameters here) learns the state likelihoods. | **Structure over size.** A 32-parameter affine metric, the exact Gaussian log-likelihood form, matches it. Larger networks are not better. |
+| Attention-based metrics. | Transformer and ViT metrics of the same size are worse at every training budget and cost more. |
+| Cost of learned detection. | Only LS-Viterbi and ViterbiNet with 5 steps meet a real-time budget on one CPU thread. |
+| Higher-order modulation. | For QPSK the per-branch metric needs M^L classes and fails with a realistic pilot. Tying the classes to the channel taps fixes it. |
+| Time-varying channels. | The learned receivers' advantage over a last-word LS estimate is memory of the channel statistics, which exponentially weighted LS reproduces. |
+
+In short: on a linear Gaussian ISI channel, ViterbiNet's reported gain comes from the baselines it was compared against, not from learning. Learned detectors should be compared against a classical receiver that gets the same pilots and decisions.
+
+### Citation
+
+If you use this code or these results, please cite:
+
+```bibtex
+@unpublished{zukerman2026viterbinetrevisited,
+  author = {Gil Zukerman},
+  title  = {{ViterbiNet} Revisited: A Matched-Information Classical Baseline for Learned Trellis Detection},
+  note   = {Manuscript to be submitted to IEEE Communications Letters},
+  year   = {2026},
+  url    = {https://github.com/Gilzuk/viterbinet-revisited}}
+
+@unpublished{zukerman2026learningtrellis,
+  author = {Gil Zukerman},
+  title  = {When Does Learning Help Trellis Detection? Matched Baselines, Structure, and Complexity of Model-Based Deep {Viterbi} Receivers},
+  note   = {Manuscript to be submitted to IEEE Transactions on Machine Learning in Communications and Networking},
+  year   = {2026},
+  url    = {https://github.com/Gilzuk/viterbinet-revisited}}
+```
+
+The prior work these papers build on and re-examine:
+
+```bibtex
+@article{shlezinger2020viterbinet,
+  author  = {Nir Shlezinger and Nariman Farsad and Yonina C. Eldar and Andrea J. Goldsmith},
+  title   = {{ViterbiNet}: A Deep Learning Based {Viterbi} Algorithm for Symbol Detection},
+  journal = {IEEE Trans. Wireless Commun.},
+  volume  = {19}, number = {5}, pages = {3319--3331}, year = {2020},
+  doi     = {10.1109/TWC.2020.2972352}}
+
+@inproceedings{raviv2021metaviterbinet,
+  author    = {Tomer Raviv and Sangwoo Park and Nir Shlezinger and Osvaldo Simeone and Yonina C. Eldar and Joonhyuk Kang},
+  title     = {{Meta-ViterbiNet}: Online Meta-Learned {Viterbi} Equalization for Non-Stationary Channels},
+  booktitle = {Proc. IEEE Int. Conf. Commun. Workshops (ICC Workshops)},
+  year      = {2021},
+  doi       = {10.1109/ICCWorkshops50388.2021.9473693}}
+
+@article{raviv2023online,
+  author  = {Tomer Raviv and Sangwoo Park and Osvaldo Simeone and Yonina C. Eldar and Nir Shlezinger},
+  title   = {Online Meta-Learning for Hybrid Model-Based Deep Receivers},
+  journal = {IEEE Trans. Wireless Commun.},
+  volume  = {22}, number = {10}, pages = {6415--6431}, year = {2023},
+  doi     = {10.1109/TWC.2023.3241841}}
+
+@article{magee1973adaptive,
+  author  = {F. R. Magee and John G. Proakis},
+  title   = {Adaptive Maximum-Likelihood Sequence Estimation for Digital Signaling in the Presence of Intersymbol Interference},
+  journal = {IEEE Trans. Inf. Theory},
+  volume  = {19}, number = {1}, pages = {120--124}, year = {1973}}
+```
+
 # Table of contents
+0. [Papers from this repository](#papers)
 1. [Introduction](#introduction)
 2. [Folder Structure and files Usage](#folder)
 3. [Installing](#install)

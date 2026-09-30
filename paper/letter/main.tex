@@ -32,12 +32,13 @@ Deep learning, symbol detection, Viterbi algorithm, channel estimation, intersym
 
 ViterbiNet's performance is reported relative to the Viterbi algorithm with full CSI, which it approaches, and with CSI uncertainty, which it outperforms~\cite{shlezinger2020viterbinet}. Neither baseline receives the information ViterbiNet receives. The first is given the true channel; the second is given a corrupted one and no means of correcting it. A classical receiver that estimates the channel from the same pilots and the same accepted decisions is the matched comparison. Such adaptive maximum-likelihood sequence estimators are decades old~\cite{magee1973adaptive,raheli1995psp}, but they are absent from the evaluations of learned trellis detectors that we are aware of.
 
-This letter makes three contributions:
+The evaluations of ViterbiNet and of its meta-learned extensions that we are aware of~\cite{shlezinger2020viterbinet,raviv2021metaviterbinet,raviv2023online} measure the learned receiver against Viterbi detectors with perfect or corrupted CSI, or against other learned receivers. This letter adds what those evaluations lack:
 \begin{itemize}
-\item A matched-information baseline, LS-Viterbi, which is never worse than ViterbiNet on paired draws, is significantly better at most SNRs from 6 to 12~dB, and tracks the perfect-CSI bound within a loss we predict (Section~\ref{sec:results}-A).
-\item Evidence that ViterbiNet's online adaptation overfits: 5 gradient steps per accepted word outperform the default 200 (Section~\ref{sec:results}-B).
-\item A 32-parameter affine branch metric that matches the 7,002-parameter network, and a cost comparison against a real-time budget (Section~\ref{sec:results}-C).
+\item \emph{The matched-information baseline.} LS-Viterbi, a Viterbi detector given exactly ViterbiNet's pilots and accepted decisions, is never significantly worse than ViterbiNet on paired draws. It is significantly better at most SNRs from 6 to 12~dB, and it tracks the perfect-CSI bound within a loss we predict in closed form (Section~\ref{sec:results}-A). The comparison holds under an implementable, ground-truth-free adaptation gate.
+\item \emph{An ablation of the adaptation budget.} The default 200 gradient steps per accepted word overfit; 5 steps give a lower SER and cost 40 times less (Section~\ref{sec:results}-B).
+\item \emph{An ablation of the metric size.} A 32-parameter affine metric, the exact Gaussian log-likelihood form, matches the 7,002-parameter network. We also measure every receiver's cost against a real-time budget (Section~\ref{sec:results}-C).
 \end{itemize}
+Together these results change the reading of the original evidence: on this channel, ViterbiNet's gain over classical detection comes from the baselines it was compared against, not from learning.
 
 \section{System Model and Receivers}\label{sec:model}
 \subsection{Channel and frame}

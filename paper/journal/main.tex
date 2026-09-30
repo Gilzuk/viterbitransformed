@@ -3,6 +3,7 @@
 \usepackage{amsmath,amssymb}
 \usepackage{graphicx}
 \usepackage{booktabs}
+\usepackage{array}
 \usepackage{multirow}
 \usepackage{amsthm}
 \usepackage{tikz}
@@ -37,7 +38,7 @@ Deep learning, model-based deep learning, symbol detection, Viterbi algorithm, c
 
 The evidence for this family rests on two comparisons: the learned receiver approaches the Viterbi algorithm with perfect CSI, and it outperforms the Viterbi algorithm given CSI with a fixed amount of uncertainty~\cite{shlezinger2020viterbinet}. Neither baseline receives the same information as the learned receiver. The first is given the channel; the second is given a corrupted channel and no way to correct it. A classical receiver that estimates the channel from the same pilots and the same accepted decisions, the adaptive maximum-likelihood sequence estimator~\cite{magee1973adaptive,raheli1995psp}, is the comparison that isolates what learning contributes. It is absent from the evaluations of learned trellis detectors that we are aware of.
 
-This paper re-examines the design space with matched information, paired Monte Carlo comparisons where draws are shared, and ablations of each design choice. Our contributions are:
+This paper re-examines that evidence. It uses matched information, paired Monte Carlo comparisons where draws are shared, and ablations of each design choice that the prior evaluations held fixed. Table~\ref{tab:prior} sets each prior claim or design choice beside what we find. Our contributions are:
 \begin{enumerate}
 \item \emph{A matched-information baseline.} An LS Viterbi receiver that uses the same pilot and code-gated decisions as ViterbiNet has the lowest point-estimate SER of all no-CSI receivers from 0 to 14~dB, is never significantly worse on paired draws, and tracks the perfect-CSI bound (Section~\ref{sec:bpsk}).
 \item \emph{Analysis.} We show that the affine metric contains the maximum-likelihood branch metric, predict the SNR loss of LS estimation, and count operations per word as a function of the channel memory (Section~\ref{sec:analysis}).
@@ -55,6 +56,28 @@ All code, raw results, and figure scripts are released so that every number can 
 \emph{Classical adaptive sequence estimation.} Adaptive MLSE with a decision-directed channel estimator dates to Magee and Proakis~\cite{magee1973adaptive}. Per-survivor processing (PSP) embeds the estimator in the trellis so that each survivor path carries its own channel estimate~\cite{raheli1995psp}. Least-mean-squares and recursive least-squares estimators, including exponential forgetting, are standard tools for tracking~\cite{haykin2014adaptive}. These methods use exactly the side information ViterbiNet uses: pilots and past decisions.
 
 \emph{Sequence models.} Transformers~\cite{vaswani2017attention} and their patch-based variants~\cite{dosovitskiy2021vit} have been proposed for many receiver tasks. We test whether attention over a window of samples improves the branch metric when it is embedded in the same trellis and trained under the same budget.
+
+\emph{Positioning.} Table~\ref{tab:prior} lists what this paper adds to the evaluations above. Each row takes a claim or a design choice of the prior work and tests it against a matched classical baseline or an ablation.
+
+\begin{table*}[t]
+\centering
+\caption{What this paper adds to prior evaluations of learned trellis detectors.}\label{tab:prior}
+\footnotesize
+\renewcommand{\arraystretch}{1.15}
+\begin{tabular}{@{}>{\raggedright\arraybackslash}p{0.30\textwidth}>{\raggedright\arraybackslash}p{0.64\textwidth}@{}}
+\toprule
+Prior claim or design choice & This paper \\
+\midrule
+The learned metric approaches Viterbi with perfect CSI and beats Viterbi with CSI uncertainty~\cite{shlezinger2020viterbinet}. & A Viterbi receiver given the same pilots and accepted decisions (LS-Viterbi) has the lowest point-estimate SER of all no-CSI receivers from 0 to 14~dB. On shared draws it is never significantly worse than any learned receiver and is significantly better at most SNRs from 6 to 12~dB (Sec.~\ref{sec:bpsk}). \\
+Online adaptation on code-accepted words~\cite{shlezinger2020viterbinet}; meta-learning to adapt faster~\cite{raviv2021metaviterbinet,raviv2023online}. & The reference gate uses the transmitted bits; an implementable RS gate gives the same SER within its CI (Sec.~\ref{sec:gate}). The default 200 steps per word overfit: 5 plain gradient steps give a lower SER at every SNR and cost 40 times less (Sec.~\ref{sec:adapt}). \\
+A fully connected network learns the state likelihoods~\cite{shlezinger2020viterbinet}. & A 32-parameter affine metric, the exact Gaussian log-likelihood form, matches the 7,002-parameter network, and larger networks are not better (Secs.~\ref{sec:analysis}, \ref{sec:topology}). \\
+Attention-based sequence models for receivers~\cite{vaswani2017attention,dosovitskiy2021vit}. & Transformer and ViT metrics of the same size are worse at every offline training budget and cost more to run and to adapt (Sec.~\ref{sec:arch}). \\
+Cost of learned detection. & Per-word latency and adaptation cost, measured against a real-time budget: only LS-Viterbi and ViterbiNet with 5 steps meet it on one CPU thread (Sec.~\ref{sec:latency}). \\
+Extension to higher-order modulation. & For QPSK the per-branch metric needs $M^L$ classes and fails with a realistic pilot; tying the classes to the channel taps restores classical performance (Sec.~\ref{sec:qpsk}). \\
+Tracking time-varying channels. & The learned receivers' advantage over a last-word LS estimate is memory of the channel statistics, which exponentially weighted LS reproduces; no receiver without CSI tracks within a word (Sec.~\ref{sec:ff}). \\
+\bottomrule
+\end{tabular}
+\end{table*}
 
 \section{System Model}\label{sec:model}
 \subsection{BPSK channel with memory}
