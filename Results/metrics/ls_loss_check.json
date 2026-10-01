@@ -1,0 +1,12 @@
+{
+ "words": 2000,
+ "seed": 0,
+ "L": 4,
+ "T": 136,
+ "mean_quadratic_form": 0.03009496571527186,
+ "L_over_T": 0.029411764705882353,
+ "loss_db_exact": 0.12877264690540005,
+ "loss_db_approx": 0.12589127308020467,
+ "median_condition_number": 1.3940876670845181,
+ "p95_condition_number": 1.885295016756521
+}

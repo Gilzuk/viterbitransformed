@@ -673,8 +673,14 @@ def run_point(model_name, detector_method, snr, min_reps, max_bits, step, forced
     # non-pilot subset and would under-count the array size ser_by_word
     # actually comes back in).
     words_per_rep = trainer.val_frames * trainer.subframes_in_frame
+    # BUDGET unit only: a nominal 8*n_symbols = 16 bits per word. It is NOT the number of
+    # bits detected; it is kept unchanged so the planning/stopping rule below (and max_bits)
+    # reproduces the published runs exactly. Reported bits_run / errors_observed use the
+    # information bits instead: 120 data words x val_block_length (120) bits per repetition.
     bits_per_word = trainer.n_symbols * 8
     bits_per_rep = words_per_rep * bits_per_word
+    info_bits_per_word = trainer.val_block_length
+    info_bits_per_rep = len(trainer.data_indices) * info_bits_per_word
 
     # Resume from a checkpoint: either left by a run that was interrupted
     # mid-point, or the finished point's own checkpoint when this call comes
@@ -827,8 +833,10 @@ def run_point(model_name, detector_method, snr, min_reps, max_bits, step, forced
         ser_ci95 = 0.0
 
     words_run = reps_done * words_per_rep
-    bits_run = words_run * bits_per_word
-    errors_observed = total_errors()
+    # ser_mean averages the per-word bit error rate over all words_per_rep words (pilots as 0),
+    # so the information-bit errors of a repetition are m * words_per_rep * info_bits_per_word.
+    bits_run = reps_done * info_bits_per_rep
+    errors_observed = sum(m * words_per_rep * info_bits_per_word for m in per_rep_means)
 
     return {
         'model': model_name,

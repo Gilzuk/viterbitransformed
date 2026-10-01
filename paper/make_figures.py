@@ -9,10 +9,10 @@ BPSK bookkeeping corrections (applied here, uniformly to every BPSK receiver):
   * run_mc_sweep.py averages the per-word SER over all 125 words of a repetition
     with the 5 pilot words entered as 0, so the stored ser_mean is 120/125 of the
     per-data-word SER. We report ser_mean * 125/120.
-  * bits_run / errors_observed in the CSV use a nominal 16 bits per word; each of
-    the 120 data words per repetition actually carries 120 information bits
-    (14,400 bits per repetition). Zero-error points are reported with the
-    rule-of-three bound 3 / (n_reps * 14,400).
+  * each repetition detects 120 data words x 120 information bits = 14,400 bits
+    (bits_run in the CSV; see experiments/fix_sweep_bit_metadata.py for the repair
+    of the earlier nominal 16-bits-per-word count). Zero-error points are reported
+    with the rule-of-three bound 3 / (n_reps * 14,400).
 QPSK results (Code/qpsk_sim.py) count data symbols directly and need no correction.
 """
 import csv, os
@@ -593,6 +593,16 @@ if gc:
         return f'{x:.2f}' if int(e) >= -1 else f'${m}\\e{{{int(e)}}}$'
     order = ['LS-Viterbi', 'ViterbiNet K=5', 'VNet-affine K=200', 'ViterbiNet K=200']
     g = {(r['receiver'], int(r['snr']), r['gate']): r for r in gc}
+    gd = {(r['receiver'], int(r['snr'])): r for r in (maybe('gate_paired_diff.csv') or [])}   # experiments/paired_stats.py
+
+    def pdiff(rec, snr):
+        r = gd.get((rec, snr))
+        if r is None:
+            return '--'
+        m, c = float(r['mean_diff_rs_minus_oracle']), float(r['ci95'])
+        if m == 0 and c == 0:
+            return '0'
+        return f"${sci(m)}\\pm{sci(c)[1:]}$" + ('$^{*}$' if r['verdict'] != 'not resolved' else '')
     lines = []
     for snr in sorted({int(r['snr']) for r in gc}):
         first = True
@@ -603,7 +613,7 @@ if gc:
             name = rec.replace('K=', '$K{=}').replace('200', '200$').replace('K{=}5', 'K{=}5$')
             lines.append(f"{snr if first else ''} & {name} & {s2(o['ser'])} & {s2(q['ser'])} & "
                          f"{float(o['accept_rate']):.2f} & {float(q['accept_rate']):.2f} & "
-                         f"{float(o['wrong_label_rate']):.2f} & {float(q['wrong_label_rate']):.3f} \\\\")
+                         f"{float(o['wrong_label_rate']):.2f} & {float(q['wrong_label_rate']):.3f} & {pdiff(rec, snr)} \\\\")
             first = False
     open(os.path.join(OUT, 'gate_table.tex'), 'w').write('\n'.join(lines) + '\n\\bottomrule\n')   # rule here: booktabs breaks after \\input
 
