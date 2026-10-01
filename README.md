@@ -10,19 +10,19 @@ Their sources are in `paper/`. The curated code and data needed to reproduce the
 
 ### What these papers add to prior work
 
-ViterbiNet [Shlezinger et al., 2020] keeps the Viterbi trellis and learns the branch metric with a small network, adapted online on code-accepted words. Meta-learning was later added to speed up that adaptation [Raviv et al., 2021, 2023]. Those works compare the learned receiver against Viterbi with perfect CSI or with corrupted CSI, or against other learned receivers. No baseline in those comparisons receives the same information as the learned receiver.
+ViterbiNet [Shlezinger et al., 2020] keeps the Viterbi trellis and learns the branch metric with a small network, adapted online on code-accepted words. Meta-learning was later added to speed up that adaptation [Raviv et al., 2021, 2023]. On Gaussian intersymbol-interference channels, the 2020 paper compares the learned receiver with Viterbi given perfect CSI, CSI with uncertainty, or (under block fading) only the initial CSI; it also compares learned detectors and covers non-Gaussian channels. None of those classical baselines receives the same information as the learned receiver.
 
 | Prior claim or design choice | What these papers find |
 |---|---|
-| The learned metric approaches Viterbi with perfect CSI and beats Viterbi with CSI uncertainty. | **Matched-information baseline.** LS-Viterbi gets exactly ViterbiNet's pilots and accepted decisions. It has the lowest point-estimate SER of all no-CSI receivers from 0 to 14 dB. On shared draws it is never significantly worse and is significantly better at most SNRs from 6 to 12 dB. It stays within a 0.13 dB estimation loss of the perfect-CSI bound, which we predict in closed form. |
-| Online adaptation on code-accepted words; meta-learning to adapt faster. | **Adaptation budget.** The default 200 gradient steps per word overfit. 5 plain steps give a lower SER at every SNR and cost 40 times less. The reference gate uses the transmitted bits; an implementable RS gate gives the same SER within its CI. |
-| A fully connected network (7,002 parameters here) learns the state likelihoods. | **Structure over size.** A 32-parameter affine metric, the exact Gaussian log-likelihood form, matches it. Larger networks are not better. |
-| Attention-based metrics. | Transformer and ViT metrics of the same size are worse at every training budget and cost more. |
-| Cost of learned detection. | Only LS-Viterbi and ViterbiNet with 5 steps meet a real-time budget on one CPU thread. |
+| On Gaussian ISI channels the learned metric approaches Viterbi with perfect CSI and beats Viterbi with CSI uncertainty or only initial CSI. | **Matched-information baseline.** LS-Viterbi uses ViterbiNet's pilots and acceptance rule, applied to its own decisions. It has the lowest point-estimate SER of all no-CSI receivers from 0 to 14 dB. On shared draws it is significantly better than ViterbiNet (5 updates) at 1, 6, 7 and 9-12 dB and than VNet-affine at 0, 2-7 and 11 dB, and never significantly worse in any available paired comparison; 13-14 dB is unresolved. It stays within about 3-30% of the perfect-CSI SER, close to a predicted 0.13 dB estimation loss. |
+| Online adaptation on code-accepted words, 200 Adam updates per word; meta-learning to adapt faster. | **Adaptation budget.** 200 updates per word overfit; 5 Adam updates give a lower point-estimate SER at every SNR with 40 times fewer updates. The gate of the starting code uses the transmitted bits; under an implementable RS gate LS-Viterbi keeps the lowest point-estimate SER at 7, 10 and 12 dB, though one of twelve paired gate differences (VNet-affine, 7 dB) is significant. Meta-learned adaptation is not tested. |
+| A fully connected network learns the state likelihoods (100-50 hidden units in the original; 100-58, 7,002 parameters, here). | **Structure over size.** A 32-parameter affine metric, the exact Gaussian log-likelihood form, matches it. Larger networks are not better. |
+| Attention-based architectures, applied here as branch metrics. | Transformer and ViT metrics of the same size are worse at every training budget and cost more to adapt. |
+| Cost of learned detection. | Only LS-Viterbi and ViterbiNet with 5 updates fit the measured detection-plus-adaptation time within a 17 ms word on one CPU thread (RS decoding and gating not timed). |
 | Higher-order modulation. | For QPSK the per-branch metric needs M^L classes and fails with a realistic pilot. Tying the classes to the channel taps fixes it. |
 | Time-varying channels. | The learned receivers' advantage over a last-word LS estimate is memory of the channel statistics, which exponentially weighted LS reproduces. |
 
-In short: on a linear Gaussian ISI channel, ViterbiNet's reported gain comes from the baselines it was compared against, not from learning. Learned detectors should be compared against a classical receiver that gets the same pilots and decisions.
+In short: in these experiments, on a linear Gaussian ISI channel, the tested learned receivers show no established advantage over a classical receiver given the same information. Learned detectors should be compared against such a receiver.
 
 ### Citation
 
