@@ -19,7 +19,7 @@ all can be regenerated.
   - Adaptation always uses the re-encoded word.
 - `experiments/gate_check.py` re-runs LS-Viterbi, ViterbiNet K=5, VNet-affine and ViterbiNet K=200 under both gates at 7, 10 and 12 dB. All runs use the same offline weights and the same draws; results are in `Results/metrics/gate_check.csv`.
   - The implementable gate accepts fewer words at 7 dB (33% vs 44% for LS-Viterbi) but labels them better (15% vs 37% of accepted words carry any label error).
-  - No receiver's SER changes by more than its 95% CI.
+  - No receiver's SER changes by more than its marginal 95% CI. (Superseded in round 2: one paired difference is significant; see below.)
   - LS-Viterbi keeps the lowest SER under both gates.
 - New journal subsection "An implementable adaptation gate" with Table `tab:gate`, plus one paragraph in the letter.
 
@@ -66,5 +66,54 @@ all can be regenerated.
 ## Wording and blockers
 - "smallest learned metric" is now "smallest free per-state affine metric", noting that a tap-parameterized metric (as in LS-Viterbi) is smaller.
 - **Author block:** now filled in: Gil Zukerman, School of Electrical Engineering, Tel Aviv University (gilzukerman@mail.tau.ac.il).
-- **Code availability:** now points to https://github.com/Gilzuk/viterbitransformed, which is public.
+- **Code availability:** points to https://github.com/Gilzuk/viterbinet-revisited, a public repository with the curated code, data and paper sources.
 - **"Manuscript received" date:** removed, because the editor assigns it.
+
+---
+
+# Round 2: independent verification (on commit 40080746)
+
+An independent check of the round-1 fixes found most of them correct. It also raised a blocker, new problems and overstatements. Each item and the action taken:
+
+## Blockers
+- **B1, code URL 404.** The repository `Gilzuk/viterbinet-revisited` was published after the checked commit and now resolves publicly. This document previously named the wrong repository; corrected.
+- **B2, journal abstract over 250 words.** Rewritten for the fixes below at 346 words, with every highlight kept as the author asked. Still over the IEEE 150-250 guideline: **author decision needed**.
+
+## Major
+- **M1, "best learned receiver at most SNRs".** The journal abstract and Table I now name each comparator and its SNRs: ViterbiNet K=5 at 1, 6, 7 and 9-12 dB; VNet-affine at 0, 2-7 and 11 dB. "Never significantly worse" is limited to the available paired comparisons. K=200 and the Transformer are marked unpaired.
+- **M2, gate robustness overinterpreted.** New paired RS-minus-oracle differences: `experiments/paired_stats.py` writes `Results/metrics/gate_paired_diff.csv`, and Table V has a new column.
+  - VNet-affine at 7 dB is significant: +7.7e-4 ± 5.6e-4.
+  - The other 11 differences are not resolved.
+  - The text now claims only that LS-Viterbi keeps the lowest point-estimate SER at 7, 10 and 12 dB. "The two effects cancel" and "conclusions hold" are removed.
+- **M3, normal instead of Student-t intervals.** Paired intervals are now pointwise paired Student-t, with pairing capped at the 200 shared repetitions. No verdict changes. Tables and text say "pointwise paired Student-t".
+- **M4, universal-superiority wording in the conclusions.** Removed "reaches the bound", "can at best match it" and "matched or outperformed every learned detector". They are replaced by the measured point-estimate and paired results, with 13-14 dB unresolved.
+- **M5, incomplete description of prior work.** Both papers now say that the 2020 paper also uses an initial-CSI baseline under block fading, compares learned detectors and covers non-Gaussian channels, and that the follow-ups compare adaptation methods. Only the Gaussian-setting classical baselines are revisited.
+- **M6, "reference implementation" attribution.** Changed to "the gate of the code base this study builds on". K=200 is attributed to [raviv2023online], noting that it uses mini-batches of 64 while we use full-word updates. *Not verified here:* the claim that the published protocol gates on receiver-side re-encoding. It is not asserted in the papers.
+- **M7, 100-58 network.** Both papers state that the original uses 100-50 and that 58 is this study's choice.
+- **M8, Table I attention row.** Now reads "Attention-based architectures [vaswani, dosovitskiy], applied here as branch metrics".
+- **M9, causal take-home sentence.** Now "In this experiment, the tested learned receivers show no established advantage over a classical receiver given the same information". Both papers note that meta-learned variants were not tested.
+- **M10, Poisson "events".** Now "bit errors", noted to be clustered in one or two repetitions; the Poisson and 3/N bounds are described as treating them as more independent than they are.
+- **M11, wrong raw bit and error metadata.**
+  - `run_mc_sweep.py` now reports information bits (120 × 120 per repetition). The stopping budget keeps its old unit, so published runs reproduce.
+  - `experiments/fix_sweep_bit_metadata.py` rewrote `bits_run` and `errors_observed` in `mc_sweep_validation.csv` (and `bits_run` in the topology and training-budget CSVs).
+  - SER columns are untouched. LS-Viterbi at 14 dB now reads 14,400,000 bits and 4 errors.
+- **M12, LS-loss check not reproducible; assumptions incomplete.** Added the seeded `experiments/ls_loss_check.py` and its output `Results/metrics/ls_loss_check.json`: 0.03009 vs L/T 0.02941, median condition number 1.394. The papers now state the independent-noise and unchanged-taps assumptions, and call the SNR-shift reading a heuristic.
+- **M13, "Transformer worst at every SNR" is false.** Corrected: at 12 and 13 dB the Transformer is slightly below ViterbiNet K=200.
+
+## Minor
+- **m1:** 1 dB added to the letter abstract.
+- **m2:** "meet the measured detection-plus-adaptation budget" with 1.4% headroom; RS decoding and gating are not timed.
+- **m3:** "same pilots and acceptance/labeling rule, applied to each receiver's own decisions" everywhere, including captions and Fig. 2.
+- **m4:** "20-50 repetitions".
+- **m5:** provenance variance statement limited to the 105 nonzero BPSK points.
+- **m6:** "about 3-30%".
+- **m7:** the 125/120 pilot correction is now explained in both papers.
+- **m8:** pairing capped at 200.
+- **m9:** "missing or incomplete per-repetition record".
+- **m10:** "Adam updates", and "40 times fewer updates" instead of "40 times cheaper".
+- **m11:** "every no-CSI adaptive receiver within 1.5×".
+
+## Result
+- Letter: 4 pages, abstract 246 words.
+- Journal: 12 pages, abstract 346 words.
+- Both compile with no overfull boxes and no unresolved references. `numbers.tex` (every SER in the papers) is unchanged.
