@@ -746,7 +746,9 @@ def run_point(model_name, detector_method, snr, min_reps, max_bits, step, forced
     trainer._eval_rep_counter = reps_done
 
     def total_errors():
-        return sum(m * bits_per_rep for m in per_rep_means)
+        # information-bit errors (see info_bits_per_word above); used only for logging and
+        # the zero-error test, never for the stopping rule
+        return sum(m * words_per_rep * info_bits_per_word for m in per_rep_means)
 
     last_eval_commit = [0.0]
     eval_commit_interval_sec = 120
@@ -801,6 +803,8 @@ def run_point(model_name, detector_method, snr, min_reps, max_bits, step, forced
     else:
         predicted_ser = max(expected_ser_isi(snr), 1e-300)
         required_bits = TARGET_ERRORS / predicted_ser
+        # planning in the legacy BUDGET unit (bits_per_rep), unchanged so published runs reproduce;
+        # required_bits / max_bits are therefore budget units, not detected information bits
         required_reps = math.ceil(required_bits / bits_per_rep)
         capped_reps = max_bits // bits_per_rep
         planned_reps = int(min(max(required_reps, min_reps), capped_reps))
@@ -814,11 +818,11 @@ def run_point(model_name, detector_method, snr, min_reps, max_bits, step, forced
     censored = total_errors() == 0
     if censored:
         print(f'[censored] {model_name} snr={snr}: 0 errors in {reps_done} reps '
-              f'({reps_done * bits_per_rep:,} bits) -- reporting as upper bound',
+              f'({reps_done * info_bits_per_rep:,} information bits) -- reporting as upper bound',
               flush=True)
     elif total_errors() < THIN_ERROR_THRESHOLD:
-        print(f'[thin] {model_name} snr={snr}: only {total_errors():.0f} errors in '
-              f'{reps_done * bits_per_rep:,} bits (one-shot budget reached) -- '
+        print(f'[thin] {model_name} snr={snr}: only {total_errors():.0f} bit errors in '
+              f'{reps_done * info_bits_per_rep:,} information bits (one-shot budget reached) -- '
               f'CI will be wide', flush=True)
 
     run_time = time.time() - t0

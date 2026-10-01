@@ -1,4 +1,5 @@
-"""One-off repair of the bit bookkeeping in the BPSK sweep CSVs (SER values are not touched).
+"""One-off repair of the bit bookkeeping in the BPSK sweep CSVs, including the fast-fading study
+(SER values are not touched).
 
 Before the fix in run_mc_sweep.py, bits_run counted a nominal 16 bits per word (the two RS
 parity symbols, 8 * n_symbols) over all 125 words of a repetition: 2,000 bits per repetition.
@@ -16,7 +17,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 MET = os.path.join(ROOT, 'Results', 'metrics')
 OLD_PER_REP, INFO_PER_REP, WORD_BITS = 125 * 16, 120 * 120, 125 * 120
 
-for name in ('mc_sweep_validation.csv', 'vnet_topology_study_snr7.csv', 'minibatch_search_snr7.csv'):
+for name in ('mc_sweep_validation.csv', 'vnet_topology_study_snr7.csv', 'minibatch_search_snr7.csv', 'fast_fading.csv'):
     path = os.path.join(MET, name)
     rows = list(csv.DictReader(open(path)))
     fields = list(rows[0].keys())

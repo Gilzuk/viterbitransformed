@@ -77,7 +77,7 @@ An independent check of the round-1 fixes found most of them correct. It also ra
 
 ## Blockers
 - **B1, code URL 404.** The repository `Gilzuk/viterbinet-revisited` was published after the checked commit and now resolves publicly. This document previously named the wrong repository; corrected.
-- **B2, journal abstract over 250 words.** Rewritten for the fixes below at 346 words, with every highlight kept as the author asked. Still over the IEEE 150-250 guideline: **author decision needed**.
+- **B2, journal abstract over 250 words.** Rewritten for the fixes below at 346 words, with every highlight kept as the author asked. Still over the IEEE 150-250 guideline (resolved in round 3).
 
 ## Major
 - **M1, "best learned receiver at most SNRs".** The journal abstract and Table I now name each comparator and its SNRs: ViterbiNet K=5 at 1, 6, 7 and 9-12 dB; VNet-affine at 0, 2-7 and 11 dB. "Never significantly worse" is limited to the available paired comparisons. K=200 and the Transformer are marked unpaired.
@@ -117,3 +117,23 @@ An independent check of the round-1 fixes found most of them correct. It also ra
 - Letter: 4 pages, abstract 246 words.
 - Journal: 12 pages, abstract 346 words.
 - Both compile with no overfull boxes and no unresolved references. `numbers.tex` (every SER in the papers) is unchanged.
+
+---
+
+# Round 3: second verification (on commit 260d8811)
+
+The round-2 numerical fixes reproduce: all 28 paired comparisons, the gate difference, the LS-loss check and the 105-row provenance check. Remaining items and actions:
+
+- **Blocker, journal abstract over 250 words.** Condensed to 247 words (PDF count; 244 in the source) without dropping any highlight: matched LS baseline, comparator-specific significance, 3-30% / 0.13 dB, implementable gate, adaptation budget, affine metric and attention metrics, per-word time, QPSK tying, fast fading, take-home, code/data/design guidance. The letter abstract is 247 words in the PDF. The 346-word version is in git history (commit 260d8811).
+- **"In every setting studied ... none had a lower SER".** Now limited to the BPSK SNR sweep. Under fast fading the learned receivers do beat last-word LS, but not LS with exponential forgetting (journal Discussion and Conclusion).
+- **Label errors and channel jumps "have little effect".** Removed from both papers. The measurements are now described as compatible with the heuristic, without attributing the remaining gap.
+- **"No receiver without CSI tracks within a word".** Now: none of the tested receivers without CSI approaches the per-sample genie, including PSP-LMS, which updates its taps at every trellis step (journal abstract, contributions, Table I, Section on fast fading).
+- **Affine "too little capacity to overfit".** Replaced by the observation: its SER kept falling up to K = 100-200, which does not show that it cannot overfit.
+- **Gate K=200 initialization.** Both papers and the `gate_check.py` docstring now say that the K=200 gate runs start from the K=5 sweep's offline weights, not the separately trained K=200 sweep's.
+- **fast_fading.csv bit metadata.** Repaired by `fix_sweep_bit_metadata.py`: 54 rows, 50 repetitions = 720,000 information bits. SER untouched.
+- **Sweep logs in budget units.** `run_mc_sweep.py` now labels the planning quantities as the legacy budget unit and logs true information-bit and bit-error counts.
+- **"same pilots and decisions" (design guidance).** Now "same pilots and acceptance rule, applied to its own decisions".
+- **LS 11.4 ms.** Both papers now state that it is the measured trellis time plus a separately timed 0.02 ms LS solve.
+- **Fig. 18 overlap.** The legend moved to the right panel, the annotation is wrapped onto three lines, and the x-labels are shortened; re-rendered.
+- **Release README "RS(15,13)".** Corrected to shortened RS(17,15) over GF(2^8).
+- **Pin the release revision.** Suggest tagging the paper repository at submission (e.g. `v1.0-submission`) and citing the tag; not done yet (author decision).

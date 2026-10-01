@@ -7,7 +7,9 @@ gate_mode): accept a data word when the re-encoded decoded word differs from
 the detector's hard decisions in at most one RS symbol (bounded-distance
 decoding for 2 parity symbols) and adapt on the re-encoded word.
 
-Every configuration starts from the same offline weights as the SNR sweeps and
+Each configuration starts from the offline weights of its SNR sweep (the weights label in
+CONFIGS), except 'ViterbiNet K=200', which starts from the ViterbiNet_on5 (K=5) sweep's weights
+rather than those of the separately trained K=200 sweep. Every configuration
 evaluates repetitions 0..N-1, i.e. the same cached (bits, noise) draws the
 sweeps used, so differences between rows are paired.
 

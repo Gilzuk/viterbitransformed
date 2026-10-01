@@ -451,7 +451,7 @@ def paired(name, ref, fd):
 
 import json
 if any(r['model'].startswith('tune_') for r in ff):
-    fig, (a, b) = plt.subplots(1, 2, figsize=(COL, 2.1), sharey=True, gridspec_kw={'wspace': 0.08})
+    fig, (a, b) = plt.subplots(1, 2, figsize=(COL, 2.1), sharey=True, gridspec_kw={'wspace': 0.12})
     for k, (fd, col, mk) in enumerate(((0.001, BLUE, 'o'), (0.01, ORANGE, 's'), (0.03, VERM, 'D'))):
         off = 1 + (k - 1) * 0.06
         pp = [(mu * off,) + paired(f'tune_PSP_mu{mu:g}', 'VNet_affine', fd) for mu in (0.003, 0.01, 0.02, 0.05)
@@ -468,13 +468,14 @@ if any(r['model'].startswith('tune_') for r in ff):
         ax_.axhline(0, color=K, lw=0.8, ls='--')
     a.set_xscale('log'); a.xaxis.set_major_locator(FixedLocator([0.003, 0.01, 0.02, 0.05]))
     a.xaxis.set_major_formatter(FixedFormatter(['0.003', '0.01', '0.02', '0.05'])); a.xaxis.set_minor_locator(NullLocator())
-    a.set_xlabel('PSP-LMS step size $\\mu$'); a.set_ylabel('SER $-$ SER(VNet-affine), 7 dB')
-    b.set_xscale('log'); b.set_xlabel('LS memory $1/(1-\\lambda)$ (words)')
+    a.set_xlabel('PSP-LMS step $\\mu$'); a.set_ylabel('SER $-$ SER(VNet-affine), 7 dB')
+    b.set_xscale('log'); b.set_xlabel('LS memory $1/(1-\\lambda)$ (words)', fontsize=7)
     b.xaxis.set_major_locator(FixedLocator([1, 2, 5, 10, 20, 100]))
     b.xaxis.set_major_formatter(FixedFormatter(['1', '2', '5', '10', '20', '100'])); b.xaxis.set_minor_locator(NullLocator())
     a.set_ylim(-0.012, 0.06)
-    a.text(0.0125, 0.058, '$\\mu$=0.05:\n+0.09 to +0.19 (off scale)', fontsize=5.5, ha='center', va='top')
-    a.legend(loc='upper left', fontsize=6)
+    a.text(0.0029, 0.057, '$\\mu$=0.05:\n+0.09 to +0.19\n(off scale)', fontsize=5.5, ha='left', va='top')
+    h_, l_ = a.get_legend_handles_labels()
+    b.legend(h_, l_, loc='upper right', fontsize=6)
     fig.savefig(os.path.join(OUT, 'tracker_tuning.pdf')); plt.close(fig)
 
 # ------------------------- Mamba2 comparison (standalone; not in either paper) ---
