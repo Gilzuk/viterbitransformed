@@ -156,3 +156,12 @@ The round-2 numerical fixes reproduce: all 28 paired comparisons, the gate diffe
 - **Gate:** re-trains on blocks whose decoding is correct "as determined by error detection", using the re-encoded word (p. 3). This agrees with our description of the published labeling.
 - **Simulation setup:** 136-symbol blocks, RS[17,15] with two parity symbols, one pilot block followed by 24 data blocks, L = 4, SNR = 1/sigma^2, COST 2100 taps (p. 5). Our setup follows it.
 - **Fix:** both papers now attribute this setup to Meta-ViterbiNet.
+
+# Primary-source check of Raviv et al. 2023 (arXiv 2203.14359)
+
+- **"200 Adam updates per word with mini-batches of 64":** confirmed (p. 20: "All training methods use the Adam optimizer with Isgd = 200 iterations and learning rate 10^-3 ... Both meta-learning and online learning employ a batch size of 64 symbols").
+- **Network 1x100, 100x50, 50x|S|^L:** confirmed (p. 19).
+- **Gate:** "re-training occurs if the normalized bits difference between the re-encoded word and the hard-decision of the channel word is smaller than the threshold of 0.02" (pp. 20-21), with re-encoded labels (p. 8). This is a receiver-side test close to our RS gate. Both papers now say so, and that the oracle gate of our code base departs from both published rules.
+- **Setup:** B = 136, 120 information bits, RS[17,15], L = 4 (p. 21). Both papers now attribute the setup to [raviv2021metaviterbinet, raviv2023online].
+
+All statements attributed to the three cited ViterbiNet papers have now been checked against the papers themselves.
