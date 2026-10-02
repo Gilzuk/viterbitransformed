@@ -85,7 +85,7 @@ Information words of 120 bits are encoded with a Reed--Solomon (RS) code over GF
 \begin{equation}\label{eq:channel}
 y_t=\sum_{k=0}^{L-1} h_k^{(w)}\, s_{t+L-1-k}+n_t,\qquad n_t\sim\mathcal{N}(0,\sigma^2),
 \end{equation}
-with memory $L=4$, $\mathrm{SNR}=1/\sigma^2$, and state $x_t=(s_t,\dots,s_{t+L-1})\in\{\pm1\}^4$ (16 states). The taps of word $w$ are the magnitudes of a fixed COST~2100 channel trace~\cite{liu2012cost2100} of 300 blocks (Fig.~\ref{fig:channel}a). Within each block of 50 words the taps decay smoothly; between blocks they jump, so a frame sees two abrupt changes that the receivers must follow from decisions alone. A frame has 125 words; every 25th word is a pilot, so each frame carries 5 pilots and 120 data words.
+with memory $L=4$, $\mathrm{SNR}=1/\sigma^2$, and state $x_t=(s_t,\dots,s_{t+L-1})\in\{\pm1\}^4$ (16 states). The taps of word $w$ are the magnitudes of a fixed COST~2100 channel trace~\cite{liu2012cost2100} of 300 blocks (Fig.~\ref{fig:channel}a). Within each block of 50 words the taps decay smoothly; between blocks they jump, so a frame sees two abrupt changes that the receivers must follow from decisions alone. A frame has 125 words; every 25th word is a pilot, so each frame carries 5 pilots and 120 data words. The 136-symbol word, the RS code with two parity symbols, the pilot spacing, and the COST~2100 taps follow the Meta-ViterbiNet setup~\cite{raviv2021metaviterbinet}.
 
 \subsection{Fast-fading extension}
 To test tracking within a word, the taps of Section~\ref{sec:ff} vary sample by sample:

@@ -46,7 +46,7 @@ Information words of 120 bits are RS-encoded over GF($2^8$) with two parity symb
 \begin{equation}
 y_t=\sum_{k=0}^{L-1} h_k^{(w)}\, s_{t+L-1-k}+n_t,\qquad n_t\sim\mathcal{N}(0,\sigma^2),
 \end{equation}
-where $\mathrm{SNR}=1/\sigma^2$. The taps $h^{(w)}$ of word $w$ are the magnitudes of a fixed COST~2100 channel trace~\cite{liu2012cost2100} (300 blocks; within each block of 50 words the taps decay smoothly, and between blocks they jump, so every frame contains two abrupt changes); $L=4$ matches the intersymbol-interference setting of~\cite{shlezinger2020viterbinet}. A frame has 125 words; every 25th word is a pilot, so each frame carries 5 pilots and 120 data words. The trellis has $2^L=16$ states $x_t=(s_t,\dots,s_{t+L-1})$.
+where $\mathrm{SNR}=1/\sigma^2$. The taps $h^{(w)}$ of word $w$ are the magnitudes of a fixed COST~2100 channel trace~\cite{liu2012cost2100} (300 blocks; within each block of 50 words the taps decay smoothly, and between blocks they jump, so every frame contains two abrupt changes); $L=4$ matches the intersymbol-interference setting of~\cite{shlezinger2020viterbinet}. A frame has 125 words; every 25th word is a pilot, so each frame carries 5 pilots and 120 data words. The 136-symbol word, the RS code with two parity symbols, the pilot spacing, and the COST~2100 taps follow the Meta-ViterbiNet setup~\cite{raviv2021metaviterbinet}. The trellis has $2^L=16$ states $x_t=(s_t,\dots,s_{t+L-1})$.
 
 \subsection{Receivers}
 All receivers run the same 16-state Viterbi recursion and differ only in the branch metric $\ell_t(x)$ assigned to state $x$ at time $t$.

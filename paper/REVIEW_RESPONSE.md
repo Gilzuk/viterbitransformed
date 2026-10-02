@@ -147,3 +147,12 @@ The round-2 numerical fixes reproduce: all 28 paired comparisons, the gate diffe
 - **Learned-detector comparison (SBRNN) and non-Gaussian channels (Poisson, alpha-stable):** confirmed (pp. 16-21).
 - **Added sentence on the published rule (both papers).** Algorithm 2 (pp. 13-14) retrains when the estimated number of decoding errors is below a threshold (2%, p. 23) and always retrains on the re-encoded word. Our implementable RS gate follows that labeling. The oracle gate of our code base departs from it by using raw hard decisions when the decoded SER is nonzero.
 - **Still to check against its source:** "200 Adam updates per word with mini-batches of 64" [Raviv et al., 2023].
+
+# Primary-source check of Meta-ViterbiNet (arXiv 2103.13483v1)
+
+- **"Meta-learning to adapt faster" and "the follow-up work compares adaptation methods":** confirmed. It compares joint, online and online meta-learning training, for ViterbiNet and an LSTM detector (p. 4).
+- **No classical Viterbi baseline** appears in its evaluation. This is consistent with our statement that these evaluations compare against Viterbi with perfect/initial/corrupted CSI "or against other learned receivers".
+- **Network:** 1x100, 100x50, 50xM^L with sigmoid, ReLU and softmax (p. 4). This confirms the original 100-50 widths a second time.
+- **Gate:** re-trains on blocks whose decoding is correct "as determined by error detection", using the re-encoded word (p. 3). This agrees with our description of the published labeling.
+- **Simulation setup:** 136-symbol blocks, RS[17,15] with two parity symbols, one pilot block followed by 24 data blocks, L = 4, SNR = 1/sigma^2, COST 2100 taps (p. 5). Our setup follows it.
+- **Fix:** both papers now attribute this setup to Meta-ViterbiNet.
