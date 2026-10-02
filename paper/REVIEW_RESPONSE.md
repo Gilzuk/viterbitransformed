@@ -137,3 +137,13 @@ The round-2 numerical fixes reproduce: all 28 paired comparisons, the gate diffe
 - **Fig. 18 overlap.** The legend moved to the right panel, the annotation is wrapped onto three lines, and the x-labels are shortened; re-rendered.
 - **Release README "RS(15,13)".** Corrected to shortened RS(17,15) over GF(2^8).
 - **Pin the release revision.** Suggest tagging the paper repository at submission (e.g. `v1.0-submission`) and citing the tag; not done yet (author decision).
+
+---
+
+# Primary-source check of the cited ViterbiNet paper (arXiv 1905.10750v2)
+
+- **Original widths 100 and 50:** confirmed (p. 16: "a 1x100 layer followed by a 100x50 layer and a 50x16 layer, using intermediate sigmoid and ReLU").
+- **Initial-CSI baseline under block fading:** confirmed (p. 23; "Viterbi, initial CSI" in Figs. 12-13).
+- **Learned-detector comparison (SBRNN) and non-Gaussian channels (Poisson, alpha-stable):** confirmed (pp. 16-21).
+- **Added sentence on the published rule (both papers).** Algorithm 2 (pp. 13-14) retrains when the estimated number of decoding errors is below a threshold (2%, p. 23) and always retrains on the re-encoded word. Our implementable RS gate follows that labeling. The oracle gate of our code base departs from it by using raw hard decisions when the decoded SER is nonzero.
+- **Still to check against its source:** "200 Adam updates per word with mini-batches of 64" [Raviv et al., 2023].
