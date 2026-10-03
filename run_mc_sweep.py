@@ -1,12 +1,12 @@
 """
-Higher-MC validation sweep (Colab/GPU configuration): ClassicViterbi,
-ViterbiNet, and the Viterbi-Transformer over SNR 0-17, evaluating each with
-an SNR-adaptive number of repetitions so every point actually observes a
-meaningful number of errors, rather than a fixed rep count that silently
-floors to a meaningless "0" once the true SER drops below what that many
-bits can resolve.
+Higher-MC validation sweep: ClassicViterbi, ViterbiNet, and the
+Viterbi-Transformer over SNR 0-17, evaluating each with an SNR-adaptive
+number of repetitions so every
+point actually observes a meaningful number of errors, rather than a fixed
+rep count that silently floors to a meaningless "0" once the true SER drops
+below what that many bits can resolve.
 
-Sizing method (per point):
+Sizing method (per point) -- calculated once, run once, no iteration:
   1. Predict the SER at this SNR with Q(sqrt(2*snr_eff_linear)), where
      snr_eff = snr - ISI_PENALTY_DB. The ideal single-tap AWGN expression
      (penalty 0) is badly miscalibrated for this 4-tap ISI channel --
@@ -14,103 +14,42 @@ Sizing method (per point):
      measurements -- but the gap is a near-constant effective-SNR shift,
      so applying that shift makes it a usable prior. See ISI_PENALTY_DB.
   2. Target ~100 expected errors (the standard rule of thumb for a stable
-     Monte-Carlo BER/SER estimate) purely to size the OPENING run:
-     required_bits = 100 / predicted_ser. This is only a prior -- the
-     observed error count, not the prediction, decides what happens next.
+     Monte-Carlo BER/SER estimate): required_bits = TARGET_ERRORS /
+     predicted_ser, capped at the per-model max_bits so a point cannot run
+     away when the prediction is optimistic.
   3. Convert to repetitions via the trainer's actual words/rep and bits/word,
-     clipped to a per-model [MIN_REPS, MAX_REPS].
-  4. If the opening run sees zero errors, double the bits and look again
-     ("run until the first error") -- there is nothing to estimate a rate
-     from yet.
-  5. Once the first error is observed, at bits_to_first_error, run to a
-     FIXED cap of FIRST_ERROR_BITS_MULTIPLIER (100) times that bit count and
-     stop -- e.g. first error at 1e6 bits means run to 1e8 bits, then stop,
-     however many errors that ends up with. This is deliberately NOT
-     re-estimated from the running SER as more errors come in: re-targeting
-     off a noisy observed rate can keep chasing a moving goalpost and never
-     converge, whereas the first-error bit count is measured once and the
-     cap it sets is fixed. Bounded by the per-model max_bits so a point
-     cannot run away.
-  6. If max_bits is spent with still zero errors, the point is recorded as
-     CENSORED: ser_mean is 0.0, but `censored=1` and `bits_run` are recorded
-     so it reads as an honest upper bound rather than a converged zero. (For
-     zero errors in N bits the correct 95% bound is the rule of three, 3/N.)
-     If the 100x-first-error cap is reached with very few errors (bursty
-     luck), the point is kept and flagged `[thin]` in the log -- its CI is
-     real but wide.
+     floored at a per-model MIN_REPS. Run exactly that many reps, in
+     checkpointed `step`-sized chunks for restart safety, and stop --
+     whatever error count that ends up with is the result. There is
+     deliberately no adaptive re-estimation or extending after this: a
+     previous version doubled the bit budget over and over hunting for a
+     first error at high SNR, which could run for days without ever
+     stopping when the true SER was far below what the predictor assumed.
+     Calculating once and running exactly that is fast and bounded; if the
+     prediction was too optimistic, the point comes back censored or thin
+     (see below) instead of running forever.
+  4. If the run sees zero errors, the point is recorded as CENSORED:
+     ser_mean is 0.0, but `censored=1` and `bits_run` are recorded so it
+     reads as an honest upper bound rather than a converged zero. (For zero
+     errors in N bits the correct 95% bound is the rule of three, 3/N.) If
+     it finishes with some errors but fewer than THIN_ERROR_THRESHOLD, the
+     point is kept and flagged `[thin]` in the log -- its CI is real but
+     wide.
 
-On CPU, ClassicViterbi was ~6.5s/rep before the COST2100 tap-load cache fix
-(now ~0.02s/rep); the Transformer's and ViterbiNet's self-supervised online
-training fires on almost every word during each eval rep, making each rep
-on the order of minutes there -- see COLAB_MC_SWEEP.md for why this copy of
-the script targets a GPU runtime instead.
+Commits and pushes Results/metrics/mc_sweep_validation.csv after every
+completed (model, snr) point, so a container reset loses at most one point.
+Any existing row with ser_mean==0.0 is treated as not-done and re-run under
+this adaptive scheme (that is exactly the floor artifact this rewrite
+fixes) -- everything else already in the CSV is left alone.
 
-ClassicViterbi's max_bits (20M) is copied from the CPU branch's
-measured-throughput calibration: the COST2100 tap-load cache fix is CPU
-logic, not GPU-dependent, so the same throughput should transfer here.
-
-ViterbiNet and Transformer max_bits (2M) are an UNCALIBRATED placeholder --
-no run has completed on this branch yet, so GPU throughput for their
-per-word online-training backprop is unknown. Check the first [done] log
-lines' run_time_sec once this actually runs, recompute bits/sec, and raise
-or lower max_bits to target a similar few-hours-per-point budget as
-ClassicViterbi -- do not leave this unexamined after the first real timing
-comes back.
-
-ViterbiNet is included because the cache bug invalidated its old n=84
-baseline too, so the paper's three-way comparison still needs it under the
-fixed pipeline.
-
-RESILIENCE (this matters a lot more here than on a persistent machine --
-a Colab runtime is ephemeral: on disconnect/restart, everything not already
-pushed to GitHub is gone, full stop):
-  - Every completed (model, snr) point is committed AND pushed to the
-    mc-sweep-colab-gpu branch before moving to the next point. Training a
-    model-based method's weights are ALSO committed+pushed the moment
-    training finishes, before the (often much longer) eval-rep phase runs
-    -- see commit_weights_snapshot().
-  - If push fails, it is retried with capped backoff for several minutes;
-    if it still fails, the script stops immediately (raises) rather than
-    silently continuing and leaving that point committed-but-unpushed
-    (which a Colab restart would then drop entirely).
-  - On (re)start, already_done() reads the CSV already on disk (i.e. after
-    re-cloning the branch, which carries every point pushed so far) and
-    skips every point already present, so a rerun after a disconnect
-    resumes from the last pushed point instead of starting over from SNR=0.
-    Re-running this script (e.g. re-running the notebook cell after a
-    reconnect) is therefore always safe and always cheap for already-done
-    points.
-  - Within a point, an extend round can be thousands of reps in a single
-    trainer call that does not return for hours. run_point() also
-    checkpoints per-rep SER means to disk after every `step`-sized chunk
-    and resumes from that checkpoint if this process restarts mid-point,
-    so a restart loses at most one chunk instead of the whole point. This
-    checkpoint is local-only (not committed to git, see .gitignore) --
-    it does not survive a full Colab disconnect, only a restart of this
-    process on the same runtime. It is discarded (not resumed) for
-    model-based methods, because their training step always reruns from
-    scratch on a restart -- resuming eval reps computed against the
-    PREVIOUS training run's weights would silently blend two different
-    trained models into one point's statistics. Only the eval phase is
-    lost on such a restart, not the checkpoint's correctness.
-
-PARALLEL RUNS: python run_mc_sweep.py <ModelName> restricts this process to
-one model, so three notebook cells (one per model, each in its own cloned
-copy of this branch) can run concurrently on the same GPU runtime instead of
-one process working through all three in sequence -- a single slow or
-restart-prone point in one model no longer blocks progress on the others.
-See the notebook's "Run in parallel" section. Point-level commit/push is
-safe under this: push_with_retry rebases onto the latest origin tip before
-retrying a failed push, and every commit here is a pure append (one new CSV
-row, one model's own weights file), so rebasing one clean append onto
-another's essentially never conflicts.
-
-Run standalone: python run_mc_sweep.py [ModelName]
+Run standalone: python run_mc_sweep.py
 """
 import csv
+import hashlib
 import json
 import math
 import os
+import socket
 import subprocess
 import sys
 import time
@@ -121,59 +60,102 @@ import torch
 from Code.dir_definitions import RESULTS_DIR, WEIGHTS_DIR
 from Code.trainer import Trainer
 
-CSV_PATH = os.path.join(RESULTS_DIR, 'metrics', 'mc_sweep_validation_colab.csv')
+CSV_PATH = os.path.join(RESULTS_DIR, 'metrics', 'mc_sweep_validation.csv')
 FIELDNAMES = ['model', 'snr', 'ser_mean', 'ser_std', 'ser_ci95', 'n_reps',
               'words_run', 'bits_run', 'errors_observed', 'censored',
-              'model_size', 'run_time_sec']
+              'model_size', 'run_time_sec', 'source']
+
+# Label recorded on rows written before provenance was tracked. Not a guess at
+# which machine produced them -- just an honest "not recorded".
+PRE_TRACKING_SOURCE = 'unknown'
 SNR_VALUES = list(range(0, 18))
-# Used only to size the opening run (see docstring step 2) -- NOT the
-# stopping condition. The actual stopping rule is FIRST_ERROR_BITS_MULTIPLIER.
-INITIAL_SIZING_TARGET_ERRORS = 100
-# Once the first error is observed at N bits, run to a fixed cap of this many
-# times N and stop, rather than re-targeting an error count from the
-# (noisy) observed rate as more errors accumulate. See docstring step 5.
-FIRST_ERROR_BITS_MULTIPLIER = 100
-# Below this many observed errors at the cap, flag the point [thin] -- the
-# result is still a valid unbiased estimate, just with a wide CI.
+# Target expected error count the sizing calculation aims for (see docstring
+# step 2). This is the ONLY thing that decides how many bits a point runs --
+# calculated once up front, not adjusted afterward based on what's observed.
+TARGET_ERRORS = 100
+# Below this many observed errors at the end of the run, flag the point
+# [thin] -- the result is still a valid unbiased estimate, just wide CI.
 THIN_ERROR_THRESHOLD = 10
 
-# (model_name, detector_method, min_reps, max_reps, max_bits, step)
-#   min_reps   -- floor
-#   max_reps   -- cap on the predictor-sized opening run
-#   max_bits   -- total bit budget for the point. The run keeps going past
-#                 max_reps until the FIRST_ERROR_BITS_MULTIPLIER cap is
-#                 reached (see docstring); this is what stops it running
-#                 away when the first error never comes.
-#   step       -- minimum rep increment while extending
+# (model_name, detector_method, min_reps, max_bits, step)
+#   min_reps   -- floor on the calculated rep count
+#   step       -- repetitions per online_evaluation() call, i.e. how much work
+#                 is in flight and unsaved at any moment. Nothing is written
+#                 until the call returns, so this is a DATA-LOSS window, and it
+#                 is counted in reps while the risk is measured in hours: at
+#                 step=100 ClassicViterbi went ~10h between saves, and at
+#                 step=5 Transformer ~4h, so a container reclaim could discard
+#                 most of a day. It is 1 everywhere now -- one repetition is
+#                 the smallest unit online_evaluation can return, so a restart
+#                 loses at most the rep in progress. Chunking bought nothing
+#                 anyway: each repetition already reloads its own data inside
+#                 the loop, so the per-call overhead it avoided is negligible.
+#   max_bits   -- ceiling on the calculated bit budget, so an optimistic
+#                 prediction (or a genuinely very low SER) cannot make a
+#                 point run away; the point comes back censored/thin instead
+#   step       -- checkpoint every this many reps, for restart safety
 #
-# ClassicViterbi's max_bits (20M) is copied from the CPU branch's
-# measured-throughput calibration: the COST2100 tap-load cache fix is CPU
-# logic, not GPU-dependent, so the same throughput should transfer here.
+# Sizing max_bits, from MEASURED throughput on this box (2000 bits/rep):
+#   ClassicViterbi  1.15 s/rep = ~1760 bits/s  -> 2e7 bits = 3.2 h/point
+#   Transformer     ~210 s/rep = ~9.5 bits/s   -> 1e5 bits = 2.9 h/point
+# (ClassicViterbi was 6.5 s/rep before the COST2100 tap-load cache in
+# 0ad20cd; that is a 5.7x end-to-end speedup, not the 224x that applies to
+# estimate_channel alone.)
 #
-# ViterbiNet and Transformer max_bits (2M) are an UNCALIBRATED placeholder --
-# no run has completed on this branch yet, so GPU throughput for their
-# per-word online-training backprop is unknown. Check the first [done] log
-# lines' run_time_sec once this actually runs, recompute bits/sec, and raise
-# or lower max_bits to target a similar few-hours-per-point budget as
-# ClassicViterbi -- do not leave this unexamined after the first real timing
-# comes back.
+# ViterbiNet's max_bits (100_000, matching Transformer) is an UNCALIBRATED
+# placeholder -- no run has completed on this branch yet. It is included
+# because the data-cache bug invalidated its old n=84 baseline
+# (Results/metrics/model_performance_final_mc_83.csv) too -- the paper's
+# three-way comparison needs all three detectors measured under the fix, and
+# it is already in the Colab branch's MODELS list for the same reason. Check
+# the first [done] log line's run_time_sec once this actually runs, recompute
+# bits/sec, and raise or lower max_bits to target a similar per-point budget
+# as the other two -- do not leave this unexamined after the first real
+# timing comes back.
 #
-# ViterbiNet is included because the cache bug invalidated its old n=84
-# baseline (Results/metrics/model_performance_final_mc_83.csv) too -- the
-# paper's three-way comparison needs all three detectors measured under the fix.
+# What this does and does not buy: ~100 errors needs ~100/SER bits, so
+# SNR<=13 (SER >= 5.5e-6) now reaches a full 100 errors. The error floor at
+# SNR>=14 (SER < 5e-7) would need ~2e8 bits = 31.5 h for ONE point, so those
+# stay censored -- but at 2e7 bits their upper bound tightens 10x, to
+# ~1.5e-7. Brute force cannot reach the floor here; that needs importance
+# sampling, or a much faster detector implementation.
 MODELS = [
-    ('ClassicViterbi', 'Statistical', 100, 500, 20_000_000, 100),
-    ('ViterbiNet', 'ModelBased', 20, 30, 2_000_000, 5),
-    ('Transformer', 'ModelBased', 20, 30, 2_000_000, 5),
+    ('Transformer', 'ModelBased', 20, 100_000, 1),
+    ('ViterbiNet', 'ModelBased', 20, 100_000, 1),
+    ('ClassicViterbi', 'Statistical', 100, 20_000_000, 1),
+    # Same row shape as ViterbiNet (its size-matched comparison target) --
+    # see Code/mamba2.py.
+    ('Mamba2', 'ModelBased', 20, 100_000, 1),
 ]
-BRANCH = 'mc-sweep-colab-gpu'
-# Set MC_SWEEP_NO_GIT=1 to skip every git commit/push in this file entirely
-# and rely on RESULTS_DIR/WEIGHTS_DIR pointing at persistent storage instead
-# (e.g. a Google Drive mount symlinked over Results/ before this runs) --
-# for when GitHub push access isn't available. Results are then only as
-# durable as wherever those directories actually live; nothing here backs
-# them up a second way.
-NO_GIT = os.environ.get('MC_SWEEP_NO_GIT') == '1'
+# Push target. Override with MC_SWEEP_BRANCH when running this on a second
+# machine so it does not push into the same branch another runner is already
+# advancing -- see "Resuming on another machine" in README.md.
+BRANCH = os.environ.get('MC_SWEEP_BRANCH') or 'claude/transformer-sionna-mlp-comparison-wc67zp'
+
+# Set MC_SWEEP_NO_GIT=1 to keep results local: no commits, no pushes. Resume is
+# unaffected -- a restart reads the same CSV row / weights / checkpoint files
+# from disk either way; they just are not mirrored to a remote. Needed on a
+# machine without push credentials, where the default behaviour would otherwise
+# abort the sweep after push_with_retry exhausts its attempts.
+NO_GIT = (os.environ.get('MC_SWEEP_NO_GIT') or '').lower() not in ('', '0', 'false', 'no')
+
+
+def default_source():
+    """Which machine produced a result. Rows from several machines end up in
+    one CSV once a second runner's branch is merged back, and the hardware is
+    part of how a row should be read -- run_time_sec in particular is not
+    comparable between a CPU container and a local GPU. Override with
+    MC_SWEEP_SOURCE to label a run explicitly."""
+    host = socket.gethostname()
+    try:
+        device = (torch.cuda.get_device_name(0).replace(' ', '_')
+                  if torch.cuda.is_available() else 'cpu')
+    except Exception:
+        device = 'cpu'
+    return f'{host}:{device}'
+
+
+SOURCE = os.environ.get('MC_SWEEP_SOURCE') or default_source()
 
 
 # Effective-SNR penalty of the ISI channel relative to ideal single-tap AWGN.
@@ -247,6 +229,28 @@ def ensure_header():
     if not os.path.isfile(CSV_PATH):
         with open(CSV_PATH, 'w', newline='') as f:
             csv.DictWriter(f, fieldnames=FIELDNAMES).writeheader()
+        return
+
+    # Upgrade a CSV written before a column existed. Without this, appending a
+    # row with the new field to a file still carrying the old header writes
+    # more values than there are columns, and every later read misaligns.
+    with open(CSV_PATH, newline='') as f:
+        reader = csv.DictReader(f)
+        if (reader.fieldnames or []) == FIELDNAMES:
+            return
+        rows = list(reader)
+    for row in rows:
+        if not row.get('source'):
+            row['source'] = PRE_TRACKING_SOURCE
+    tmp = CSV_PATH + '.tmp'
+    with open(tmp, 'w', newline='') as f:
+        writer = csv.DictWriter(f, fieldnames=FIELDNAMES, restval='',
+                                extrasaction='ignore')
+        writer.writeheader()
+        writer.writerows(rows)
+    os.replace(tmp, CSV_PATH)
+    print(f'[csv] upgraded {len(rows)} existing rows to the current columns '
+          f'(source={PRE_TRACKING_SOURCE!r} for rows predating provenance)', flush=True)
 
 
 def drop_existing_row(model, snr):
@@ -259,14 +263,16 @@ def drop_existing_row(model, snr):
         rows = [r for r in reader
                 if not (r['model'] == model and int(r['snr']) == snr)]
     with open(CSV_PATH, 'w', newline='') as f:
-        writer = csv.DictWriter(f, fieldnames=FIELDNAMES)
+        writer = csv.DictWriter(f, fieldnames=FIELDNAMES, restval='',
+                                extrasaction='ignore')
         writer.writeheader()
         writer.writerows(rows)
 
 
 def append_row(row):
     with open(CSV_PATH, 'a', newline='') as f:
-        csv.DictWriter(f, fieldnames=FIELDNAMES).writerow(row)
+        csv.DictWriter(f, fieldnames=FIELDNAMES, restval='',
+                       extrasaction='ignore').writerow(row)
 
 
 # In-progress-point resume state. A point can take hours (an extend batch is a
@@ -291,19 +297,74 @@ def load_checkpoint(model, snr):
         return json.load(f)
 
 
-def save_checkpoint(model, snr, per_rep_means):
+_UNTAGGED = object()  # sentinel: checkpoint predates weights tagging
+
+
+def weights_fingerprint(weights_dir, snr, gamma):
+    """Identity of the exact weights a point's eval reps were measured
+    against, or None for a method with no weights (Statistical). Checkpoints
+    are committed and therefore travel between worktrees via git, so reps
+    must be matched to their model rather than trusted by filename alone --
+    the on-disk weights file does not change during evaluation (save_weights
+    is only called from train()), so this is stable across the whole run."""
+    if weights_dir is None:
+        return None
+    path = os.path.join(weights_dir, f'snr_{snr}_gamma_{gamma}.pt')
+    if not os.path.isfile(path):
+        return None
+    with open(path, 'rb') as f:
+        return hashlib.sha256(f.read()).hexdigest()
+
+
+def save_checkpoint(model, snr, per_rep_means, weights_tag=None):
     os.makedirs(CHECKPOINT_DIR, exist_ok=True)
     path = checkpoint_path(model, snr)
     tmp = path + '.tmp'
     with open(tmp, 'w') as f:
-        json.dump({'per_rep_means': per_rep_means}, f)
+        json.dump({'per_rep_means': per_rep_means, 'weights_tag': weights_tag}, f)
     os.replace(tmp, path)  # atomic: a restart mid-write never leaves a corrupt checkpoint
 
 
-def clear_checkpoint(model, snr):
+def clear_eval_checkpoint(model, snr):
+    """Drop only the banked eval reps, keeping training progress."""
     path = checkpoint_path(model, snr)
     if os.path.isfile(path):
         os.remove(path)
+
+
+def training_state_path(model, snr):
+    return os.path.join(CHECKPOINT_DIR, f'{model}_snr{snr}_training.json')
+
+
+def load_training_state(model, snr):
+    """Where training got to for this point, across restarts: how many
+    minibatches have run, the best validation SER seen so far (so a resumed
+    run does not overwrite good weights with a worse first evaluation), and
+    whether the full training budget has been spent. Without this, every
+    restart replayed the whole minibatch loop from 1 -- and a point whose
+    training takes longer than the container lives (e.g. ~6 min/minibatch x
+    25 at high SNR, vs a ~1h container) could never finish training at all,
+    so it never reached the eval phase and never produced a CSV row."""
+    path = training_state_path(model, snr)
+    if not os.path.isfile(path):
+        return {'minibatches_done': 0, 'best_ser': math.inf, 'complete': False}
+    with open(path) as f:
+        state = json.load(f)
+    # json has no inf: it round-trips as None.
+    if state.get('best_ser') is None:
+        state['best_ser'] = math.inf
+    return state
+
+
+def save_training_state(model, snr, minibatches_done, best_ser, complete):
+    os.makedirs(CHECKPOINT_DIR, exist_ok=True)
+    path = training_state_path(model, snr)
+    tmp = path + '.tmp'
+    with open(tmp, 'w') as f:
+        json.dump({'minibatches_done': minibatches_done,
+                   'best_ser': None if math.isinf(best_ser) else best_ser,
+                   'complete': complete}, f)
+    os.replace(tmp, path)
 
 
 def repo_dir():
@@ -314,7 +375,7 @@ def weights_dir_for(model_name, detector_method):
     method_name = f'{model_name}_{detector_method}'
     return os.path.join(
         WEIGHTS_DIR,
-        f'{method_name}_training_120_2_channel1_cost2100_mcsweep_colab')
+        f'{method_name}_training_120_2_channel1_cost2100_mcsweep')
 
 
 def push_with_retry(context):
@@ -360,38 +421,104 @@ def push_with_retry(context):
         f'locally but not on the remote yet).')
 
 
-def commit_weights_snapshot(model_name, detector_method, snr):
-    """Commit+push a point's just-trained weights right after training
-    finishes, before the (often much longer) eval-rep phase runs. Without
-    this, a freshly-written weights file sits untracked on disk for the
-    whole point's runtime, not just the training step's -- narrowing that
-    window means training output is never far from being pushed."""
+def commit_weights_snapshot(model_name, detector_method, snr, in_progress=False):
+    """Commit+push a snapshot of a point's weights. Called once right after
+    training finishes, before the (often much longer) eval-rep phase runs --
+    and, with in_progress=True, also periodically *during* training (see
+    make_training_committer) so that even a full disk loss mid-training
+    (not just a process restart, which local disk alone already survives)
+    cannot erase more than a bounded amount of training progress."""
     if NO_GIT:
         return
     weights_dir = weights_dir_for(model_name, detector_method)
-    if not os.path.isdir(weights_dir):
+    add_paths = []
+    if os.path.isdir(weights_dir):
+        add_paths.append(os.path.relpath(weights_dir, repo_dir()))
+    # Stage the resume state in the SAME commit as the weights that produced
+    # it, so the two can never drift apart on the remote: a restart that
+    # pulls this commit gets banked reps and the model they were measured
+    # against together, or neither.
+    #
+    # Stage only THIS point's files, never the whole directory. The directory
+    # is shared: sibling worktrees running other models pull each other's
+    # checkpoints in, so staging all of it would commit this worktree's
+    # possibly-stale copy of another model's file and revert that model's
+    # progress on the remote.
+    for path in (checkpoint_path(model_name, snr), training_state_path(model_name, snr)):
+        if os.path.isfile(path):
+            add_paths.append(os.path.relpath(path, repo_dir()))
+    if not add_paths:
         return
-    subprocess.run(['git', 'add', os.path.relpath(weights_dir, repo_dir())],
-                    check=True, cwd=repo_dir())
+    subprocess.run(['git', 'add'] + add_paths, check=True, cwd=repo_dir())
+    if nothing_staged():
+        return
+    suffix = ' (training in progress)' if in_progress else ''
     commit = subprocess.run(
-        ['git', 'commit', '-q', '-m', f'Train MC-sweep weights: {model_name} snr={snr}'],
+        ['git', 'commit', '-q', '-m', f'Train MC-sweep weights: {model_name} snr={snr}{suffix}'],
         cwd=repo_dir(), capture_output=True, text=True)
     if commit.returncode != 0:
         combined = (commit.stdout or '') + (commit.stderr or '')
-        if 'nothing to commit' in combined.lower():
-            return
         raise RuntimeError(
-            f'git commit failed for {model_name} snr={snr} weights snapshot '
-            f'(not a "nothing to commit" case): {combined.strip()}')
+            f'git commit failed for {model_name} snr={snr} weights snapshot: '
+            f'{combined.strip()}')
     push_with_retry(f'{model_name} snr={snr} weights snapshot')
 
 
-def commit_and_push(model, detector_method, snr):
-    if NO_GIT:
-        print(f'[git] skipped (MC_SWEEP_NO_GIT=1) for {model} snr={snr} -- '
-              f'relying on RESULTS_DIR/WEIGHTS_DIR for persistence instead', flush=True)
-        return
+def make_training_committer(model_name, detector_method, snr):
+    """Callback for Trainer.train()'s on_checkpoint hook: commits+pushes the
+    weights file every time training saves improved weights, rate-limited so
+    it does not push on every single improving minibatch. A failure here is
+    logged and swallowed rather than raised -- it runs deep inside the
+    training loop, and a transient git/network hiccup mid-training should
+    not abort the run; the next improvement (or the unconditional snapshot
+    once training finishes) will pick it up."""
+    last_commit = [0.0]
+    min_interval_sec = 120
+    def on_checkpoint():
+        now = time.time()
+        if now - last_commit[0] < min_interval_sec:
+            return
+        last_commit[0] = now
+        try:
+            commit_weights_snapshot(model_name, detector_method, snr, in_progress=True)
+        except Exception as e:
+            print(f'[git] mid-training commit failed for {model_name} snr={snr}: {e} '
+                  f'-- continuing training, will retry at the next improvement', flush=True)
+    return on_checkpoint
 
+
+def nothing_staged():
+    """True when the index holds no changes, so there is nothing to commit.
+
+    Asked of git directly rather than matched out of its output: git says
+    "nothing to commit" when the tree is clean but "no changes added to
+    commit" when something else is merely unstaged, and a guard keyed to the
+    first phrase mistook the second for a real failure -- which aborted a
+    point, and the sweep then skipped it."""
+    return subprocess.run(['git', 'diff', '--cached', '--quiet'],
+                          cwd=repo_dir()).returncode == 0
+
+
+def stageable_paths(*paths):
+    """Of the given paths, the ones `git add` will accept: present on disk,
+    or absent but tracked (so the deletion stages). Passing a path that is
+    neither makes git fail the whole invocation with "pathspec did not
+    match", staging nothing at all -- which would silently drop the CSV row
+    staged alongside it."""
+    out = []
+    for path in paths:
+        rel = os.path.relpath(path, repo_dir())
+        if os.path.exists(path):
+            out.append(rel)
+            continue
+        tracked = subprocess.run(['git', 'ls-files', '--', rel],
+                                  cwd=repo_dir(), capture_output=True, text=True)
+        if tracked.stdout.strip():
+            out.append(rel)
+    return out
+
+
+def commit_and_push(model, detector_method, snr):
     # Other models' weight checkpoints are already tracked in this repo (see
     # Results/weights/*), so this sweep's are too -- add them alongside the
     # CSV row so each point's commit is atomic and a training run this sweep
@@ -399,44 +526,65 @@ def commit_and_push(model, detector_method, snr):
     # no-op here: commit_weights_snapshot already committed them right after
     # training, before the eval-rep phase ran.)
     weights_dir = weights_dir_for(model, detector_method)
-    add_paths = ['Results/metrics/mc_sweep_validation_colab.csv']
+    add_paths = ['Results/metrics/mc_sweep_validation.csv']
     if os.path.isdir(weights_dir):
         add_paths.append(os.path.relpath(weights_dir, repo_dir()))
-    subprocess.run(['git', 'add'] + add_paths, check=True, cwd=repo_dir())
+    # Both the eval checkpoint (per-rep SER means) and the training state are
+    # deliberately KEPT, not cleared, once a point finishes: together they are
+    # the raw data the CSV row's aggregated stats were computed from, and
+    # keeping both lets a finished point be extended with more reps later
+    # (extend_point.py) on the exact same trained weights, no retraining,
+    # without redoing the reps it already has. run_point()'s own resume logic
+    # already treats "training complete + matching weights" as a signal to
+    # skip straight to eval, so a later extend call needs the training state
+    # to still say complete=True -- if it were cleared, extending would
+    # silently retrain from scratch instead of reusing the finished model.
+    if NO_GIT:
+        return
+    add_paths += stageable_paths(checkpoint_path(model, snr),
+                                 training_state_path(model, snr))
+    # -A so the deletions above are staged, not just modifications.
+    subprocess.run(['git', 'add', '-A', '--'] + add_paths, check=True, cwd=repo_dir())
+    # append_row wrote a fresh row just before this, so the index should never
+    # be empty here -- but ask git rather than assume, so that a genuine
+    # failure below (say an unconfigured git identity) still raises instead of
+    # being waved through as "probably nothing to commit".
+    if nothing_staged():
+        print(f'[git] nothing staged for {model} snr={snr}', flush=True)
+        return
     commit = subprocess.run(
         ['git', 'commit', '-q', '-m', f'Add MC-sweep validation point: {model} snr={snr}'],
         cwd=repo_dir(), capture_output=True, text=True)
     if commit.returncode != 0:
-        # The only expected/benign failure is "nothing to commit" (append_row
-        # already wrote a fresh row before this is called, so that should
-        # never actually happen -- but check for it specifically rather than
-        # swallowing every commit failure, since a real failure here (e.g.
-        # git identity not configured: "Please tell me who you are") would
-        # otherwise be silently mislabeled as "nothing to commit" and the
-        # point would never reach the remote.
         combined = (commit.stdout or '') + (commit.stderr or '')
-        if 'nothing to commit' in combined.lower():
-            print(f'[git] nothing to commit for {model} snr={snr}', flush=True)
-            return
         raise RuntimeError(
-            f'git commit failed for {model} snr={snr} (not a "nothing to commit" '
-            f'case): {combined.strip()}')
+            f'git commit failed for {model} snr={snr}: {combined.strip()}')
 
     push_with_retry(f'{model} snr={snr}')
 
 
-def run_point(model_name, detector_method, snr, min_reps, max_reps, max_bits, step):
+def run_point(model_name, detector_method, snr, min_reps, max_bits, step, forced_reps=None,
+             trainer_model_name=None, trainer_kwargs=None):
+    """trainer_model_name/trainer_kwargs let a caller run a variant of an
+    existing Trainer-dispatchable model (e.g. ClassicViterbi with a non-zero
+    csi_uncertainty) under a distinct model_name for every CSV row,
+    checkpoint file, and weights directory this function touches -- so the
+    variant's results and resume state never collide with the base model's.
+    trainer_model_name is the literal name Trainer's own model dispatch dict
+    needs (e.g. 'ClassicViterbi'); it defaults to model_name, which is what
+    every other caller already relies on."""
     weights_dir = weights_dir_for(model_name, detector_method)
 
     t0 = time.time()
     trainer = Trainer(
-        model_name=model_name,
+        model_name=trainer_model_name or model_name,
         detector_method=detector_method,
         curr_SNR=snr,
         val_block_length=120,
         train_block_length=120,
         pilots_num=25,
         weights_dir=weights_dir,
+        **(trainer_kwargs or {}),
     )
 
     model_size = 0
@@ -444,8 +592,80 @@ def run_point(model_name, detector_method, snr, min_reps, max_reps, max_bits, st
         params = filter(lambda p: p.requires_grad, trainer.detector.model.parameters())
         model_size = sum(torch.numel(p) for p in params)
 
-    # Train once (no-op for ClassicViterbi/Statistical).
-    trainer.load_train_weights(run_over=2)
+    # Train once (no-op for ClassicViterbi/Statistical). trainer.train() always
+    # starts from the model's current in-memory weights -- Trainer.__init__
+    # leaves those at a fresh random init, so a restart mid-training would
+    # normally throw away whatever progress the interrupted attempt made and
+    # start over. If this exact (model, snr) already has a weights file on
+    # disk -- left there by a previous run_point() call for this same point,
+    # either interrupted mid-training (see the `done` skip in main(), which
+    # keeps a normal sweep from re-entering a finished point) or finished and
+    # now being re-entered deliberately by extend_point.py -- load it first so
+    # training continues from there instead of from scratch. Local disk alone
+    # already survives a plain process restart, but not necessarily a full
+    # container/disk loss -- on_checkpoint commits+pushes each improvement
+    # (rate-limited) during training too, so that case is covered as well.
+    #
+    # The minibatch loop itself also resumes: load_training_state() says how
+    # much of the training budget this point has already spent, so a point
+    # whose training takes longer than the container lives finishes it over
+    # several restarts instead of restarting the loop every time and never
+    # reaching the eval phase at all.
+    training_complete_on_entry = False
+    if detector_method != 'Statistical':
+        # load_train_weights() used to do this before calling train(); calling
+        # train() directly means save_weights() would otherwise fail on a
+        # model whose weights directory does not exist yet.
+        os.makedirs(weights_dir, exist_ok=True)
+        weights_path = os.path.join(weights_dir, f'snr_{snr}_gamma_{trainer.gamma}.pt')
+        state = load_training_state(model_name, snr)
+        training_complete_on_entry = state['complete'] and os.path.isfile(weights_path)
+        if os.path.isfile(weights_path):
+            prior = torch.load(weights_path)
+            trainer.detector.model.load_state_dict(prior['model_state_dict'])
+            print(f'[resume] {model_name} snr={snr}: warm-starting training from '
+                  f'existing weights on disk (loss={prior["loss"]:.4f})', flush=True)
+
+        if training_complete_on_entry:
+            # Training already spent its full budget in an earlier run, and
+            # those exact weights are what we just loaded. Re-running it would
+            # produce a *different* model and invalidate any eval reps already
+            # banked against this one, so leave the model frozen here and go
+            # straight to eval.
+            print(f'[resume] {model_name} snr={snr}: training already complete '
+                  f'({state["minibatches_done"]}/{trainer.train_minibatch_num} minibatches, '
+                  f'best_ser={state["best_ser"]:.6f}) -- skipping to evaluation', flush=True)
+        else:
+            commit_training = make_training_committer(model_name, detector_method, snr)
+
+            def record_progress(minibatch, best_ser):
+                save_training_state(model_name, snr, minibatch, best_ser, complete=False)
+                # Push after every minibatch, not only the ones that improve
+                # the loss. Training can run a long stretch without improving,
+                # and that stretch is still real progress: the minibatch index
+                # is what lets a restart skip it. It is rate-limited inside, so
+                # this is cheap when minibatches are fast.
+                commit_training()
+
+            done_so_far = state['minibatches_done']
+            if done_so_far:
+                print(f'[resume] {model_name} snr={snr}: continuing training at minibatch '
+                      f'{done_so_far + 1}/{trainer.train_minibatch_num} '
+                      f'(best_ser={state["best_ser"]:.6f})', flush=True)
+            trainer.fading_taps_type = 1
+            trainer.train(
+                on_checkpoint=commit_training,
+                start_minibatch=done_so_far + 1,
+                best_ser=state['best_ser'],
+                on_minibatch=record_progress)
+            trainer.fading_taps_type = 2
+            save_training_state(model_name, snr, trainer.train_minibatch_num,
+                                load_training_state(model_name, snr)['best_ser'],
+                                complete=True)
+            final = torch.load(weights_path)
+            trainer.detector.model.load_state_dict(final['model_state_dict'])
+    else:
+        trainer.load_train_weights(run_over=2)
     commit_weights_snapshot(model_name, detector_method, snr)
 
     # Total words drawn per online_evaluation repetition (matches
@@ -457,27 +677,57 @@ def run_point(model_name, detector_method, snr, min_reps, max_reps, max_bits, st
     bits_per_word = trainer.n_symbols * 8
     bits_per_rep = words_per_rep * bits_per_word
 
-    # Resume from a checkpoint left by a run that was interrupted mid-point
-    # (a restart, not a clean finish -- a finished point is a committed CSV
-    # row and has no checkpoint). per_rep_means is the only state needed to
-    # reconstruct every final statistic exactly; see save_checkpoint().
+    # Resume from a checkpoint: either left by a run that was interrupted
+    # mid-point, or the finished point's own checkpoint when this call comes
+    # from extend_point.py asking for more reps on top of it (a normal sweep
+    # never reaches here for a finished point -- main() skips it via the
+    # `done` check in append_row/drop_existing_row's caller). per_rep_means is
+    # the only state needed to reconstruct every final statistic exactly; see
+    # save_checkpoint().
     #
-    # This is only valid for methods with no training step (Statistical):
-    # load_train_weights(run_over=2) above ALWAYS retrains from scratch for
-    # model-based methods, so a restarted run_point trains a genuinely
-    # different model than whatever produced an existing checkpoint's eval
-    # reps. Resuming that checkpoint would silently blend SER measurements
-    # from two different trained models into one point's statistics -- an
-    # invalid Monte-Carlo estimate. Discard it and start eval fresh; only
-    # the (usually short) training step is repeated, not the whole point.
+    # For a model-based method this is only valid once the model is FROZEN.
+    # If training ran again in this process (training_complete_on_entry is
+    # False), it produced a genuinely different model than the one an
+    # existing checkpoint's reps were measured against, and mixing the two
+    # would blend SER measurements from two different models into one
+    # point's statistics -- an invalid Monte-Carlo estimate. Discard those
+    # reps and start eval fresh in that case. When training was already
+    # complete on entry, though, the weights loaded above are byte-identical
+    # to the ones that produced those reps, so they accumulate legitimately
+    # and the point can finish its eval budget across several restarts.
+    weights_tag = weights_fingerprint(
+        weights_dir if detector_method != 'Statistical' else None, snr, trainer.gamma)
+
     checkpoint = load_checkpoint(model_name, snr)
-    if checkpoint and detector_method != 'Statistical':
-        print(f'[resume] {model_name} snr={snr}: discarding stale eval checkpoint with '
-              f'{len(checkpoint["per_rep_means"])} reps -- training just ran fresh (not '
-              f'itself resumable), so those reps were computed against a different '
-              f'trained model and cannot be mixed with this one\'s', flush=True)
-        clear_checkpoint(model_name, snr)
-        checkpoint = None
+    if checkpoint:
+        banked = len(checkpoint['per_rep_means'])
+        stored_tag = checkpoint.get('weights_tag', _UNTAGGED)
+        discard_reason = None
+
+        if detector_method != 'Statistical' and not training_complete_on_entry:
+            discard_reason = ('training ran again this pass, so those reps were '
+                              'computed against a different trained model')
+        elif stored_tag is _UNTAGGED:
+            # Written before checkpoints carried a weights tag. Training is
+            # complete and the weights have not changed since (save_weights
+            # only runs during training), so these reps do belong to the model
+            # loaded here: adopt them and let the next save stamp the tag,
+            # rather than discarding valid evaluation over a format change.
+            print(f'[resume] {model_name} snr={snr}: adopting untagged eval checkpoint '
+                  f'with {banked} reps (predates weight tagging); it will be tagged to '
+                  f'the current weights on the next save', flush=True)
+        elif stored_tag != weights_tag:
+            # Checkpoints are committed, so one can arrive from another
+            # worktree or an older run carrying reps measured against
+            # different weights. The complete-flag check cannot see that.
+            discard_reason = ('it is tagged to different weights than the ones '
+                              'loaded here, so its reps belong to another model')
+
+        if discard_reason:
+            print(f'[resume] {model_name} snr={snr}: discarding eval checkpoint with '
+                  f'{banked} reps -- {discard_reason}', flush=True)
+            clear_eval_checkpoint(model_name, snr)
+            checkpoint = None
     per_rep_means = list(checkpoint['per_rep_means']) if checkpoint else []
     reps_done = len(per_rep_means)
     if reps_done:
@@ -493,17 +743,19 @@ def run_point(model_name, detector_method, snr, min_reps, max_reps, max_bits, st
     def total_errors():
         return sum(m * bits_per_rep for m in per_rep_means)
 
-    def bits_at_first_error():
-        """Total bits run through the first rep at which the cumulative
-        error count first became nonzero, or None if no error has been
-        observed yet. Reconstructed from per_rep_means so it is correct
-        across a checkpoint resume, not just within one process's run."""
-        cum = 0.0
-        for i, m in enumerate(per_rep_means):
-            cum += m * bits_per_rep
-            if cum > 0:
-                return (i + 1) * bits_per_rep
-        return None
+    last_eval_commit = [0.0]
+    eval_commit_interval_sec = 120
+
+    def commit_eval_progress():
+        now = time.time()
+        if now - last_eval_commit[0] < eval_commit_interval_sec:
+            return
+        last_eval_commit[0] = now
+        try:
+            commit_weights_snapshot(model_name, detector_method, snr, in_progress=True)
+        except Exception as e:
+            print(f'[git] mid-eval commit failed for {model_name} snr={snr}: {e} '
+                  f'-- continuing, will retry after the next chunk', flush=True)
 
     def run_batch(n):
         nonlocal reps_done
@@ -520,45 +772,39 @@ def run_point(model_name, detector_method, snr, min_reps, max_reps, max_bits, st
             per_rep_means.extend(float(m) for m in chunk_means)
             reps_done += chunk
             remaining -= chunk
-            save_checkpoint(model_name, snr, per_rep_means)
+            save_checkpoint(model_name, snr, per_rep_means, weights_tag)
+            # Push each banked chunk. Saving it locally only protected against
+            # a process restart; a point can now represent tens of hours of
+            # evaluation, so get it onto the remote where a container/disk
+            # loss cannot take it. Rate-limited, and failures are logged
+            # rather than raised so a git hiccup never aborts the run.
+            commit_eval_progress()
 
-    predicted_ser = max(expected_ser_isi(snr), 1e-300)
-    required_bits = INITIAL_SIZING_TARGET_ERRORS / predicted_ser
-    required_reps = math.ceil(required_bits / bits_per_rep)
-    planned_reps = int(min(max(required_reps, min_reps), max_reps))
+    # Calculate the required bit budget once, up front, and run exactly that
+    # many reps -- no doubling, no re-targeting off what gets observed. See
+    # the "Sizing method" note at the top of this file.
+    #
+    # forced_reps bypasses this sizing formula entirely: extend_point.py sets
+    # it to an explicit target (current banked reps + however many more the
+    # caller asked for) when adding reps to an already-finished point, since
+    # the point being "finished" by the normal sizing formula is exactly the
+    # situation being deliberately overridden here.
+    if forced_reps is not None:
+        planned_reps = forced_reps
+        print(f'[plan] {model_name} snr={snr}: forced_reps={planned_reps} '
+              f'(explicit extend request, sizing formula bypassed)', flush=True)
+    else:
+        predicted_ser = max(expected_ser_isi(snr), 1e-300)
+        required_bits = TARGET_ERRORS / predicted_ser
+        required_reps = math.ceil(required_bits / bits_per_rep)
+        capped_reps = max_bits // bits_per_rep
+        planned_reps = int(min(max(required_reps, min_reps), capped_reps))
 
-    print(f'[plan] {model_name} snr={snr}: predicted_ser={predicted_ser:.3e}, '
-          f'planned_reps={planned_reps} (min={min_reps}, max={max_reps})', flush=True)
+        print(f'[plan] {model_name} snr={snr}: predicted_ser={predicted_ser:.3e}, '
+              f'planned_reps={planned_reps} (min={min_reps}, cap={capped_reps})', flush=True)
 
     if reps_done < planned_reps:
         run_batch(planned_reps - reps_done)
-
-    # Phase 1: run until the first error is actually observed. The predictor
-    # only sizes the opening move -- if it undershoots, there is nothing to
-    # estimate a rate from yet, so double the bits and look again.
-    while total_errors() == 0 and reps_done * bits_per_rep < max_bits:
-        bits_so_far = reps_done * bits_per_rep
-        target_reps = min(reps_done * 2, max_bits // bits_per_rep)
-        batch = max(step, target_reps - reps_done)
-        if batch <= 0:
-            break
-        print(f'[extend] {model_name} snr={snr}: 0 errors in {bits_so_far:,} bits -- '
-              f'doubling toward first error; running {batch} more', flush=True)
-        run_batch(batch)
-
-    # Phase 2: once the first error is observed at N bits, run to a FIXED cap
-    # of FIRST_ERROR_BITS_MULTIPLIER x N bits and stop -- not re-targeted off
-    # the observed rate as more errors come in, since that can chase a moving
-    # goalpost and never converge. Bounded by max_bits as always.
-    first_bits = bits_at_first_error()
-    if first_bits is not None:
-        cap_bits = min(FIRST_ERROR_BITS_MULTIPLIER * first_bits, max_bits)
-        cap_reps = int(cap_bits // bits_per_rep)
-        if reps_done < cap_reps:
-            print(f'[extend] {model_name} snr={snr}: first error at {first_bits:,} bits -- '
-                  f'running to {FIRST_ERROR_BITS_MULTIPLIER}x cap = {cap_bits:,.0f} bits '
-                  f'({cap_reps} reps)', flush=True)
-            run_batch(cap_reps - reps_done)
 
     censored = total_errors() == 0
     if censored:
@@ -567,7 +813,7 @@ def run_point(model_name, detector_method, snr, min_reps, max_reps, max_bits, st
               flush=True)
     elif total_errors() < THIN_ERROR_THRESHOLD:
         print(f'[thin] {model_name} snr={snr}: only {total_errors():.0f} errors in '
-              f'{reps_done * bits_per_rep:,} bits (100x-first-error cap reached) -- '
+              f'{reps_done * bits_per_rep:,} bits (one-shot budget reached) -- '
               f'CI will be wide', flush=True)
 
     run_time = time.time() - t0
@@ -598,6 +844,7 @@ def run_point(model_name, detector_method, snr, min_reps, max_reps, max_bits, st
         'censored': int(censored),
         'model_size': int(model_size),
         'run_time_sec': run_time,
+        'source': SOURCE,
     }
 
 
@@ -627,7 +874,7 @@ def main():
     # sweep has to finish before the other model's points at the same SNR
     # are even attempted.
     for snr in SNR_VALUES:
-        for model_name, detector_method, min_reps, max_reps, max_bits, step in models:
+        for model_name, detector_method, min_reps, max_bits, step in models:
             key = (model_name, snr)
             if key in done:
                 print(f'[skip] {model_name} snr={snr} already in CSV', flush=True)
@@ -636,7 +883,7 @@ def main():
             print(f'\n{"="*70}\n[run] {model_name} snr={snr}\n{"="*70}', flush=True)
             try:
                 row = run_point(model_name, detector_method, snr,
-                                 min_reps, max_reps, max_bits, step)
+                                 min_reps, max_bits, step)
             except Exception as e:
                 print(f'[ERROR] {model_name} snr={snr} failed: {e}', flush=True)
                 import traceback
@@ -646,8 +893,7 @@ def main():
             drop_existing_row(model_name, snr)
             append_row(row)
             print(f'[done] {row}', flush=True)
-            commit_and_push(model_name, detector_method, snr)
-            clear_checkpoint(model_name, snr)
+            commit_and_push(model_name, detector_method, snr)  # also clears resume state
             done.add(key)
 
     print('\nAll points complete.', flush=True)

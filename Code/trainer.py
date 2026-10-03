@@ -1,4 +1,4 @@
-from Code.models import ClassicViterbi, ViterbiNet, LSTM, SionnaNeuralReceiver, SionnaSkip, SionnaViterbiPlus, SionnaViterbiAdd, ECC_Transformer, ADNN
+from Code.models import ClassicViterbi, ViterbiNet, LSTM, SionnaNeuralReceiver, SionnaSkip, SionnaViterbiPlus, SionnaViterbiAdd, ECC_Transformer, ADNN, Mamba2Detector
 from Code.detector import Detector
 from Code.channel.channel_dataset import ChannelModelDataset
 from Code.ecc.rs_main import decode, encode
@@ -45,6 +45,7 @@ class Trainer(object):
         self.channel_type = None
         self.channel_coefficients = None
         self.noisy_est_var = None
+        self.csi_uncertainty = None
         self.fading_in_channel = None
         self.fading_in_decoder = None
         self.fading_taps_type = None
@@ -153,7 +154,8 @@ class Trainer(object):
                                    noisy_est_var=self.noisy_est_var,
                                    fading=self.fading_in_decoder,
                                    fading_taps_type=self.fading_taps_type,
-                                   channel_coefficients=self.channel_coefficients),
+                                   channel_coefficients=self.channel_coefficients,
+                                   csi_uncertainty=self.csi_uncertainty or 0.0),
             'ViterbiNet': lambda: ViterbiNet(input_size=1, n_classes=self.n_states),
             'LSTM': lambda: LSTM(INPUT_SIZE, HIDDEN_SIZE, NUM_LAYERS, n_classes),
             'ADNN': lambda: ADNN(input_size=INPUT_SIZE, dim=N_DIM, n_classes=n_classes),
@@ -162,8 +164,11 @@ class Trainer(object):
             'SionnaAdd': lambda: SionnaViterbiAdd(input_size=1, n_input_channels=1, n_output_channels=N_DIM, n_classes=n_classes),
             'SionnaSkip': lambda: SionnaSkip(input_size=1, n_input_channels=1, n_output_channels=N_DIM, n_classes=n_classes),
             'Transformer': lambda: ECC_Transformer(INPUT_SIZE, N_DIM, N_HEADS, NUM_LAYERS, n_classes),
-            'Mamba': lambda: MambaLM(MambaLMConfig(d_model=4, n_layers=12, vocab_size=n_classes,pad_vocab_size_multiple=n_classes),n_classes,input_size=4)
-
+            'Mamba': lambda: MambaLM(MambaLMConfig(d_model=4, n_layers=12, vocab_size=n_classes,pad_vocab_size_multiple=n_classes),n_classes,input_size=4),
+            # Sized to match ViterbiNet's 7,002-parameter MLP as closely as
+            # possible (6,996 params) -- see Code/mamba2.py's docstring.
+            'Mamba2': lambda: Mamba2Detector(input_size=INPUT_SIZE, d_model=20, n_layers=2, n_classes=n_classes,
+                                              d_state=8, expand_factor=2, head_dim=4, d_conv=4),
         }
         selected_model = models[self.model_name]().to(device)
         model_parameters = filter(lambda p: p.requires_grad, selected_model.parameters())
@@ -239,11 +244,25 @@ class Trainer(object):
         self.load_train_weights(run_over)
         return self.online_evaluation(num_of_rep=num_of_rep)
 
-    def train(self):
+    def train(self, on_checkpoint=None, start_minibatch=1, best_ser=math.inf,
+              on_minibatch=None):
         """
         Main training loop. Runs in minibatches.
         Evaluates performance over validation SNR.
         Saves weights given the best validation SER result.
+
+        on_checkpoint: optional no-argument callback invoked right after
+        each time improved weights are written to disk, so a caller can
+        mirror that progress elsewhere (e.g. committing it to git) without
+        this method knowing anything about that.
+
+        start_minibatch/best_ser: resume point for a run that was
+        interrupted partway through the minibatch loop -- pass the
+        minibatch to continue from and the best validation SER reached so
+        far, so the loop finishes the remaining budget instead of
+        replaying it, and does not overwrite already-better weights.
+        on_minibatch: optional callback(minibatch, best_ser) invoked after
+        every minibatch, for persisting that resume point.
         """
         if self.detector_method == 'Statistical':
             raise NotImplementedError("No training implemented for Statistical decoder!!!")
@@ -254,13 +273,14 @@ class Trainer(object):
         
         from tqdm import tqdm
         
-        best_ser = math.inf
         # Progress bar for training minibatches
-        pbar = tqdm(range(1, self.train_minibatch_num + 1), 
+        pbar = tqdm(range(start_minibatch, self.train_minibatch_num + 1),
                     desc=f"🔥 Training (SNR={self.curr_SNR})",
                     unit="batch",
                     ncols=120,
                     colour='green',
+                    initial=start_minibatch - 1,
+                    total=self.train_minibatch_num,
                     bar_format='{l_bar}{bar}| {n_fmt}/{total_fmt} [{elapsed}<{remaining}, {postfix}]')
         
         for minibatch in pbar:
@@ -297,6 +317,10 @@ class Trainer(object):
             if ser < best_ser:
                 self.save_weights(current_loss)  # save best weights
                 best_ser = ser
+                if on_checkpoint is not None:
+                    on_checkpoint()
+            if on_minibatch is not None:
+                on_minibatch(minibatch, best_ser)
             # stopping if SER is 0
             if ser == 0:
                 print(f'\nmodel:{self.model_name}, snr:{self.curr_SNR} [INFO] stopping as training reached minimum of 0')
@@ -527,10 +551,6 @@ class Trainer(object):
             # received_words = self.get_overlapping_rx(received_words)
             if first_run:
                 ser_by_word = np.zeros(num_of_rep*transmitted_words.shape[0])
-                # query for all detected words
-                buffer_rx = torch.empty([0, received_words.shape[1]]).to(device)
-                buffer_tx = torch.empty([0, received_words.shape[1]]).to(device)
-                buffer_ser = torch.empty([0]).to(device)
                 first_run = False
 
             for count, (transmitted_word, received_word) in enumerate(zip(transmitted_words, received_words)):
@@ -565,17 +585,22 @@ class Trainer(object):
                     avg_ser = total_ser / max(1, (rep * len(self.data_indices) + sum(1 for c in range(count+1) if c in self.data_indices)))
                     rep_pbar.set_postfix({'avg_SER': f'{avg_ser:.6f}'})
                 
-                # save the encoded word in the buffer
+                # Only the most recently buffered word is ever read (by the
+                # online_training call just below -- it took buffer_*[-1]),
+                # so keep just that word instead of growing a tensor with
+                # torch.cat on every clean one. The old buffers copied their
+                # whole contents per word, making evaluation O(words^2) and
+                # unusably slow exactly where almost every word passes the
+                # threshold, i.e. at high SNR: measured ~2h per repetition at
+                # snr=7 against ~20s at snr=6. Same values, no accumulation.
                 if ser <= self.ser_thresh:
-                    buffer_rx = torch.cat([buffer_rx, received_word])
-                    buffer_tx = torch.cat([buffer_tx,
-                                           detected_word.reshape(1, -1) if ser > 0 else
-                                           encoded_word.reshape(1, -1)],dim=0)
-                    buffer_ser = torch.cat([buffer_ser, torch.FloatTensor([ser]).to(device)])
+                    last_rx = received_word
+                    last_tx = (detected_word.reshape(1, -1) if ser > 0
+                               else encoded_word.reshape(1, -1))
 
-                if self.self_supervised and ser <= self.ser_thresh:
-                    # use last word inserted in the buffer for training
-                    self.online_training(buffer_tx[-1].reshape(1, -1), buffer_rx[-1].reshape(1, -1))
+                    if self.self_supervised:
+                        # use last word inserted in the buffer for training
+                        self.online_training(last_tx.reshape(1, -1), last_rx.reshape(1, -1))
 
                 if (count + 1) % 300 == 0:
                     print(f'model:{self.model_name}, snr:{self.curr_SNR} , Self-supervised: {rep*transmitted_words.shape[0] + count + 1}/{transmitted_words.shape[0] * num_of_rep}, Average SER {total_ser / (rep*transmitted_words.shape[0] + count + 1)}')
