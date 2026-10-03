@@ -6,6 +6,7 @@ import copy
 import numpy as np
 from Code.channel.channel_estimation import estimate_channel
 from Code.channel.modulator import BPSKModulator
+from Code.mamba2 import Mamba2, Mamba2Config
 
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -972,11 +973,13 @@ class ClassicViterbi(nn.Module):
                  noisy_est_var: float,
                  fading: bool,
                  fading_taps_type: int,
-                 channel_coefficients: str):
+                 channel_coefficients: str,
+                 csi_uncertainty: float = 0.0):
 
         super(ClassicViterbi, self).__init__()
         self.memory_length = memory_length
         self.gamma = gamma
+        self.csi_uncertainty = csi_uncertainty
         self.val_words = val_words
         self.n_classes = n_classes
         self.channel_type = channel_type
@@ -1002,6 +1005,18 @@ class ClassicViterbi(nn.Module):
         h = np.concatenate([estimate_channel(self.memory_length, self.gamma, noisy_est_var=self.noisy_est_var,
                                              fading=self.fading, index=index, fading_taps_type=self.fading_taps_type,
                                              channel_coefficients=self.channel_coefficients) for index in range(self.val_words)], axis=0)
+        # CSI uncertainty: perturbs only the decoder's own belief about the
+        # channel (used below for the Viterbi metric), not the channel that
+        # actually transmitted the word -- that stays exact, generated
+        # separately in ChannelModelDataset with its own noisy_est_var (left
+        # at 0). This models a decoder mismatched against a perfect channel,
+        # not a noisier physical channel. csi_uncertainty is a fraction of
+        # each word's own channel energy (sqrt(mean(h**2)) that draw), used
+        # as the noise std applied uniformly to taps 1..L-1, matching the
+        # existing noisy_est_var convention of never perturbing tap 0.
+        if self.csi_uncertainty > 0:
+            std = self.csi_uncertainty * np.sqrt(np.mean(h ** 2, axis=1, keepdims=True))
+            h[:, 1:] += np.random.normal(0, 1, [self.val_words, self.memory_length - 1]) * std
         if count is not None:
             h = h[count].reshape(1, -1)
         # compute priors
@@ -1028,5 +1043,31 @@ class ClassicViterbi(nn.Module):
         priors = self.compute_likelihood_priors(y.reshape(1, -1), self.count)
         self.count += 1
         return -priors
+
+
+class Mamba2Detector(nn.Module):
+    """Drop-in replacement for ViterbiNet's per-sample MLP, using a Mamba-2
+    (Code/mamba2.py) backbone instead. Same rolling-window input contract as
+    ECC_Transformer/LSTM (Detector.forward builds the window from
+    self.input_size), same per-position class-logit output consumed by the
+    same Viterbi ACS decoder -- only the function approximator differs."""
+
+    def __init__(self, input_size, d_model, n_layers, n_classes,
+                 d_state=8, expand_factor=2, head_dim=4, d_conv=4):
+        super().__init__()
+        self.n_classes = n_classes
+        self.input_size = input_size
+        self.input_layer = nn.Linear(input_size, d_model, bias=False)
+        self.mamba2 = Mamba2(Mamba2Config(d_model=d_model, n_layers=n_layers, d_state=d_state,
+                                           expand_factor=expand_factor, head_dim=head_dim,
+                                           d_conv=d_conv))
+        self.fc = nn.Linear(d_model, n_classes)
+
+    def forward(self, input_):
+        batch_size, transmission_length = input_.size(0), input_.size(1)
+        x = self.input_layer(input_)
+        y = self.mamba2(x)
+        out = self.fc(y)
+        return out.reshape(batch_size, transmission_length, self.n_classes)
 
 
